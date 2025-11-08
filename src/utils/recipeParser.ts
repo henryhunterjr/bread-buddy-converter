@@ -44,30 +44,51 @@ const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt'];
 
 export function parseRecipe(recipeText: string): ParsedRecipe {
-  const lines = recipeText.split('\n');
   const ingredients: ParsedIngredient[] = [];
   let method = '';
-  let inMethod = false;
-
+  
+  // First, split by common method indicators to separate ingredients from method
+  const methodKeywords = ['method:', 'instructions:', 'directions:', 'steps:'];
+  let ingredientsSection = recipeText;
+  let methodSection = '';
+  
+  const lowerText = recipeText.toLowerCase();
+  let methodStartIndex = -1;
+  
+  for (const keyword of methodKeywords) {
+    const index = lowerText.indexOf(keyword);
+    if (index !== -1 && (methodStartIndex === -1 || index < methodStartIndex)) {
+      methodStartIndex = index;
+    }
+  }
+  
+  if (methodStartIndex !== -1) {
+    ingredientsSection = recipeText.substring(0, methodStartIndex);
+    methodSection = recipeText.substring(methodStartIndex);
+  }
+  
+  // Split ingredients by BOTH asterisks AND newlines to handle different formats
+  // Replace asterisks with newlines first, then split by newlines
+  const normalizedIngredients = ingredientsSection.replace(/\s*\*\s*/g, '\n');
+  const lines = normalizedIngredients.split('\n');
+  
   for (const line of lines) {
-    const trimmed = line.trim().toLowerCase();
+    const trimmed = line.trim();
     
-    if (trimmed.includes('method:') || trimmed.includes('instructions:') || trimmed.includes('directions:')) {
-      inMethod = true;
-      continue;
-    }
-
-    if (inMethod) {
-      method += line + '\n';
-      continue;
-    }
+    // Skip empty lines, titles, or very short lines
+    if (!trimmed || trimmed.length < 5) continue;
+    
+    // Skip lines that look like titles (no numbers)
+    if (!/\d/.test(trimmed)) continue;
 
     // Parse ingredient line
-    const ingredient = parseIngredientLine(line);
+    const ingredient = parseIngredientLine(trimmed);
     if (ingredient) {
       ingredients.push(ingredient);
     }
   }
+  
+  method = methodSection.trim();
 
   // Calculate totals
   const totalFlour = ingredients
@@ -116,16 +137,30 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
   // Handle bullet points and dashes
   const cleaned = lower.replace(/^[-•*]\s*/, '');
   
-  // Try to match patterns with "or" (e.g., "2 1/2 cups or 590mL water")
+  // Try to match patterns with "or" (e.g., "2 1/2 cups or 590mL water" or "1 tablespoon or 10g yeast")
   // Prefer the gram/ml measurement if available
-  const orMatch = cleaned.match(/or\s+(\d+(?:\.\d+)?)([a-z]+)\s+(.+)/);
+  const orMatch = cleaned.match(/or\s+(\d+(?:\.\d+)?)\s*([a-z]+)\s+(.+)/);
   if (orMatch) {
     const amount = parseFloat(orMatch[1]);
-    const unit = orMatch[2];
+    const unit = orMatch[2].toLowerCase();
     const name = orMatch[3].trim();
     
-    // If unit is g, ml, or mL, use it directly
-    if (unit === 'g' || unit === 'ml') {
+    // If unit is g, grams, ml, use it directly
+    if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml') {
+      return createIngredient(name, amount, lower);
+    }
+  }
+  
+  // Try to match patterns WITHOUT "or" but with direct conversion (e.g., "1 tablespoon 10g yeast")
+  // This captures: number + unit + number + unit + name
+  const directConversionMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*([a-z]+)\s+(\d+(?:\.\d+)?)\s*([a-z]+)\s+(.+)/);
+  if (directConversionMatch) {
+    const amount = parseFloat(directConversionMatch[3]); // Use the second number (grams)
+    const unit = directConversionMatch[4].toLowerCase();
+    const name = directConversionMatch[5].trim();
+    
+    // If the second unit is g or ml, use it
+    if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml') {
       return createIngredient(name, amount, lower);
     }
   }
