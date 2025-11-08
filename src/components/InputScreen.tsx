@@ -4,8 +4,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image } from 'lucide-react';
 import logo from '@/assets/logo.png';
+import { extractTextFromFile } from '@/utils/fileExtractor';
+import { useToast } from '@/hooks/use-toast';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
@@ -25,6 +27,54 @@ Mix flour and water, rest 30 min...`;
 export default function InputScreen({ direction, onConvert, onBack }: InputScreenProps) {
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF or image file (JPG, PNG, WEBP)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 20MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrors([]);
+    
+    try {
+      const extractedText = await extractTextFromFile(file);
+      setRecipeText(extractedText);
+      toast({
+        title: "Recipe extracted",
+        description: "Review the text below and edit if needed before converting",
+      });
+    } catch (error) {
+      toast({
+        title: "Extraction failed",
+        description: error instanceof Error ? error.message : "Could not extract text from file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
 
   const handleConvert = () => {
     try {
@@ -65,11 +115,52 @@ export default function InputScreen({ direction, onConvert, onBack }: InputScree
           </div>
 
           <Card className="p-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Paste your recipe below
-              </label>
-              <Textarea
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Upload Recipe (PDF or Image)
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={isProcessing}
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {isProcessing ? 'Processing...' : 'Upload File'}
+                  </Button>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <FileText className="h-3 w-3" />
+                  PDF or
+                  <Image className="h-3 w-3" />
+                  Image (JPG, PNG, WEBP) • Max 20MB
+                </p>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">
+                  Paste your recipe below
+                </label>
+                <Textarea
                 placeholder={EXAMPLE_TEXT}
                 value={recipeText}
                 onChange={(e) => setRecipeText(e.target.value)}
@@ -96,10 +187,11 @@ export default function InputScreen({ direction, onConvert, onBack }: InputScree
             <Button 
               onClick={handleConvert} 
               className="w-full"
-              disabled={!recipeText.trim()}
+              disabled={!recipeText.trim() || isProcessing}
             >
               Convert Recipe
             </Button>
+            </div>
           </Card>
         </div>
       </div>
