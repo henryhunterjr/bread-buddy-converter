@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/pdfGenerator';
+import logo from '@/assets/logo.png';
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
@@ -18,7 +19,11 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 py-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="p-4">
+        <img src={logo} alt="Baking Great Bread at Home" className="h-16 md:h-20" />
+      </div>
+      <div className="flex-1 p-4 py-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">
@@ -111,6 +116,10 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
           </Button>
         </div>
       </div>
+      </div>
+      <footer className="text-center py-4 text-xs text-muted-foreground">
+        Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
+      </footer>
     </div>
   );
 }
