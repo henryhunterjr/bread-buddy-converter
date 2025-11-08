@@ -27,25 +27,77 @@ export function generatePDF(result: ConvertedRecipe) {
   yPos += 8;
   
   const convertedPercentages = calculateBakersPercentages(result.converted);
-  const ingredientData = convertedPercentages.map(item => [
-    item.ingredient,
-    `${item.amount.toFixed(0)}g`,
-    `${item.percentage.toFixed(0)}%`
-  ]);
   
-  autoTable(doc, {
-    startY: yPos,
-    head: [['Ingredient', 'Amount', 'Baker\'s %']],
-    body: ingredientData,
-    theme: 'grid',
-    headStyles: { fillColor: [184, 134, 100] },
-  });
-  
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  // For yeast-to-sourdough, split into LEVAIN and DOUGH sections
+  if (result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3) {
+    // LEVAIN Section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LEVAIN (build night before):', 14, yPos);
+    yPos += 6;
+    
+    const levainData = convertedPercentages.slice(0, 3).map(item => [
+      item.ingredient,
+      `${item.amount.toFixed(0)}g`,
+      `${item.percentage.toFixed(0)}%`
+    ]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Ingredient', 'Amount', 'Baker\'s %']],
+      body: levainData,
+      theme: 'grid',
+      headStyles: { fillColor: [184, 134, 100] },
+      margin: { left: 14 }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 8;
+    
+    // DOUGH Section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DOUGH:', 14, yPos);
+    yPos += 6;
+    
+    const doughData = convertedPercentages.slice(3).map(item => [
+      item.ingredient,
+      `${item.amount.toFixed(0)}g`,
+      `${item.percentage.toFixed(0)}%`
+    ]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Ingredient', 'Amount', 'Baker\'s %']],
+      body: doughData,
+      theme: 'grid',
+      headStyles: { fillColor: [184, 134, 100] },
+      margin: { left: 14 }
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  } else {
+    // Single table for sourdough-to-yeast conversions
+    const ingredientData = convertedPercentages.map(item => [
+      item.ingredient,
+      `${item.amount.toFixed(0)}g`,
+      `${item.percentage.toFixed(0)}%`
+    ]);
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Ingredient', 'Amount', 'Baker\'s %']],
+      body: ingredientData,
+      theme: 'grid',
+      headStyles: { fillColor: [184, 134, 100] },
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
   
   // Hydration
   doc.setFontSize(12);
-  doc.text(`Hydration: ${result.converted.hydration.toFixed(0)}%`, 14, yPos);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, 14, yPos);
   yPos += 10;
   
   // Add flavor tip for sourdough-to-yeast conversions

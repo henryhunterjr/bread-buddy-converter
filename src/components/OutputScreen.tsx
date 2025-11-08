@@ -85,25 +85,60 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4 text-foreground">Converted Recipe</h2>
             <div className="space-y-2">
-              {convertedPercentages.map((item, i) => {
-                const isChanged = !originalPercentages.find(
-                  orig => orig.ingredient === item.ingredient && Math.abs(orig.amount - item.amount) < 1
-                );
-                return (
-                  <div 
-                    key={i} 
-                    className={`flex justify-between text-sm ${isChanged ? 'bg-highlight rounded px-2 py-1' : ''}`}
-                  >
-                    <span className="text-foreground">{item.ingredient}</span>
-                    <span className="text-muted-foreground">
-                      {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
-                    </span>
+              {result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3 ? (
+                <>
+                  {/* LEVAIN Section */}
+                  <div className="mb-4">
+                    <div className="text-xs font-bold text-primary mb-2 uppercase tracking-wide">
+                      Levain (build night before)
+                    </div>
+                    {convertedPercentages.slice(0, 3).map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm pl-2">
+                        <span className="text-foreground">{item.ingredient}</span>
+                        <span className="text-muted-foreground">
+                          {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                );
-              })}
+                  
+                  {/* DOUGH Section */}
+                  <div>
+                    <div className="text-xs font-bold text-primary mb-2 uppercase tracking-wide">
+                      Dough
+                    </div>
+                    {convertedPercentages.slice(3).map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm pl-2">
+                        <span className="text-foreground">{item.ingredient}</span>
+                        <span className="text-muted-foreground">
+                          {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Single list for yeast conversions */
+                convertedPercentages.map((item, i) => {
+                  const isChanged = !originalPercentages.find(
+                    orig => orig.ingredient === item.ingredient && Math.abs(orig.amount - item.amount) < 1
+                  );
+                  return (
+                    <div 
+                      key={i} 
+                      className={`flex justify-between text-sm ${isChanged ? 'bg-highlight rounded px-2 py-1' : ''}`}
+                    >
+                      <span className="text-foreground">{item.ingredient}</span>
+                      <span className="text-muted-foreground">
+                        {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
+                      </span>
+                    </div>
+                  );
+                })
+              )}
               <div className="border-t pt-2 mt-2">
                 <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground">Hydration</span>
+                  <span className="text-foreground">Total Hydration</span>
                   <span className="text-foreground">{result.converted.hydration.toFixed(0)}%</span>
                 </div>
               </div>
