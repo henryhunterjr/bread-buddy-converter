@@ -112,6 +112,22 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
           </Card>
         </div>
 
+        {/* Troubleshooting Tips */}
+        <Card className="p-6 bg-muted/30">
+          <h2 className="text-xl font-bold mb-4 text-foreground">🔧 Troubleshooting Tips</h2>
+          <div className="space-y-4">
+            {result.troubleshootingTips.map((tip, i) => (
+              <div key={i} className="text-sm">
+                <div className="font-bold text-foreground">{tip.issue}</div>
+                <div className="text-muted-foreground mt-1">{tip.solution}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t text-xs text-muted-foreground italic">
+            💡 Remember: Watch the dough, not the clock. Fermentation times vary with temperature and flour type.
+          </div>
+        </Card>
+
         {/* Method Text */}
         {result.original.method && (
           <Card className="p-6">

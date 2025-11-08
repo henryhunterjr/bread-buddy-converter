@@ -91,11 +91,27 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
 
+  const troubleshootingTips = [
+    {
+      issue: 'Dense Crumb',
+      solution: 'Dough was likely under-proofed or yeast too old. Ensure yeast is fresh and active, and proof until dough springs back slowly when pressed.'
+    },
+    {
+      issue: 'Crust Too Hard',
+      solution: 'Loaf may be overbaked or hydration too low. Check internal temperature (target 190-195°F) and consider increasing water by 2-3%.'
+    },
+    {
+      issue: 'Flat Loaf',
+      solution: 'Over-proofed dough. Watch for the "slow spring back" test during final proof—if dough doesn\'t spring back at all, it\'s gone too far.'
+    }
+  ];
+
   return {
     original: recipe,
     converted,
     direction: 'sourdough-to-yeast',
-    methodChanges
+    methodChanges,
+    troubleshootingTips
   };
 }
 
@@ -177,11 +193,27 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
 
+  const troubleshootingTips = [
+    {
+      issue: 'Tight Crumb',
+      solution: 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain (should double in 6-8 hours) and extend bulk fermentation until dough rises ~50%.'
+    },
+    {
+      issue: 'Gummy Interior',
+      solution: 'Sliced too soon or dough overhydrated. Always cool sourdough at least 2 hours (preferably 4+) and check hydration is appropriate for flour type.'
+    },
+    {
+      issue: 'Pale Crust',
+      solution: 'Oven temperature too low or insufficient steam. Preheat Dutch oven fully to 450°F and ensure lid is on for first 20 minutes to trap steam.'
+    }
+  ];
+
   return {
     original: recipe,
     converted,
     direction: 'yeast-to-sourdough',
-    methodChanges
+    methodChanges,
+    troubleshootingTips
   };
 }
 

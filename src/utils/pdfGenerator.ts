@@ -83,6 +83,32 @@ export function generatePDF(result: ConvertedRecipe) {
     doc.text(lines, 14, yPos);
     yPos += lines.length * 6 + 4;
   });
+
+  yPos += 5;
+  
+  // Troubleshooting Tips
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Troubleshooting Tips', 14, yPos);
+  yPos += 8;
+  
+  doc.setFontSize(11);
+  result.troubleshootingTips.forEach(tip => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(tip.issue, 14, yPos);
+    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(tip.solution, 180);
+    doc.text(lines, 14, yPos);
+    yPos += lines.length * 6 + 4;
+  });
+  
+  yPos += 2;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'italic');
+  const reminderLines = doc.splitTextToSize('Remember: Watch the dough, not the clock. Fermentation times vary with temperature and flour type.', 180);
+  doc.text(reminderLines, 14, yPos);
+  yPos += reminderLines.length * 5;
   
   // Footer
   const pageHeight = doc.internal.pageSize.height;

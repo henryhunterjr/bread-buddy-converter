@@ -21,6 +21,12 @@ export interface ConvertedRecipe {
   converted: ParsedRecipe;
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
   methodChanges: MethodChange[];
+  troubleshootingTips: TroubleshootingTip[];
+}
+
+export interface TroubleshootingTip {
+  issue: string;
+  solution: string;
 }
 
 export interface MethodChange {
