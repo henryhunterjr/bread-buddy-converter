@@ -23,6 +23,7 @@ export interface ConvertedRecipe {
   methodChanges: MethodChange[];
   troubleshootingTips: TroubleshootingTip[];
   warnings: RecipeWarning[];
+  substitutions: IngredientSubstitution[];
 }
 
 export interface TroubleshootingTip {
@@ -33,6 +34,14 @@ export interface TroubleshootingTip {
 export interface RecipeWarning {
   type: 'info' | 'warning' | 'caution';
   message: string;
+}
+
+export interface IngredientSubstitution {
+  original: string;
+  substitute: string;
+  ratio: string;
+  hydrationAdjustment: number;
+  notes: string;
 }
 
 export interface MethodChange {

@@ -151,6 +151,34 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
           </div>
         </Card>
 
+        {/* Ingredient Substitutions */}
+        {result.substitutions.length > 0 && (
+          <Card className="p-6">
+            <h2 className="text-xl font-bold mb-4 text-foreground">🔄 Ingredient Substitutions</h2>
+            <div className="space-y-4">
+              {result.substitutions.map((sub, i) => (
+                <div key={i} className="text-sm border-l-2 border-primary/30 pl-4">
+                  <div className="font-bold text-foreground">
+                    {sub.original} → {sub.substitute}
+                  </div>
+                  <div className="text-muted-foreground mt-1">
+                    <span className="font-semibold">Ratio:</span> {sub.ratio}
+                  </div>
+                  {sub.hydrationAdjustment !== 0 && (
+                    <div className="text-muted-foreground mt-1">
+                      <span className="font-semibold">Hydration:</span>{' '}
+                      {sub.hydrationAdjustment > 0 ? '+' : ''}{sub.hydrationAdjustment}%
+                    </div>
+                  )}
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    {sub.notes}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Method Text */}
         {result.original.method && (
           <Card className="p-6">

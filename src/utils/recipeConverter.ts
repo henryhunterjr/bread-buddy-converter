@@ -1,5 +1,6 @@
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
 import { generateBakerWarnings } from './recipeParser';
+import { generateSubstitutions } from './substitutions';
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   const converted: ParsedRecipe = {
@@ -108,6 +109,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   ];
 
   const warnings = generateBakerWarnings(converted);
+  const substitutions = generateSubstitutions(converted);
 
   return {
     original: recipe,
@@ -115,7 +117,8 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
     direction: 'sourdough-to-yeast',
     methodChanges,
     troubleshootingTips,
-    warnings
+    warnings,
+    substitutions
   };
 }
 
@@ -213,6 +216,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   ];
 
   const warnings = generateBakerWarnings(converted);
+  const substitutions = generateSubstitutions(converted);
 
   return {
     original: recipe,
@@ -220,7 +224,8 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     direction: 'yeast-to-sourdough',
     methodChanges,
     troubleshootingTips,
-    warnings
+    warnings,
+    substitutions
   };
 }
 

@@ -131,7 +131,51 @@ export function generatePDF(result: ConvertedRecipe) {
   doc.setFont('helvetica', 'italic');
   const reminderLines = doc.splitTextToSize('Remember: Watch the dough, not the clock. Fermentation times vary with temperature and flour type.', 180);
   doc.text(reminderLines, 14, yPos);
-  yPos += reminderLines.length * 5;
+  yPos += reminderLines.length * 5 + 5;
+  
+  // Ingredient Substitutions
+  if (result.substitutions.length > 0) {
+    // Check if we need a new page
+    if (yPos > 240) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ingredient Substitutions', 14, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    result.substitutions.forEach(sub => {
+      // Check if we need a new page for this substitution
+      if (yPos > 260) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${sub.original} → ${sub.substitute}`, 14, yPos);
+      yPos += 5;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Ratio: ${sub.ratio}`, 14, yPos);
+      yPos += 5;
+      
+      if (sub.hydrationAdjustment !== 0) {
+        const adjustment = sub.hydrationAdjustment > 0 ? `+${sub.hydrationAdjustment}` : sub.hydrationAdjustment;
+        doc.text(`Hydration: ${adjustment}%`, 14, yPos);
+        yPos += 5;
+      }
+      
+      doc.setFontSize(9);
+      const notesLines = doc.splitTextToSize(sub.notes, 180);
+      doc.text(notesLines, 14, yPos);
+      yPos += notesLines.length * 4 + 4;
+      
+      doc.setFontSize(10);
+    });
+  }
   
   // Footer
   const pageHeight = doc.internal.pageSize.height;
