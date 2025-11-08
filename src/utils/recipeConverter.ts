@@ -60,33 +60,33 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
 
   const methodChanges: MethodChange[] = [
     {
-      step: 'MIX & KNEAD',
-      change: 'Combine all ingredients in a bowl. Knead by hand for 8-10 minutes or with a stand mixer (dough hook) for 5-6 minutes until smooth and elastic. The dough should pass the windowpane test.',
-      timing: '8-10 min by hand'
+      step: '1. MIX & KNEAD',
+      change: 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
+      timing: '8-10 min by hand, 5-6 min mixer'
     },
     {
-      step: 'FIRST RISE',
-      change: 'Place dough in a lightly greased bowl, cover with plastic wrap or a damp towel. Let rise at room temperature (75-78°F) until doubled in size.',
+      step: '2. FIRST RISE',
+      change: 'Place in a lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
       timing: '1-1.5 hours'
     },
     {
-      step: 'SHAPE',
-      change: 'Punch down the dough to release air. Shape into desired form (loaf, round, braid, etc.). If making a loaf, flatten into a rectangle and roll tightly. For round loaves, create surface tension by pulling edges to center.',
+      step: '3. SHAPE',
+      change: 'Punch down gently, shape as desired (loaf, braid, or boule), and place on a greased pan or parchment.',
       timing: '5-10 min'
     },
     {
-      step: 'FINAL PROOF',
-      change: 'Place shaped dough in greased pan or on parchment. Cover and let rise until nearly doubled and springs back slowly when gently poked.',
+      step: '4. FINAL PROOF',
+      change: 'Cover and let rise 45–60 minutes, or until dough springs back slowly when gently pressed.',
       timing: '45-60 min'
     },
     {
-      step: 'BAKE',
-      change: 'Preheat oven to 375°F (190°C). Optional: brush with egg wash for golden crust. Bake until deep golden brown and internal temperature reaches 190-195°F.',
-      timing: '35-40 min'
+      step: '5. BAKE',
+      change: 'Preheat oven to 375°F (190°C). Optionally brush with egg wash for a golden crust. Bake 35–40 minutes until deep golden and internal temperature is 190–195°F.',
+      timing: '35-40 min at 375°F (190°C)'
     },
     {
-      step: 'COOL',
-      change: 'Remove from pan immediately and cool on wire rack for at least 1 hour before slicing. This allows the crumb to set properly.',
+      step: '6. COOL',
+      change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
       timing: '1 hour minimum'
     }
   ];
@@ -136,29 +136,44 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
 
   const methodChanges: MethodChange[] = [
     {
-      step: 'AUTOLYSE EXTENDED',
-      change: 'Mix flour and water. Rest 1-2 hours. Add starter.',
-      timing: '1-2 hours'
+      step: '1. LEVAIN BUILD (Night Before)',
+      change: 'Mix 50g active starter, 100g water (80–85°F), and 100g flour. Rest covered overnight until doubled and bubbly.',
+      timing: '8-12 hours'
     },
     {
-      step: 'FERMENTOLYSE ADDED',
-      change: 'After adding starter, mix well and rest 20-30 minutes before adding salt.',
-      timing: '20-30 min'
+      step: '2. AUTOLYSE',
+      change: 'Mix flour and water from main dough. Rest 30–60 minutes to hydrate.',
+      timing: '30-60 min'
     },
     {
-      step: 'BULK FERMENT',
-      change: '6-8 hours at 75-78°F until dough has risen 75% and feels airy, OR overnight (12-18 hours) in fridge at 38-40°F',
-      timing: '6-8 hours (room) or 12-18 hours (cold)'
+      step: '3. ADD LEVAIN & SALT',
+      change: 'Add levain to autolysed dough, mix to combine, then add salt. Rest 20–30 minutes.',
+      timing: '20-30 min rest'
     },
     {
-      step: 'STRETCH AND FOLDS',
-      change: 'Every 30-45 min for first 2-3 hours',
-      timing: 'Every 30-45 min'
+      step: '4. BULK FERMENTATION',
+      change: 'Rest 4–6 hours at 75–78°F, performing stretch and folds every 30–45 minutes for first 2–3 hours, until dough rises ~50%.',
+      timing: '4-6 hours with folds'
     },
     {
-      step: 'PROOF',
-      change: '2-4 hours at room temp, OR overnight cold proof (8-18 hours)',
-      timing: '2-4 hours (room) or 8-18 hours (cold)'
+      step: '5. SHAPE',
+      change: 'Turn out onto lightly floured surface, pre-shape, rest 20 minutes, then do final shape (round or loaf).',
+      timing: '20 min bench rest + shaping'
+    },
+    {
+      step: '6. PROOF',
+      change: '2–4 hours at room temp or overnight in refrigerator (8–12 hours) for flavor development.',
+      timing: '2-4 hours (room) or 8-12 hours (cold)'
+    },
+    {
+      step: '7. BAKE',
+      change: 'Bake in covered Dutch oven at 450°F (232°C): 20 minutes covered, then 25–30 minutes uncovered, until internal temperature reaches 205–210°F.',
+      timing: '45-50 min total at 450°F (232°C)'
+    },
+    {
+      step: '8. COOL',
+      change: 'Cool at least 2 hours before slicing.',
+      timing: '2 hours minimum'
     }
   ];
 
