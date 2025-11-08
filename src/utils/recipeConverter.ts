@@ -1,3 +1,32 @@
+/**
+ * BGB Master Baker Context
+ * 
+ * This module embodies expert artisan baker knowledge for recipe conversions.
+ * All conversions follow real fermentation science, ingredient ratios, and dough behavior.
+ * 
+ * Core Baking Logic:
+ * - Hydration: Lean sourdough 70-78%, Enriched 60-68%, >80% = caution warning
+ * - Formula: yeast_hydration = sourdough_hydration × 0.92
+ * - Salt: 2% of flour weight
+ * - Sugar: ≤5% for browning/activation
+ * - Fat: reduces hydration by 2-3% per 5% fat
+ * 
+ * Yeast ↔ Starter Equivalents:
+ * - 100g active starter ≈ 4g instant yeast (0.7% of flour)
+ * - Instant → Active dry = ×1.25
+ * - Active dry → Instant = ×0.75
+ * 
+ * Fermentation Logic:
+ * - Yeast: First rise 1-1.5h; Final proof 45-60min
+ * - Sourdough: Bulk 4-6h (room) or 12-18h (cold); Proof 2-4h (room) or 8-12h (cold)
+ * 
+ * Temperature Targets:
+ * - Dough development: 75-78°F (24-26°C)
+ * - Yeast activation: 105-110°F (if pre-dissolving)
+ * 
+ * Voice: Clear, confident, sensory, encouraging - like a mentor baker.
+ */
+
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
 import { generateBakerWarnings } from './recipeParser';
 import { generateSubstitutions } from './substitutions';

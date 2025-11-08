@@ -21,7 +21,12 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="p-4">
-        <img src={logo} alt="Baking Great Bread at Home" className="h-16 md:h-20" />
+        <img 
+          src={logo} 
+          alt="Baking Great Bread at Home" 
+          className="h-16 md:h-20 cursor-pointer hover:opacity-80 transition-opacity" 
+          onClick={onStartOver}
+        />
       </div>
       <div className="flex-1 p-4 py-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -38,10 +43,10 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
                   key={i} 
                   className={`p-3 rounded-lg border text-sm ${
                     warning.type === 'caution' 
-                      ? 'bg-destructive/10 border-destructive/30 text-destructive-foreground' 
+                      ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200' 
                       : warning.type === 'warning'
-                      ? 'bg-yellow-500/10 border-yellow-500/30 text-foreground'
-                      : 'bg-blue-500/10 border-blue-500/30 text-foreground'
+                      ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200'
+                      : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200'
                   }`}
                 >
                   <span className="font-semibold">
