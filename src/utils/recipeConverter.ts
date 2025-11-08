@@ -161,70 +161,79 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     totalLiquid: recipe.totalLiquid
   };
 
-  // Remove yeast and add starter
-  if (recipe.yeastAmount > 0 || recipe.yeastAmount === 0) {
-    // Remove yeast from ingredients
-    converted.ingredients = converted.ingredients.filter(i => i.type !== 'yeast');
-    
-    // Add 20% starter (100% hydration)
-    const starterAmount = recipe.totalFlour * 0.20;
-    converted.starterAmount = starterAmount;
-    
-    // Add starter to ingredients
-    converted.ingredients.push({
-      name: 'active starter (100% hydration)',
-      amount: starterAmount,
-      unit: 'g',
-      type: 'starter'
-    });
+  // Remove yeast completely (any type)
+  converted.ingredients = converted.ingredients.filter(i => i.type !== 'yeast');
+  
+  // Build levain: 20-25% of total flour weight (default to 20%)
+  // For a 1000g flour recipe, this is 200g levain (50g starter + 100g water + 100g flour)
+  const starterAmount = recipe.totalFlour * 0.20;
+  converted.starterAmount = starterAmount;
+  
+  // Add levain to ingredients with proper description
+  converted.ingredients.push({
+    name: 'levain (50g active starter + 100g water + 100g flour, built overnight until doubled)',
+    amount: starterAmount,
+    unit: 'g',
+    type: 'starter'
+  });
 
-    // Adjust flour and water for the starter
-    converted.totalFlour = recipe.totalFlour + (starterAmount / 2);
-    converted.totalLiquid = recipe.totalLiquid + (starterAmount / 2);
+  // Adjust flour and water for the levain
+  // Levain adds half flour, half water to totals
+  converted.totalFlour = recipe.totalFlour + (starterAmount / 2);
+  converted.totalLiquid = recipe.totalLiquid + (starterAmount / 2);
+  
+  // Increase hydration by 5-8% for sourdough (multiply by 1.08)
+  const adjustedHydration = recipe.hydration * 1.08;
+  converted.hydration = adjustedHydration;
+  
+  // Adjust water amount to match new hydration
+  const newWaterAmount = (converted.hydration / 100) * converted.totalFlour;
+  const waterIndex = converted.ingredients.findIndex(i => i.type === 'liquid');
+  if (waterIndex !== -1) {
+    converted.ingredients[waterIndex].amount = newWaterAmount;
+    converted.ingredients[waterIndex].name = 'water (80-85°F for levain and main dough)';
   }
-
-  // Recalculate hydration
-  converted.hydration = (converted.totalLiquid / converted.totalFlour) * 100;
+  converted.totalLiquid = newWaterAmount;
 
   const methodChanges: MethodChange[] = [
     {
-      step: '1. LEVAIN BUILD (Night Before)',
-      change: 'Mix 50g active starter, 100g water (80–85°F), and 100g flour. Rest covered overnight until doubled and bubbly.',
-      timing: '8-12 hours'
+      step: '1. BUILD LEVAIN (Night Before)',
+      change: 'Mix 50g active starter, 100g water (80–85°F), and 100g flour. Cover loosely and rest overnight until doubled and bubbly. If you don\'t have active starter, feed yours 6–8 hours before mixing so it\'s at peak activity.',
+      timing: '8-12 hours overnight'
     },
     {
-      step: '2. AUTOLYSE',
-      change: 'Mix flour and water from main dough. Rest 30–60 minutes to hydrate.',
-      timing: '30-60 min'
+      step: '2. MIX DOUGH (Morning)',
+      change: 'In a large bowl, dissolve levain into 375–400g warm water. Add flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.',
+      timing: '45-60 min autolyse'
     },
     {
-      step: '3. ADD LEVAIN & SALT',
-      change: 'Add levain to autolysed dough, mix to combine, then add salt. Rest 20–30 minutes.',
+      step: '3. ADD SALT & DEVELOP STRENGTH',
+      change: 'Sprinkle in salt, mix or pinch to incorporate throughout the dough. Rest 20–30 minutes to allow salt to dissolve and gluten to relax.',
       timing: '20-30 min rest'
     },
     {
       step: '4. BULK FERMENTATION',
-      change: 'Rest 4–6 hours at 75–78°F, performing stretch and folds every 30–45 minutes for first 2–3 hours, until dough rises ~50%.',
-      timing: '4-6 hours with folds'
+      change: 'Perform 3–4 sets of stretch and folds every 30–45 minutes during the first 2–3 hours. Then let rest undisturbed for 4–6 hours total at 75–78°F. Stop when dough has risen ~50%, looks airy, and holds its shape. Fermentation is guided by dough strength and temperature, not the clock.',
+      timing: '4-6 hours at 75-78°F'
     },
     {
       step: '5. SHAPE',
-      change: 'Turn out onto lightly floured surface, pre-shape, rest 20 minutes, then do final shape (round or loaf).',
+      change: 'Turn dough onto lightly floured surface. Pre-shape into a round, rest 20 minutes, then perform final shape (boule or batard). Build surface tension by pulling dough toward you while rotating.',
       timing: '20 min bench rest + shaping'
     },
     {
-      step: '6. PROOF',
-      change: '2–4 hours at room temp or overnight in refrigerator (8–12 hours) for flavor development.',
-      timing: '2-4 hours (room) or 8-12 hours (cold)'
+      step: '6. FINAL PROOF',
+      change: 'Place shaped dough seam-side up in a floured banneton or bowl. Proof 2–4 hours at room temperature until dough springs back slowly when pressed, OR refrigerate overnight (8–12 hours) for enhanced flavor development.',
+      timing: '2-4 hours room temp or 8-12 hours cold'
     },
     {
       step: '7. BAKE',
-      change: 'Bake in covered Dutch oven at 450°F (232°C): 20 minutes covered, then 25–30 minutes uncovered, until internal temperature reaches 205–210°F.',
-      timing: '45-50 min total at 450°F (232°C)'
+      change: 'Preheat Dutch oven to 450°F (232°C). Score the top of the dough with a sharp blade. Bake covered for 20 minutes to trap steam, then uncover and bake 25–30 minutes more until deep golden brown and internal temperature reaches 205–210°F.',
+      timing: '45-50 min at 450°F (232°C)'
     },
     {
       step: '8. COOL',
-      change: 'Cool at least 2 hours before slicing.',
+      change: 'Remove from Dutch oven and cool on a wire rack for minimum 2 hours before slicing. This allows the crumb to set properly.',
       timing: '2 hours minimum'
     }
   ];
@@ -232,17 +241,27 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   const troubleshootingTips = [
     {
       issue: 'Tight Crumb',
-      solution: 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain (should double in 6-8 hours) and extend bulk fermentation until dough rises ~50%.'
+      solution: 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain that doubles in 6–8 hours and extend bulk fermentation until dough rises ~50% and looks airy.'
     },
     {
-      issue: 'Gummy Interior',
-      solution: 'Sliced too soon or dough overhydrated. Always cool sourdough at least 2 hours (preferably 4+) and check hydration is appropriate for flour type.'
+      issue: 'Gummy Crumb',
+      solution: 'Sliced too soon or dough overhydrated. Always cool sourdough minimum 2 hours (preferably 4+) before slicing, and verify hydration is appropriate for your flour type.'
     },
     {
       issue: 'Pale Crust',
-      solution: 'Oven temperature too low or insufficient steam. Preheat Dutch oven fully to 450°F and ensure lid is on for first 20 minutes to trap steam.'
+      solution: 'Oven temperature too low or insufficient steam. Preheat Dutch oven fully to 450°F and keep lid on for first 20 minutes to trap steam for proper oven spring and color.'
+    },
+    {
+      issue: 'Weak Rise',
+      solution: 'Inactive starter or cold dough temperature. Ensure starter is at peak activity (doubled and bubbly) before mixing, and maintain dough temperature at 75–78°F during bulk fermentation.'
     }
   ];
+  
+  // Add reminder note about watching the dough
+  troubleshootingTips.push({
+    issue: 'Remember',
+    solution: 'Watch the dough, not the clock. Fermentation times vary with temperature, starter strength, and flour type.'
+  });
 
   const warnings = generateBakerWarnings(converted);
   const substitutions = generateSubstitutions(converted);
