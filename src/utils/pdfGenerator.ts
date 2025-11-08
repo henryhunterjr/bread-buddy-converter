@@ -66,6 +66,29 @@ export function generatePDF(result: ConvertedRecipe) {
   
   yPos += 10;
   
+  // Warnings
+  if (result.warnings.length > 0) {
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Recipe Warnings', 14, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    result.warnings.forEach(warning => {
+      const prefix = warning.type === 'caution' ? '⚠️' : warning.type === 'warning' ? '⚡' : 'ℹ️';
+      doc.setFont('helvetica', 'bold');
+      const warningType = warning.type === 'caution' ? 'CAUTION' : warning.type === 'warning' ? 'NOTE' : 'INFO';
+      doc.text(`${prefix} ${warningType}:`, 14, yPos);
+      yPos += 5;
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(warning.message, 180);
+      doc.text(lines, 14, yPos);
+      yPos += lines.length * 5 + 3;
+    });
+    
+    yPos += 5;
+  }
+  
   // Method Updates
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');

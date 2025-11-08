@@ -25,10 +25,33 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
       </div>
       <div className="flex-1 p-4 py-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="space-y-4">
           <h1 className="text-3xl font-bold text-foreground">
             Recipe Converted: {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast' : 'Yeast → Sourdough'}
           </h1>
+          
+          {/* Warnings */}
+          {result.warnings.length > 0 && (
+            <div className="space-y-2">
+              {result.warnings.map((warning, i) => (
+                <div 
+                  key={i} 
+                  className={`p-3 rounded-lg border text-sm ${
+                    warning.type === 'caution' 
+                      ? 'bg-destructive/10 border-destructive/30 text-destructive-foreground' 
+                      : warning.type === 'warning'
+                      ? 'bg-yellow-500/10 border-yellow-500/30 text-foreground'
+                      : 'bg-blue-500/10 border-blue-500/30 text-foreground'
+                  }`}
+                >
+                  <span className="font-semibold">
+                    {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
+                  </span>{' '}
+                  {warning.message}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">

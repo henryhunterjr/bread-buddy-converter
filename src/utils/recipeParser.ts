@@ -273,3 +273,101 @@ export function validateRecipe(recipe: ParsedRecipe): string[] {
 
   return errors;
 }
+
+export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info' | 'warning' | 'caution'; message: string }> {
+  const warnings: Array<{ type: 'info' | 'warning' | 'caution'; message: string }> = [];
+  
+  // Check if recipe has enrichments
+  const hasOil = recipe.ingredients.some(i => 
+    i.name.toLowerCase().includes('oil') || i.name.toLowerCase().includes('butter')
+  );
+  const hasEggs = recipe.ingredients.some(i => 
+    i.name.toLowerCase().includes('egg')
+  );
+  const hasHoney = recipe.ingredients.some(i => 
+    i.name.toLowerCase().includes('honey') || i.name.toLowerCase().includes('sugar')
+  );
+  const isEnriched = hasOil || hasEggs || hasHoney;
+  
+  // Hydration warnings based on dough type
+  if (isEnriched) {
+    // Enriched doughs: 60-68%
+    if (recipe.hydration > 68 && recipe.hydration <= 75) {
+      warnings.push({
+        type: 'warning',
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%. For enriched doughs (with butter, eggs, or sugar), 60-68% is typical. Higher hydration may make shaping difficult.`
+      });
+    } else if (recipe.hydration > 75) {
+      warnings.push({
+        type: 'caution',
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is very high for an enriched dough. This may be too wet to handle. Consider reducing water by 5-10%.`
+      });
+    } else if (recipe.hydration < 55) {
+      warnings.push({
+        type: 'warning',
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is quite low. The dough may be stiff and dense. Consider adding 2-5% more water.`
+      });
+    }
+  } else {
+    // Lean doughs: 70-78%
+    if (recipe.hydration < 65) {
+      warnings.push({
+        type: 'warning',
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is low for a lean dough. Typical artisan breads are 70-78%. This will produce a tighter crumb.`
+      });
+    } else if (recipe.hydration > 82) {
+      warnings.push({
+        type: 'caution',
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is very high. This is ciabatta territory and requires advanced handling skills. Expect a very slack, sticky dough.`
+      });
+    }
+  }
+  
+  // Salt percentage warnings
+  const saltPercentage = (recipe.saltAmount / recipe.totalFlour) * 100;
+  if (saltPercentage < 1.5 && saltPercentage > 0) {
+    warnings.push({
+      type: 'info',
+      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight. Professional bakers typically use 2%. The bread may taste bland.`
+    });
+  } else if (saltPercentage > 2.5 && saltPercentage <= 3.5) {
+    warnings.push({
+      type: 'warning',
+      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight, which is higher than the typical 2%. The bread will taste quite salty.`
+    });
+  }
+  
+  // Yeast percentage warnings
+  if (recipe.yeastAmount > 0) {
+    const yeastPercentage = (recipe.yeastAmount / recipe.totalFlour) * 100;
+    if (yeastPercentage > 1.5) {
+      warnings.push({
+        type: 'info',
+        message: `Instant yeast is at ${yeastPercentage.toFixed(1)}% of flour weight. This is higher than typical (0.7%). Expect a faster rise but less flavor development.`
+      });
+    } else if (yeastPercentage < 0.4) {
+      warnings.push({
+        type: 'info',
+        message: `Yeast is at ${yeastPercentage.toFixed(1)}% of flour weight, which is quite low. This will result in a slower rise—plan for 2-3 hours instead of 1-1.5 hours.`
+      });
+    }
+  }
+  
+  // Starter percentage warnings
+  if (recipe.starterAmount > 0) {
+    const starterPercentage = (recipe.starterAmount / recipe.totalFlour) * 100;
+    if (starterPercentage < 15) {
+      warnings.push({
+        type: 'warning',
+        message: `Starter is only ${starterPercentage.toFixed(0)}% of total flour weight. Typical sourdough uses 15-25%. Bulk fermentation may take 8-12 hours or longer.`
+      });
+    } else if (starterPercentage > 30) {
+      warnings.push({
+        type: 'info',
+        message: `Starter is ${starterPercentage.toFixed(0)}% of total flour weight, which is higher than typical (15-25%). This will speed up fermentation but may taste more acidic.`
+      });
+    }
+  }
+  
+  return warnings;
+}

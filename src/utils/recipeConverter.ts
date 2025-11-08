@@ -1,4 +1,5 @@
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
+import { generateBakerWarnings } from './recipeParser';
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   const converted: ParsedRecipe = {
@@ -106,12 +107,15 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
 
+  const warnings = generateBakerWarnings(converted);
+
   return {
     original: recipe,
     converted,
     direction: 'sourdough-to-yeast',
     methodChanges,
-    troubleshootingTips
+    troubleshootingTips,
+    warnings
   };
 }
 
@@ -208,12 +212,15 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
 
+  const warnings = generateBakerWarnings(converted);
+
   return {
     original: recipe,
     converted,
     direction: 'yeast-to-sourdough',
     methodChanges,
-    troubleshootingTips
+    troubleshootingTips,
+    warnings
   };
 }
 

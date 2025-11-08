@@ -22,11 +22,17 @@ export interface ConvertedRecipe {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
   methodChanges: MethodChange[];
   troubleshootingTips: TroubleshootingTip[];
+  warnings: RecipeWarning[];
 }
 
 export interface TroubleshootingTip {
   issue: string;
   solution: string;
+}
+
+export interface RecipeWarning {
+  type: 'info' | 'warning' | 'caution';
+  message: string;
 }
 
 export interface MethodChange {
