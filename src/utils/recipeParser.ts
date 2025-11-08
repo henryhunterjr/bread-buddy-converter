@@ -67,19 +67,27 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     methodSection = recipeText.substring(methodStartIndex);
   }
   
-  // Split ingredients by BOTH asterisks AND newlines to handle different formats
-  // Replace asterisks with newlines first, then split by newlines
-  const normalizedIngredients = ingredientsSection.replace(/\s*\*\s*/g, '\n');
-  const lines = normalizedIngredients.split('\n');
+  // Normalize the ingredients section:
+  // 1. Replace asterisks with newlines
+  // 2. Add newlines before common measurement patterns to split continuous text
+  let normalized = ingredientsSection
+    .replace(/\s*\*\s*/g, '\n')  // Replace asterisks with newlines
+    .replace(/\s+(\d+(?:\.\d+)?)\s*(?:g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+/gi, '\n$1 ')  // Add newline before measurements
+    .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ');  // Add newline before fractions
+    
+  const lines = normalized.split('\n');
   
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Skip empty lines, titles, or very short lines
+    // Skip empty lines or very short lines
     if (!trimmed || trimmed.length < 5) continue;
     
-    // Skip lines that look like titles (no numbers)
+    // Skip lines that don't contain numbers (likely titles or section headers)
     if (!/\d/.test(trimmed)) continue;
+    
+    // Skip lines that are just metadata (like "Prep Time:", "Yield:", etc.)
+    if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
 
     // Parse ingredient line
     const ingredient = parseIngredientLine(trimmed);
@@ -135,61 +143,67 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
   const lower = trimmed.toLowerCase();
   
   // Handle bullet points and dashes
-  const cleaned = lower.replace(/^[-•*]\s*/, '');
+  let cleaned = lower.replace(/^[-•*]\s*/, '');
   
-  // Try to match patterns with "or" (e.g., "2 1/2 cups or 590mL water" or "1 tablespoon or 10g yeast")
-  // Prefer the gram/ml measurement if available
-  const orMatch = cleaned.match(/or\s+(\d+(?:\.\d+)?)\s*([a-z]+)\s+(.+)/);
-  if (orMatch) {
-    const amount = parseFloat(orMatch[1]);
-    const unit = orMatch[2].toLowerCase();
-    const name = orMatch[3].trim();
-    
-    // If unit is g, grams, ml, use it directly
-    if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml') {
-      return createIngredient(name, amount, lower);
-    }
+  // Remove parenthetical alternative measurements (e.g., "(3/4 cup)" or "(scant 1/2 cup)")
+  // This helps extract the primary measurement and ingredient name cleanly
+  cleaned = cleaned.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Pattern 1: "100g bread flour" or "240ml water" (grams/ml directly stated)
+  const gramsFirstMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
+  if (gramsFirstMatch) {
+    const amount = parseFloat(gramsFirstMatch[1]);
+    const name = gramsFirstMatch[2].trim();
+    return createIngredient(name, amount, lower);
   }
   
-  // Try to match patterns WITHOUT "or" but with direct conversion (e.g., "1 tablespoon 10g yeast")
-  // This captures: number + unit + number + unit + name
-  const directConversionMatch = cleaned.match(/(\d+(?:\.\d+)?)\s*([a-z]+)\s+(\d+(?:\.\d+)?)\s*([a-z]+)\s+(.+)/);
-  if (directConversionMatch) {
-    const amount = parseFloat(directConversionMatch[3]); // Use the second number (grams)
-    const unit = directConversionMatch[4].toLowerCase();
-    const name = directConversionMatch[5].trim();
-    
-    // If the second unit is g or ml, use it
-    if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml') {
-      return createIngredient(name, amount, lower);
-    }
+  // Pattern 2: "or 590g water" or "or 10g yeast" (prefer the gram measurement after "or")
+  const orGramsMatch = cleaned.match(/or\s+(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
+  if (orGramsMatch) {
+    const amount = parseFloat(orGramsMatch[1]);
+    const name = orGramsMatch[2].trim();
+    return createIngredient(name, amount, lower);
   }
   
-  // Match fractions like "2 1/2" or "1/2"
-  const fractionMatch = cleaned.match(/(\d+)?\s*(\d+)\/(\d+)\s+([a-z]+)\s+(.+)/);
+  // Pattern 3: Fractions "2 1/2 cups flour" or "1/2 cup water"
+  const fractionMatch = cleaned.match(/^(\d+)?\s*(\d+)\/(\d+)\s+([a-z]+)\s+(.+)/);
   if (fractionMatch) {
     const whole = fractionMatch[1] ? parseFloat(fractionMatch[1]) : 0;
     const numerator = parseFloat(fractionMatch[2]);
     const denominator = parseFloat(fractionMatch[3]);
-    const amount = whole + (numerator / denominator);
+    const fractionalAmount = whole + (numerator / denominator);
     const unit = fractionMatch[4];
     const name = fractionMatch[5].trim();
     
-    return createIngredient(name, convertToGrams(amount, unit, name), lower);
+    const grams = convertToGrams(fractionalAmount, unit, name);
+    return createIngredient(name, grams, lower);
   }
   
-  // Match patterns like "500g flour" or "2 cups water" or "3 tsp salt"
-  const match = cleaned.match(/(\d+(?:\.\d+)?)\s*([a-z]+)?\s+(.+)/);
-  if (!match) return null;
+  // Pattern 4: "2 cups flour", "3 tablespoons yeast", etc. (number + unit + name)
+  const standardMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s+([a-z]+)\s+(.+)/);
+  if (standardMatch) {
+    let amount = parseFloat(standardMatch[1]);
+    const unit = standardMatch[2];
+    const name = standardMatch[3].trim();
+    
+    // Convert to grams if needed
+    amount = convertToGrams(amount, unit, name);
+    return createIngredient(name, amount, lower);
+  }
+  
+  // Pattern 5: Just "500g flour" or "240 water" (number + optional unit + name)
+  const simpleMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)?\s+(.+)/);
+  if (simpleMatch) {
+    let amount = parseFloat(simpleMatch[1]);
+    const unit = simpleMatch[2] || 'g';
+    const name = simpleMatch[3].trim();
+    
+    // Convert to grams if needed
+    amount = convertToGrams(amount, unit, name);
+    return createIngredient(name, amount, lower);
+  }
 
-  let amount = parseFloat(match[1]);
-  const unit = match[2] || 'g';
-  const name = match[3].trim();
-
-  // Convert to grams if needed
-  amount = convertToGrams(amount, unit, name);
-
-  return createIngredient(name, amount, lower);
+  return null;
 }
 
 function convertToGrams(amount: number, unit: string, name: string): number {
