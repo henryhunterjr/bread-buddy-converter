@@ -10,8 +10,8 @@ export function generatePDF(result: ConvertedRecipe) {
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   const title = result.direction === 'sourdough-to-yeast' 
-    ? 'Sourdough → Yeast Conversion'
-    : 'Yeast → Sourdough Conversion';
+    ? 'Yeast Conversion Recipe'
+    : 'Sourdough Conversion Recipe';
   doc.text(title, 105, 20, { align: 'center' });
   
   doc.setFontSize(10);
@@ -46,7 +46,25 @@ export function generatePDF(result: ConvertedRecipe) {
   // Hydration
   doc.setFontSize(12);
   doc.text(`Hydration: ${result.converted.hydration.toFixed(0)}%`, 14, yPos);
-  yPos += 15;
+  yPos += 10;
+  
+  // Add flavor tip for sourdough-to-yeast conversions
+  if (result.direction === 'sourdough-to-yeast') {
+    yPos += 5;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tip for Sourdough Flavor:', 14, yPos);
+    yPos += 6;
+    doc.setFont('helvetica', 'normal');
+    const tipLines = doc.splitTextToSize(
+      'To mimic sourdough tang, add 15g (1 tbsp) lemon juice or plain yogurt to the liquid ingredients.',
+      180
+    );
+    doc.text(tipLines, 14, yPos);
+    yPos += tipLines.length * 5;
+  }
+  
+  yPos += 10;
   
   // Method Updates
   doc.setFontSize(14);

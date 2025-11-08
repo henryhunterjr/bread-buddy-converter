@@ -90,8 +90,24 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
                 <div key={i} className="text-sm">
                   <div className="font-bold text-foreground">✓ {change.step}</div>
                   <div className="text-muted-foreground">{change.change}</div>
+                  {change.timing && (
+                    <div className="text-xs text-muted-foreground italic mt-1">
+                      Timing: {change.timing}
+                    </div>
+                  )}
                 </div>
               ))}
+              
+              {result.direction === 'sourdough-to-yeast' && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="text-sm">
+                    <div className="font-bold text-foreground">💡 Tip: Sourdough Flavor</div>
+                    <div className="text-muted-foreground">
+                      To mimic sourdough tang, add 15g (1 tbsp) lemon juice or plain yogurt to the liquid ingredients.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         </div>
