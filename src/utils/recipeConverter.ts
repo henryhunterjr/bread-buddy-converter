@@ -37,10 +37,21 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   const starterFlour = recipe.starterAmount / 2;
   const starterWater = recipe.starterAmount / 2;
   
+  // Debug logging
+  console.log('=== SOURDOUGH TO YEAST CONVERSION ===');
+  console.log('Input recipe.totalFlour:', recipe.totalFlour);
+  console.log('Input recipe.totalLiquid:', recipe.totalLiquid);
+  console.log('Input recipe.starterAmount:', recipe.starterAmount);
+  console.log('Parsed ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
+  
   // TRUE totals including what's IN the starter
   const trueFlour = recipe.totalFlour; // Already includes starter flour from parser
   const trueWater = recipe.totalLiquid; // Already includes starter water from parser
   const trueHydration = (trueWater / trueFlour) * 100;
+  
+  console.log('Calculated trueFlour:', trueFlour);
+  console.log('Calculated trueWater:', trueWater);
+  console.log('Calculated trueHydration:', trueHydration);
   
   // STEP 2: Build clean ingredient list for yeast version
   // Remove starter, liquid, and flour entries - we'll add back consolidated totals

@@ -119,10 +119,23 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     .filter(i => i.type === 'salt')
     .reduce((sum, i) => sum + i.amount, 0);
 
+  // Debug logging
+  console.log('=== PARSER CALCULATIONS ===');
+  console.log('Raw totalFlour:', totalFlour);
+  console.log('Raw totalLiquid:', totalLiquid);
+  console.log('Raw starterAmount:', starterAmount);
+  console.log('Flour ingredients:', ingredients.filter(i => i.type === 'flour').map(i => `${i.amount}g ${i.name}`));
+  console.log('Liquid ingredients:', ingredients.filter(i => i.type === 'liquid').map(i => `${i.amount}g ${i.name}`));
+  console.log('Starter ingredients:', ingredients.filter(i => i.type === 'starter').map(i => `${i.amount}g ${i.name}`));
+
   // Adjust for starter (100% hydration assumed)
   const adjustedFlour = totalFlour + (starterAmount / 2);
   const adjustedLiquid = totalLiquid + (starterAmount / 2);
   const hydration = adjustedFlour > 0 ? (adjustedLiquid / adjustedFlour) * 100 : 0;
+  
+  console.log('Adjusted totalFlour:', adjustedFlour);
+  console.log('Adjusted totalLiquid:', adjustedLiquid);
+  console.log('Calculated hydration:', hydration);
 
   return {
     ingredients,
