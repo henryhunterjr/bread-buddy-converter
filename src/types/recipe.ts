@@ -2,7 +2,7 @@ export interface ParsedIngredient {
   name: string;
   amount: number;
   unit: string;
-  type: 'flour' | 'liquid' | 'starter' | 'yeast' | 'salt' | 'other';
+  type: 'flour' | 'liquid' | 'starter' | 'yeast' | 'salt' | 'fat' | 'enrichment' | 'sweetener' | 'other';
 }
 
 export interface ParsedRecipe {

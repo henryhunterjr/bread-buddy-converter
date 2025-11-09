@@ -166,7 +166,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Total flour:', totalFlour);
   console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
-  // STEP 2: Separate ingredients by type
+  // STEP 2: Separate ingredients by category
   const waterIngredients = recipe.ingredients.filter(i => 
     i.type === 'liquid' && !i.name.toLowerCase().includes('milk')
   );
@@ -174,33 +174,55 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     i.type === 'liquid' && i.name.toLowerCase().includes('milk')
   );
   const saltIngredients = recipe.ingredients.filter(i => i.type === 'salt');
-  const allOtherIngredients = recipe.ingredients.filter(i => i.type === 'other');
+  
+  // CRITICAL: Capture ALL enrichments explicitly
+  const butterIngredients = recipe.ingredients.filter(i => 
+    i.type === 'fat' || i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil')
+  );
+  const eggIngredients = recipe.ingredients.filter(i => 
+    i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
+  );
+  const sugarIngredients = recipe.ingredients.filter(i => 
+    i.type === 'sweetener' || i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey')
+  );
+  
+  // Catch any remaining ingredients not categorized above
+  const otherIngredients = recipe.ingredients.filter(i => 
+    i.type !== 'flour' && 
+    i.type !== 'liquid' && 
+    i.type !== 'yeast' && 
+    i.type !== 'salt' &&
+    i.type !== 'fat' &&
+    i.type !== 'enrichment' &&
+    i.type !== 'sweetener'
+  );
   
   const originalWater = waterIngredients.reduce((sum, i) => sum + i.amount, 0);
   const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const butterAmount = butterIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const eggAmount = eggIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const sugarAmount = sugarIngredients.reduce((sum, i) => sum + i.amount, 0);
   
-  console.log('Original water:', originalWater);
-  console.log('Milk amount:', milkAmount);
-  console.log('Other ingredients:', allOtherIngredients);
+  console.log('Original water:', originalWater, 'g');
+  console.log('Milk:', milkAmount, 'g');
+  console.log('Butter:', butterAmount, 'g');
+  console.log('Eggs:', eggAmount, 'g');
+  console.log('Sugar:', sugarAmount, 'g');
+  console.log('Other ingredients:', otherIngredients);
   
-  // Calculate enrichment percentages
-  const sugarAmount = allOtherIngredients
-    .filter(i => i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey'))
-    .reduce((sum, i) => sum + i.amount, 0);
-  const fatAmount = allOtherIngredients
-    .filter(i => i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
-    .reduce((sum, i) => sum + i.amount, 0);
+  // Determine if enriched
+  const isEnrichedDough = butterAmount > 0 || eggAmount > 0 || sugarAmount > 0 || milkAmount > 0;
   
+  // Calculate percentages for warnings
   const sugarPercentage = (sugarAmount / totalFlour) * 100;
-  const fatPercentage = (fatAmount / totalFlour) * 100;
-  const isEnrichedDough = sugarAmount > 0 || fatAmount > 0 || milkAmount > 0;
+  const fatPercentage = (butterAmount / totalFlour) * 100;
   
-  console.log('Sugar:', sugarAmount, `(${sugarPercentage.toFixed(1)}%)`);
-  console.log('Fat:', fatAmount, `(${fatPercentage.toFixed(1)}%)`);
   console.log('Is enriched:', isEnrichedDough);
+  console.log('Sugar %:', sugarPercentage.toFixed(1));
+  console.log('Fat %:', fatPercentage.toFixed(1));
   
-  // STEP 3: Calculate proper starter amount (20% of flour for enriched, 15% for lean)
-  const starterPercentage = isEnrichedDough ? 0.20 : 0.15;
+  // STEP 3: Calculate starter amount (20% of flour)
+  const starterPercentage = 0.20;
   const targetLevainFlour = Math.round(totalFlour * starterPercentage);
   
   console.log('Target levain flour:', targetLevainFlour, `(${starterPercentage * 100}% of ${totalFlour}g)`);
@@ -297,12 +319,66 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     });
   }
   
-  // Add ALL other ingredients exactly as they were
-  doughIngredients.push(...milkIngredients); // Milk
-  doughIngredients.push(...saltIngredients); // Salt
-  doughIngredients.push(...allOtherIngredients); // Butter, eggs, sugar, etc.
+  // Add ALL enrichments explicitly
+  console.log('Adding enrichments to dough:');
   
-  console.log('Final dough ingredients:', doughIngredients.map(i => `${i.amount}g ${i.name}`));
+  if (milkIngredients.length > 0) {
+    console.log('  - Milk ingredients:', milkIngredients.length);
+    doughIngredients.push(...milkIngredients);
+  }
+  
+  if (butterIngredients.length > 0) {
+    console.log('  - Butter ingredients:', butterIngredients.length);
+    doughIngredients.push(...butterIngredients);
+  }
+  
+  if (eggIngredients.length > 0) {
+    console.log('  - Egg ingredients:', eggIngredients.length);
+    doughIngredients.push(...eggIngredients);
+  }
+  
+  if (sugarIngredients.length > 0) {
+    console.log('  - Sugar ingredients:', sugarIngredients.length);
+    doughIngredients.push(...sugarIngredients);
+  }
+  
+  if (saltIngredients.length > 0) {
+    console.log('  - Salt ingredients:', saltIngredients.length);
+    doughIngredients.push(...saltIngredients);
+  }
+  
+  if (otherIngredients.length > 0) {
+    console.log('  - Other ingredients:', otherIngredients.length);
+    doughIngredients.push(...otherIngredients);
+  }
+  
+  console.log('Final dough ingredients:', doughIngredients.map(i => `${i.amount}g ${i.name} [${i.type}]`));
+  
+  // Validation: Check that enrichments are present
+  const hasButterInDough = doughIngredients.some(i => 
+    i.type === 'fat' || i.name.toLowerCase().includes('butter')
+  );
+  const hasEggsInDough = doughIngredients.some(i => 
+    i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
+  );
+  const hasSugarInDough = doughIngredients.some(i => 
+    i.type === 'sweetener' || i.name.toLowerCase().includes('sugar')
+  );
+  
+  console.log('=== ENRICHMENT VALIDATION ===');
+  console.log('Butter in original:', butterAmount > 0, '| Butter in dough:', hasButterInDough);
+  console.log('Eggs in original:', eggAmount > 0, '| Eggs in dough:', hasEggsInDough);
+  console.log('Sugar in original:', sugarAmount > 0, '| Sugar in dough:', hasSugarInDough);
+  
+  if (butterAmount > 0 && !hasButterInDough) {
+    console.error('❌ BUTTER WAS LOST IN CONVERSION!');
+  }
+  if (eggAmount > 0 && !hasEggsInDough) {
+    console.error('❌ EGGS WERE LOST IN CONVERSION!');
+  }
+  if (sugarAmount > 0 && !hasSugarInDough) {
+    console.error('❌ SUGAR WAS LOST IN CONVERSION!');
+  }
   
   const converted: ParsedRecipe = {
     ...recipe,
@@ -327,46 +403,48 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     {
       step: '2. MIX DOUGH (Morning)',
       change: isEnrichedDough 
-        ? `In a large bowl, dissolve levain into ${doughWater}g warm water. Add flour and mix until shaggy. Rest 30-45 minutes (autolyse). Then add enrichments (butter should be softened, eggs at room temperature). Mix until just combined.`
-        : `In a large bowl, dissolve levain into ${doughWater}g warm water. Add flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
+        ? `In a large bowl, dissolve levain into ${doughWater > 0 ? doughWater + 'g' : 'the'} warm water${milkAmount > 0 ? ' and ' + milkAmount + 'g milk' : ''}. Add ${doughFlour}g flour and mix until shaggy. Rest 30-45 minutes (autolyse). ${butterAmount > 0 ? 'Add softened butter gradually during first fold, not in initial mix.' : ''} ${eggAmount > 0 ? 'Add eggs at room temperature after autolyse.' : ''}`
+        : `In a large bowl, dissolve levain into ${doughWater}g warm water. Add ${doughFlour}g flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
       timing: isEnrichedDough ? '30-45 min autolyse' : '45-60 min autolyse'
     },
     {
       step: '3. ADD SALT & DEVELOP STRENGTH',
-      change: 'Sprinkle in salt, mix or pinch to incorporate throughout the dough. Rest 20–30 minutes to allow salt to dissolve and gluten to relax.',
+      change: `Sprinkle in ${recipe.saltAmount}g salt, mix or pinch to incorporate throughout the dough. Rest 20–30 minutes to allow salt to dissolve and gluten to relax.`,
       timing: '20-30 min rest'
     },
     {
       step: '4. BULK FERMENTATION',
       change: isEnrichedDough
-        ? `Perform 3-4 sets of stretch and folds every 30-45 minutes during the first 2-3 hours. Enriched doughs ferment more slowly due to sugar and fat. Bulk fermentation may take 5-7 hours at 75-78°F. Stop when dough has risen 50-75% and looks airy.`
+        ? `Perform 3-4 sets of stretch and folds every 30-45 minutes during the first 2-3 hours. Enriched doughs ferment more slowly due to ${sugarAmount > 0 ? 'sugar' : ''}${sugarAmount > 0 && butterAmount > 0 ? ' and ' : ''}${butterAmount > 0 ? 'fat' : ''}. Bulk fermentation may take 5-7 hours at 75-78°F. Stop when dough has risen 50-75% and looks airy.`
         : 'Perform 3–4 sets of stretch and folds every 30–45 minutes during the first 2–3 hours. Then let rest undisturbed for 4–6 hours total at 75–78°F. Stop when dough has risen ~50%, looks airy, and holds its shape. Fermentation is guided by dough strength and temperature, not the clock.',
       timing: isEnrichedDough ? '5-7 hours at 75-78°F' : '4-6 hours at 75-78°F'
     },
     {
       step: '5. SHAPE',
-      change: 'Turn dough onto lightly floured surface. Pre-shape into a round, rest 20 minutes, then perform final shape (boule or batard). Build surface tension by pulling dough toward you while rotating.',
+      change: isEnrichedDough
+        ? 'Turn dough onto lightly floured surface. Shape into desired form (rolls, loaf, etc.). Enriched doughs are softer and more forgiving to shape.'
+        : 'Turn dough onto lightly floured surface. Pre-shape into a round, rest 20 minutes, then perform final shape (boule or batard). Build surface tension by pulling dough toward you while rotating.',
       timing: '20 min bench rest + shaping'
     },
     {
       step: '6. FINAL PROOF',
       change: isEnrichedDough
-        ? 'Place shaped dough in a greased pan or banneton. Proof 2-3 hours at room temperature until dough springs back slowly when pressed. Enriched doughs are more delicate—avoid over-proofing.'
-        : 'Place shaped dough seam-side up in a floured banneton or bowl. Proof 2–4 hours at room temperature until dough springs back slowly when pressed, OR refrigerate overnight (8–12 hours) for enhanced flavor development.',
+        ? 'Place shaped dough in greased pan or banneton. Proof 2-3 hours at room temperature until puffy and nearly doubled. When pressed, dough should spring back slowly.'
+        : 'Place shaped dough seam-side up in a floured banneton. Proof 2–4 hours at room temperature OR refrigerate overnight (8–12 hours).',
       timing: isEnrichedDough ? '2-3 hours room temp' : '2-4 hours room temp or 8-12 hours cold'
     },
     {
       step: '7. BAKE',
       change: isEnrichedDough
-        ? 'Preheat oven to 375°F (190°C). Optionally brush with egg wash for shine. Bake 35-40 minutes until deep golden and internal temperature reaches 190-195°F. Enriched doughs bake at lower temperature to prevent burning the sugars.'
-        : 'Preheat Dutch oven to 450°F (232°C). Score the top of the dough with a sharp blade. Bake covered for 20 minutes to trap steam, then uncover and bake 25–30 minutes more until deep golden brown and internal temperature reaches 205–210°F.',
-      timing: isEnrichedDough ? '35-40 min at 375°F (190°C)' : '45-50 min at 450°F (232°C)'
+        ? 'Preheat oven to 375°F (190°C). Brush with egg wash if desired. Bake 25-35 minutes until deep golden and internal temperature reaches 190-195°F.'
+        : 'Preheat Dutch oven to 450°F (232°C). Score the top. Bake covered 20 minutes, then uncovered 25–30 minutes until internal temp 205–210°F.',
+      timing: isEnrichedDough ? '25-35 min at 375°F' : '45-50 min at 450°F'
     },
     {
       step: '8. COOL',
       change: isEnrichedDough
-        ? 'Remove from pan and cool on a wire rack for at least 1 hour before slicing. Enriched breads set faster than lean sourdoughs.'
-        : 'Remove from Dutch oven and cool on a wire rack for minimum 2 hours before slicing. This allows the crumb to set properly.',
+        ? 'Cool on wire rack for at least 1 hour before slicing.'
+        : 'Cool on wire rack minimum 2 hours before slicing.',
       timing: isEnrichedDough ? '1 hour minimum' : '2 hours minimum'
     }
   ];
@@ -375,47 +453,32 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     {
       issue: 'Tight Crumb',
       solution: isEnrichedDough
-        ? 'Dough was under-fermented. Enriched doughs take longer—extend bulk fermentation by 1-2 hours and watch for 50-75% rise.'
-        : 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain that doubles in 6–8 hours and extend bulk fermentation until dough rises ~50% and looks airy.'
+        ? 'Dough was under-fermented. Enriched doughs take longer—extend bulk fermentation by 1-2 hours.'
+        : 'Dough was under-fermented or starter too weak. Build strong levain and extend bulk fermentation.'
     },
     {
       issue: 'Gummy Crumb',
-      solution: isEnrichedDough
-        ? 'Sliced too soon. Cool enriched breads at least 1 hour (preferably 2+) before slicing.'
-        : 'Sliced too soon or dough overhydrated. Always cool sourdough minimum 2 hours (preferably 4+) before slicing, and verify hydration is appropriate for your flour type.'
-    },
-    {
-      issue: 'Dark/Burnt Crust',
-      solution: isEnrichedDough
-        ? 'Sugar causes faster browning. Lower oven temperature to 350-375°F and tent with foil if browning too quickly.'
-        : 'Oven temperature too high. Reduce to 425°F and check internal temperature (should reach 205-210°F).'
+      solution: 'Sliced too soon. Cool completely before slicing.'
     },
     {
       issue: 'Weak Rise',
-      solution: 'Inactive starter or cold dough temperature. Ensure starter is at peak activity (doubled and bubbly) before mixing, and maintain dough temperature at 75–78°F during bulk fermentation.'
+      solution: 'Inactive starter or cold temperature. Ensure starter doubles in 6-8 hours and maintain 75–78°F.'
     }
   ];
   
-  // Add enrichment-specific warnings
   if (sugarPercentage > 10) {
     troubleshootingTips.push({
-      issue: 'High Sugar Content Detected',
-      solution: `Sugar content is ${Math.round(sugarPercentage)}% of flour. This will slow fermentation significantly. Consider increasing starter to 25% or extending bulk fermentation by 2-3 hours.`
+      issue: 'High Sugar Content',
+      solution: `Sugar is ${Math.round(sugarPercentage)}% of flour. This slows fermentation. Consider increasing starter to 25% or extending bulk fermentation 2-3 hours.`
     });
   }
   
   if (fatPercentage > 15) {
     troubleshootingTips.push({
-      issue: 'High Fat Content Detected',
-      solution: `Fat content is ${Math.round(fatPercentage)}% of flour. Add butter AFTER initial mixing (during first fold) to prevent coating flour particles and inhibiting gluten development.`
+      issue: 'High Fat Content',
+      solution: `Fat is ${Math.round(fatPercentage)}% of flour. Add butter AFTER initial mixing to prevent coating flour particles.`
     });
   }
-  
-  // Add reminder note about watching the dough
-  troubleshootingTips.push({
-    issue: 'Remember',
-    solution: 'Watch the dough, not the clock. Fermentation times vary with temperature, starter strength, and flour type.'
-  });
 
   const warnings = generateBakerWarnings(converted);
   const substitutions = generateSubstitutions(converted);

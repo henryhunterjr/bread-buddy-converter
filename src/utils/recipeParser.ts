@@ -17,6 +17,14 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'cups oil': 224,
   'cup vegetable oil': 224,
   'cups vegetable oil': 224,
+  // BUTTER CONVERSIONS
+  'cup butter': 227,
+  'cups butter': 227,
+  'tablespoon butter': 14,
+  'tbsp butter': 14,
+  'teaspoon butter': 5,
+  'tsp butter': 5,
+  // YEAST
   'tablespoon yeast': 10,
   'tablespoon active dry yeast': 10,
   'tablespoon instant yeast': 10,
@@ -24,17 +32,26 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'tsp instant yeast': 3,
   'tsp active dry yeast': 3,
   'tsp yeast': 3,
+  // SALT
   'tablespoon salt': 20,
   'tbsp salt': 20,
   'tsp salt': 6,
+  // OIL
   'tablespoon oil': 15,
   'tbsp oil': 15,
   'tablespoon vegetable oil': 15,
   'tbsp vegetable oil': 15,
+  // HONEY/SUGAR
   'tablespoon honey': 21,
   'tbsp honey': 21,
   'cup honey': 340,
   'cups honey': 340,
+  'cup sugar': 200,
+  'cups sugar': 200,
+  // EGG (count, not grams)
+  'egg': 50,  // 1 large egg ≈ 50g
+  'large egg': 50,
+  'eggs': 50,
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
@@ -42,6 +59,9 @@ const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'oil'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt'];
+const BUTTER_KEYWORDS = ['butter'];
+const EGG_KEYWORDS = ['egg'];
+const SUGAR_KEYWORDS = ['sugar', 'honey'];
 
 export function parseRecipe(recipeText: string): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
@@ -158,9 +178,22 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
   // Handle bullet points and dashes
   let cleaned = lower.replace(/^[-•*]\s*/, '');
   
-  // Remove parenthetical alternative measurements (e.g., "(3/4 cup)" or "(scant 1/2 cup)")
-  // This helps extract the primary measurement and ingredient name cleanly
+  // CRITICAL FIX: Extract grams from parentheses BEFORE removing them
+  // Pattern: "(57g / 4 tablespoons)" or "(3/4 cup)" or "(50g)"
+  const gramsInParens = cleaned.match(/\((\d+(?:\.\d+)?)\s*g(?:rams?)?\s*(?:\/|\||or)?\s*[^)]*\)/);
+  
+  // Remove parenthetical alternative measurements AFTER extracting grams
   cleaned = cleaned.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // If we found grams in parentheses, use that as the primary measurement
+  if (gramsInParens) {
+    const amount = parseFloat(gramsInParens[1]);
+    // Extract ingredient name after the parenthetical
+    const nameMatch = trimmed.match(/\([^)]*\)\s*(.+)/);
+    const name = nameMatch ? nameMatch[1].trim() : cleaned.replace(/^\d+(?:\.\d+)?/, '').trim();
+    console.log(`Found grams in parens: ${amount}g ${name}`);
+    return createIngredient(name, amount, lower);
+  }
   
   // Pattern 1: "100g bread flour" or "240ml water" (grams/ml directly stated)
   const gramsFirstMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
@@ -224,13 +257,25 @@ function convertToGrams(amount: number, unit: string, name: string): number {
     return amount;
   }
   
-  const conversionKey = `${unit} ${name}`;
+  // Build conversion key: unit + name
+  const conversionKey = `${unit} ${name}`.toLowerCase();
+  
+  // Try exact match first
   for (const [key, grams] of Object.entries(UNIT_CONVERSIONS)) {
     if (conversionKey.includes(key)) {
+      console.log(`Converting ${amount} ${unit} ${name} using key "${key}" = ${amount * grams}g`);
       return amount * grams;
     }
   }
   
+  // Special handling for eggs (count as whole items)
+  if (name.toLowerCase().includes('egg')) {
+    console.log(`Converting ${amount} egg(s) = ${amount * 50}g`);
+    return amount * 50; // 1 egg ≈ 50g
+  }
+  
+  // If no conversion found, assume grams
+  console.log(`No conversion found for "${unit} ${name}", assuming ${amount}g`);
   return amount;
 }
 
@@ -238,9 +283,15 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   // Determine type
   let type: ParsedIngredient['type'] = 'other';
   
-  // Check more specific types first (flour, liquid) before generic starter/levain
+  // Check most specific types first
   if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'flour';
+  } else if (BUTTER_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'fat';  // Butter is fat, not "other"
+  } else if (EGG_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'enrichment';  // Eggs are enrichments
+  } else if (SUGAR_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'sweetener';  // Sugar/honey is sweetener
   } else if (LIQUID_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'liquid';
   } else if (YEAST_KEYWORDS.some(k => lowerLine.includes(k))) {
@@ -250,6 +301,8 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   } else if (STARTER_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'starter';
   }
+
+  console.log(`Created ingredient: ${amount}g ${name} [type: ${type}]`);
 
   return {
     name,
@@ -293,13 +346,13 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
   
   // Check if recipe has enrichments
   const hasOil = recipe.ingredients.some(i => 
-    i.name.toLowerCase().includes('oil') || i.name.toLowerCase().includes('butter')
+    i.name.toLowerCase().includes('oil') || i.name.toLowerCase().includes('butter') || i.type === 'fat'
   );
   const hasEggs = recipe.ingredients.some(i => 
-    i.name.toLowerCase().includes('egg')
+    i.name.toLowerCase().includes('egg') || i.type === 'enrichment'
   );
   const hasHoney = recipe.ingredients.some(i => 
-    i.name.toLowerCase().includes('honey') || i.name.toLowerCase().includes('sugar')
+    i.name.toLowerCase().includes('honey') || i.name.toLowerCase().includes('sugar') || i.type === 'sweetener'
   );
   const isEnriched = hasOil || hasEggs || hasHoney;
   
