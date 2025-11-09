@@ -474,15 +474,13 @@ export function validateRecipe(recipe: ParsedRecipe): string[] {
   );
   const isEnrichedDough = hasMilk || hasEnrichments;
 
+  // Only block on extremely unrealistic hydration (>100% = more water than flour)
   if (recipe.hydration > 100) {
     errors.push(`Your hydration calculates to ${recipe.hydration.toFixed(0)}%. That's more batter than bread dough. Double-check your flour and water amounts.`);
-  } else if (recipe.hydration < 35 && !isEnrichedDough) {
-    // Only enforce minimum hydration for lean doughs
-    errors.push(`Your hydration is ${recipe.hydration.toFixed(0)}%. That's quite low for a lean dough. Double-check your amounts.`);
-  } else if (recipe.hydration < 25 && isEnrichedDough) {
-    // Enriched doughs can have lower hydration, but not too low
-    errors.push(`Your hydration is ${recipe.hydration.toFixed(0)}%. Even for enriched dough, this seems low. Double-check your amounts.`);
   }
+  
+  // Low hydration is unusual but not invalid - let users proceed with a warning
+  // The warning will be shown in generateBakerWarnings() instead
 
   if (recipe.starterAmount > 0 && recipe.yeastAmount > 0) {
     errors.push("I found both yeast and starter. Pick one, then try again.");
