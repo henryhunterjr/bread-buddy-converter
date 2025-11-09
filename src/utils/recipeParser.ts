@@ -67,81 +67,57 @@ const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
 const CORE_INGREDIENTS = ['water', 'milk', 'butter', 'oil', 'egg', 'flour', 'yeast', 'sugar', 'salt', 'starter', 'honey'];
 
 // Detect and split compound ingredient lines (multiple ingredients on one line)
+// DISABLED: Normalization now handles splitting via regex patterns
 function splitCompoundIngredients(line: string): string[] {
-  const lower = line.toLowerCase();
-  
-  // Count how many core ingredient keywords appear
-  const positions: Array<{ keyword: string; index: number }> = [];
-  
-  CORE_INGREDIENTS.forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-    const matches = [...lower.matchAll(regex)];
-    matches.forEach(m => {
-      if (m.index !== undefined) {
-        positions.push({ keyword, index: m.index });
-      }
-    });
-  });
-  
-  // If we found multiple ingredient keywords, try to split
-  if (positions.length > 1) {
-    positions.sort((a, b) => a.index - b.index);
-    
-    console.log(`Found ${positions.length} ingredients in one line:`, line);
-    console.log('Positions:', positions.map(p => `${p.keyword} at ${p.index}`));
-    
-    const segments: string[] = [];
-    
-    // Try to find measurement patterns before each ingredient keyword
-    for (let i = 0; i < positions.length; i++) {
-      const currentPos = positions[i];
-      const nextPos = positions[i + 1];
-      
-      // Look backwards from current position to find the measurement
-      const beforeCurrent = line.substring(0, currentPos.index);
-      const measurementMatch = beforeCurrent.match(/(\d+(?:\.\d+)?(?:\/\d+)?\s*(?:g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp|°F|°C)?)\s*$/i);
-      
-      if (measurementMatch) {
-        const startIndex = measurementMatch.index || 0;
-        const endIndex = nextPos ? nextPos.index : line.length;
-        const segment = line.substring(startIndex, endIndex).trim();
-        
-        // Only add if it has a number
-        if (/\d/.test(segment)) {
-          segments.push(segment);
-          console.log(`  Extracted: "${segment}"`);
-        }
-      }
-    }
-    
-    // If we successfully extracted segments, return them
-    if (segments.length > 1) {
-      return segments;
-    }
-  }
-  
-  // No compound detected, return original
-  return [line];
+  // The compound splitting algorithm was causing bugs where:
+  // - Wrong measurements were assigned to ingredients
+  // - Ingredient names got contaminated with other ingredients' text
+  //
+  // Now we rely on normalization (line 208) to split compound lines
+  // by adding newlines after closing parens when followed by measurements
+  //
+  // Example: "120ml water (temp) 57g butter" becomes two lines:
+  //   "120ml water (temp)"
+  //   "57g butter"
+
+  return [line];  // Just return the line as-is
 }
 
 // Enhanced egg detection pattern
 function extractEggFromLine(line: string): { count: number; fullText: string } | null {
   const lower = line.toLowerCase();
-  
+
+  // CRITICAL: Skip egg wash, topping, and finishing eggs (not part of dough)
+  const skipPatterns = [
+    /egg\s+wash/i,
+    /for\s+(?:egg\s+)?wash/i,
+    /beaten\s+(?:egg|eggs)/i,
+    /for\s+brushing/i,
+    /for\s+topping/i,
+    /for\s+finishing/i,
+    /for\s+glazing/i,
+    /to\s+brush/i,
+  ];
+
+  if (skipPatterns.some(pattern => pattern.test(line))) {
+    console.log(`Skipping egg (not a dough ingredient): "${line}"`);
+    return null;
+  }
+
   // Pattern: "1 large egg", "2 eggs", "1 egg, room temperature"
   const eggPattern = /(\d+)\s*(large|medium|extra[\s-]?large|xl)?\s*eggs?(?:\s*,\s*[^,\n]+)?/i;
   const match = lower.match(eggPattern);
-  
+
   if (match) {
     const count = parseInt(match[1]);
     // Find the full context in the original line (preserve capitalization)
     const fullMatch = line.match(new RegExp(match[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
     const fullText = fullMatch ? fullMatch[0] : match[0];
-    
+
     console.log(`✓ Detected egg: "${fullText}" (count: ${count})`);
     return { count, fullText };
   }
-  
+
   return null;
 }
 
@@ -200,10 +176,12 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
   // Normalize the ingredients section:
   // 1. Replace asterisks with newlines
   // 2. Add newlines before common measurement patterns to split continuous text
+  // 3. Split compound lines (multiple ingredients on one line)
   let normalized = ingredientsSection
     .replace(/\s*\*\s*/g, '\n')  // Replace asterisks with newlines
     .replace(/\s+(\d+(?:\.\d+)?)\s*(?:g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+/gi, '\n$1 ')  // Add newline before measurements
-    .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ');  // Add newline before fractions
+    .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ')  // Add newline before fractions
+    .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
     
   const lines = normalized.split('\n');
   
