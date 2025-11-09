@@ -149,13 +149,13 @@ function isValidIngredientLine(line: string): boolean {
   
   // Must contain a measurement word + ingredient word
   const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
-  const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
-  
+  const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter|honey|syrup|molasses|agave)/i.test(line);
+
   // Skip if matches any skip pattern
   if (skipPatterns.some(pattern => pattern.test(line))) {
     return false;
   }
-  
+
   // Must have both measurement AND ingredient
   return hasMeasurement && hasIngredient;
 }
@@ -428,6 +428,7 @@ function convertToGrams(amount: number, unit: string, name: string): number {
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
   // CRITICAL FIX: Clean ingredient name - remove instruction contamination
   let cleanName = name
+    .replace(/,?\s*plus\s+[\d-]+g?\s+(more\s+)?for.*/gi, '') // Remove ", plus 25-50g more for kneading"
     .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature|room temperature|neutral).*/gi, '')
     .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling|bowl).*/gi, '')
     .replace(/\s+/g, ' ')
