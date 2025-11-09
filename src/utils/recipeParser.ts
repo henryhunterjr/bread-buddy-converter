@@ -140,13 +140,21 @@ function isValidIngredientLine(line: string): boolean {
   const hasMeasurement = /\d+(?:\.\d+)?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
   const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
   
+  console.log(`🔍 Validating line: "${line}"`);
+  console.log(`  - Has measurement: ${hasMeasurement}`);
+  console.log(`  - Has ingredient: ${hasIngredient}`);
+  console.log(`  - Skip patterns match: ${skipPatterns.some(pattern => pattern.test(line))}`);
+  
   // Skip if matches any skip pattern
   if (skipPatterns.some(pattern => pattern.test(line))) {
+    console.log(`  ❌ SKIPPED (matched skip pattern)`);
     return false;
   }
   
   // Must have both measurement AND ingredient
-  return hasMeasurement && hasIngredient;
+  const isValid = hasMeasurement && hasIngredient;
+  console.log(`  ${isValid ? '✅ VALID' : '❌ INVALID'}`);
+  return isValid;
 }
 
 export function parseRecipe(recipeText: string): ParsedRecipe {
@@ -185,17 +193,30 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     
   const lines = normalized.split('\n');
   
+  console.log('🔥 PARSING RECIPE - All lines after normalization:', lines);
+  
   for (const line of lines) {
     const trimmed = line.trim();
     
+    console.log(`\n📋 Processing line: "${trimmed}"`);
+    
     // Skip empty lines or very short lines
-    if (!trimmed || trimmed.length < 5) continue;
+    if (!trimmed || trimmed.length < 5) {
+      console.log('  ⏭️  Skipped: too short or empty');
+      continue;
+    }
     
     // Skip lines that don't contain numbers (likely titles or section headers)
-    if (!/\d/.test(trimmed)) continue;
+    if (!/\d/.test(trimmed)) {
+      console.log('  ⏭️  Skipped: no numbers found');
+      continue;
+    }
     
     // Skip lines that are just metadata (like "Prep Time:", "Yield:", etc.)
-    if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
+    if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) {
+      console.log('  ⏭️  Skipped: metadata line');
+      continue;
+    }
 
     // CRITICAL FIX: Skip lines that are ONLY "extra for kneading" (not main ingredient lines)
     // Match lines that start with small amounts (under 100g) that are clearly just extra
