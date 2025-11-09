@@ -3,22 +3,28 @@ import autoTable from 'jspdf-autotable';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from './recipeConverter';
 
-export function generatePDF(result: ConvertedRecipe) {
+export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Converted Recipe') {
   const doc = new jsPDF();
   
-  // Header
-  doc.setFontSize(20);
+  // Header - Recipe Name
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  const title = result.direction === 'sourdough-to-yeast' 
+  doc.text(recipeName, 105, 15, { align: 'center' });
+  
+  // Subtitle - Conversion type
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'normal');
+  const subtitle = result.direction === 'sourdough-to-yeast' 
     ? 'Yeast Conversion Recipe'
     : 'Sourdough Conversion Recipe';
-  doc.text(title, 105, 20, { align: 'center' });
+  doc.text(subtitle, 105, 23, { align: 'center' });
   
+  // Branding
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Converted using BakingGreatBread.blog Recipe Converter', 105, 28, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.text('Recipe conversion by BakingGreatBread.com', 105, 30, { align: 'center' });
   
-  let yPos = 40;
+  let yPos = 38;
   
   // Converted Ingredients
   doc.setFontSize(14);
@@ -233,7 +239,7 @@ export function generatePDF(result: ConvertedRecipe) {
   const pageHeight = doc.internal.pageSize.height;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'italic');
-  doc.text('For more bread tips and recipes, visit BakingGreatBread.blog', 105, pageHeight - 15, { align: 'center' });
+  doc.text('BakingGreatBread.com', 105, pageHeight - 15, { align: 'center' });
   
   // Save
   doc.save('recipe-conversion.pdf');

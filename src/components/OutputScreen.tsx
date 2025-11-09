@@ -35,7 +35,8 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
   const convertedPercentages = calculateBakersPercentages(result.converted);
 
   const handleDownloadPDF = () => {
-    generatePDF(result);
+    const name = recipeName.trim() || 'Converted Recipe';
+    generatePDF(result, name);
   };
 
   const handleSaveRecipe = () => {
