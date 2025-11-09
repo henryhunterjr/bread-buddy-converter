@@ -1,21 +1,60 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/pdfGenerator';
+import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
+import { Save } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
+  originalRecipeText: string;
   onStartOver: () => void;
 }
 
-export default function OutputScreen({ result, onStartOver }: OutputScreenProps) {
+export default function OutputScreen({ result, originalRecipeText, onStartOver }: OutputScreenProps) {
+  const [recipeName, setRecipeName] = useState('');
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const { toast } = useToast();
+  
   const originalPercentages = calculateBakersPercentages(result.original);
   const convertedPercentages = calculateBakersPercentages(result.converted);
 
   const handleDownloadPDF = () => {
     generatePDF(result);
+  };
+
+  const handleSaveRecipe = () => {
+    if (!recipeName.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter a name for this recipe",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveRecipe(recipeName, originalRecipeText, result);
+    toast({
+      title: "Recipe saved",
+      description: `"${recipeName}" has been saved to your browser`,
+    });
+    setSaveDialogOpen(false);
+    setRecipeName('');
   };
 
   return (
@@ -230,7 +269,47 @@ export default function OutputScreen({ result, onStartOver }: OutputScreenProps)
         )}
 
         {/* Actions */}
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="lg">
+                <Save className="mr-2 h-4 w-4" />
+                Save Recipe
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Save Recipe</DialogTitle>
+                <DialogDescription>
+                  Give this recipe a name so you can easily find it later
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Recipe Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g. Cranberry Walnut Sourdough"
+                    value={recipeName}
+                    onChange={(e) => setRecipeName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveRecipe();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveRecipe}>
+                  Save
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button onClick={handleDownloadPDF} size="lg">
             Download PDF
           </Button>

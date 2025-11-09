@@ -8,11 +8,15 @@ import { AlertCircle, Upload, FileText, Image } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { extractTextFromFile } from '@/utils/fileExtractor';
 import { useToast } from '@/hooks/use-toast';
+import { SavedRecipes } from '@/components/SavedRecipes';
+import { SavedRecipe } from '@/utils/recipeStorage';
+import { ConvertedRecipe } from '@/types/recipe';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
   onConvert: (recipeText: string) => void;
   onBack: () => void;
+  onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
 }
 
 const EXAMPLE_TEXT = `Example format:
@@ -24,11 +28,15 @@ const EXAMPLE_TEXT = `Example format:
 Method:
 Mix flour and water, rest 30 min...`;
 
-export default function InputScreen({ direction, onConvert, onBack }: InputScreenProps) {
+export default function InputScreen({ direction, onConvert, onBack, onLoadSaved }: InputScreenProps) {
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const handleLoadRecipe = (recipe: SavedRecipe) => {
+    onLoadSaved(recipe.originalText, recipe.convertedRecipe);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,8 +112,8 @@ export default function InputScreen({ direction, onConvert, onBack }: InputScree
       </div>
       
       <div className="flex-1 p-4 py-8">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
             <Button variant="outline" onClick={onBack}>
               ← Back
             </Button>
@@ -114,85 +122,95 @@ export default function InputScreen({ direction, onConvert, onBack }: InputScree
             </h1>
           </div>
 
-          <Card className="p-6 space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Upload Recipe (PDF or Image)
-                </label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={isProcessing}
-                    onClick={() => document.getElementById('file-upload')?.click()}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left column: Recipe Input */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="p-6 space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Upload Recipe (PDF or Image)
+                    </label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        disabled={isProcessing}
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {isProcessing ? 'Processing...' : 'Upload File'}
+                      </Button>
+                      <input
+                        id="file-upload"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-3 w-3" />
+                      PDF or
+                      <Image className="h-3 w-3" />
+                      Image (JPG, PNG, WEBP) • Max 20MB
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">Or</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Paste your recipe below
+                    </label>
+                    <Textarea
+                      placeholder={EXAMPLE_TEXT}
+                      value={recipeText}
+                      onChange={(e) => setRecipeText(e.target.value)}
+                      className="min-h-[300px] font-mono text-sm"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Include ingredient amounts (grams preferred) and your method. Don't worry about perfect formatting—I'll figure it out.
+                    </p>
+                  </div>
+
+                  {errors.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <ul className="list-disc list-inside space-y-1">
+                          {errors.map((error, i) => (
+                            <li key={i}>{error}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button 
+                    onClick={handleConvert} 
+                    className="w-full"
+                    disabled={!recipeText.trim() || isProcessing}
                   >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {isProcessing ? 'Processing...' : 'Upload File'}
+                    Convert Recipe
                   </Button>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.webp"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-2">
-                  <FileText className="h-3 w-3" />
-                  PDF or
-                  <Image className="h-3 w-3" />
-                  Image (JPG, PNG, WEBP) • Max 20MB
-                </p>
-              </div>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Paste your recipe below
-                </label>
-                <Textarea
-                placeholder={EXAMPLE_TEXT}
-                value={recipeText}
-                onChange={(e) => setRecipeText(e.target.value)}
-                className="min-h-[300px] font-mono text-sm"
-              />
-              <p className="text-sm text-muted-foreground">
-                Include ingredient amounts (grams preferred) and your method. Don't worry about perfect formatting—I'll figure it out.
-              </p>
+              </Card>
             </div>
 
-            {errors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <ul className="list-disc list-inside space-y-1">
-                    {errors.map((error, i) => (
-                      <li key={i}>{error}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Button 
-              onClick={handleConvert} 
-              className="w-full"
-              disabled={!recipeText.trim() || isProcessing}
-            >
-              Convert Recipe
-            </Button>
+            {/* Right column: Saved Recipes */}
+            <div className="lg:col-span-1">
+              <SavedRecipes onLoadRecipe={handleLoadRecipe} />
             </div>
-          </Card>
+          </div>
         </div>
       </div>
       
