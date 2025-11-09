@@ -323,10 +323,23 @@ export function validateRecipe(recipe: ParsedRecipe): string[] {
     errors.push("I couldn't find enough liquid. Please include water or other liquids.");
   }
 
+  // Check if recipe has enrichments (milk, butter, eggs, sugar)
+  const hasMilk = recipe.ingredients.some(i => 
+    i.type === 'liquid' && i.name.toLowerCase().includes('milk')
+  );
+  const hasEnrichments = recipe.ingredients.some(i => 
+    i.type === 'fat' || i.type === 'enrichment' || i.type === 'sweetener'
+  );
+  const isEnrichedDough = hasMilk || hasEnrichments;
+
   if (recipe.hydration > 100) {
     errors.push(`Your hydration calculates to ${recipe.hydration.toFixed(0)}%. That's more batter than bread dough. Double-check your flour and water amounts.`);
-  } else if (recipe.hydration < 45) {
-    errors.push(`Your hydration is ${recipe.hydration.toFixed(0)}%. That's quite low. Double-check your amounts.`);
+  } else if (recipe.hydration < 35 && !isEnrichedDough) {
+    // Only enforce minimum hydration for lean doughs
+    errors.push(`Your hydration is ${recipe.hydration.toFixed(0)}%. That's quite low for a lean dough. Double-check your amounts.`);
+  } else if (recipe.hydration < 25 && isEnrichedDough) {
+    // Enriched doughs can have lower hydration, but not too low
+    errors.push(`Your hydration is ${recipe.hydration.toFixed(0)}%. Even for enriched dough, this seems low. Double-check your amounts.`);
   }
 
   if (recipe.starterAmount > 0 && recipe.yeastAmount > 0) {
