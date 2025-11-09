@@ -167,11 +167,20 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Total flour:', totalFlour);
   console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
+  console.log('=== CONVERSION DEBUG ===');
+  console.log('All confirmed ingredients:', recipe.ingredients.map(i => 
+    `${i.amount}g ${i.name} [type: ${i.type}]`
+  ));
+  
   // STEP 2: Separate ingredients by category
   // Use WORKING PATTERN from convertSourdoughToYeast: filter OUT what we don't want
   const nonFlourLiquidYeastIngredients = recipe.ingredients.filter(
     i => i.type !== 'flour' && i.type !== 'liquid' && i.type !== 'yeast'
   );
+  
+  console.log('After filter (should include salt + egg):', nonFlourLiquidYeastIngredients.map(i => 
+    `${i.amount}g ${i.name} [type: ${i.type}]`
+  ));
   
   const waterIngredients = recipe.ingredients.filter(i => 
     i.type === 'liquid' && !i.name.toLowerCase().includes('milk')
