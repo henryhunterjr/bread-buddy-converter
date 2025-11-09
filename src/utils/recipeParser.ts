@@ -55,13 +55,13 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
-const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'oil'];
+const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt'];
-const BUTTER_KEYWORDS = ['butter'];
-const EGG_KEYWORDS = ['egg'];
-const SUGAR_KEYWORDS = ['sugar', 'honey'];
+const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
+const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
+const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
 
 export function parseRecipe(recipeText: string): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
@@ -109,8 +109,10 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     // Skip lines that are just metadata (like "Prep Time:", "Yield:", etc.)
     if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
 
-    // CRITICAL FIX: Skip "extra for kneading/dusting" type lines
-    if (/(plus|extra|additional|more)\s+.*\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface)/i.test(trimmed)) {
+    // CRITICAL FIX: Skip lines that are ONLY "extra for kneading" (not main ingredient lines)
+    // Match lines that start with small amounts (under 100g) that are clearly just extra
+    if (/^(plus|extra|additional)?\s*\d+(?:-\d+)?\s*(?:g|grams?)\s+.*\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface)/i.test(trimmed) &&
+        !/\d{3,}/.test(trimmed)) {  // Don't skip if it has 3+ digit numbers (main ingredient amounts)
       console.log('Skipping extra/kneading line:', trimmed);
       continue;
     }
@@ -288,29 +290,29 @@ function convertToGrams(amount: number, unit: string, name: string): number {
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
   // CRITICAL FIX: Clean ingredient name - remove instruction contamination
   let cleanName = name
-    .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature).*/gi, '')
-    .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling).*/gi, '')
+    .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature|room temperature|neutral).*/gi, '')
+    .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling|bowl).*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
   
-  // Determine type
+  // Determine type - CHECK MOST SPECIFIC FIRST
   let type: ParsedIngredient['type'] = 'other';
   
-  // Check most specific types first
-  if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
+  // Check enrichments BEFORE flour (egg might have "flour" in contaminated text)
+  if (ENRICHMENT_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'enrichment';
+  } else if (SWEETENER_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'sweetener';
+  } else if (FAT_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'fat';
+  } else if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'flour';
-  } else if (BUTTER_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'fat';  // Butter is fat, not "other"
-  } else if (EGG_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'enrichment';  // Eggs are enrichments
-  } else if (SUGAR_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'sweetener';  // Sugar/honey is sweetener
-  } else if (LIQUID_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'liquid';
   } else if (YEAST_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'yeast';
   } else if (SALT_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'salt';
+  } else if (LIQUID_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'liquid';
   } else if (STARTER_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'starter';
   }
