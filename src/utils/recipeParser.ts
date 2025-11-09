@@ -148,7 +148,7 @@ function isValidIngredientLine(line: string): boolean {
   ];
   
   // Must contain a measurement word + ingredient word
-  const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
+  const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s*(?:\(.*?\))?/i.test(line);
   const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
   
   // Skip if matches any skip pattern
