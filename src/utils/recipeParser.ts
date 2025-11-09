@@ -238,16 +238,17 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   // Determine type
   let type: ParsedIngredient['type'] = 'other';
   
-  if (STARTER_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'starter';
+  // Check more specific types first (flour, liquid) before generic starter/levain
+  if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'flour';
+  } else if (LIQUID_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'liquid';
   } else if (YEAST_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'yeast';
   } else if (SALT_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'salt';
-  } else if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'flour';
-  } else if (LIQUID_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'liquid';
+  } else if (STARTER_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'starter';
   }
 
   return {
