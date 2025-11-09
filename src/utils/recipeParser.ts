@@ -39,7 +39,7 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
 const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'oil'];
-const STARTER_KEYWORDS = ['starter', 'levain', 'sourdough'];
+const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt'];
 
