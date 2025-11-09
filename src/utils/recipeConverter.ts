@@ -377,6 +377,9 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Starter flour contribution:', totalLevainFlour + 'g (' + ((totalLevainFlour / totalFlour) * 100).toFixed(1) + '% of total flour)');
   console.log('Active starter used:', activeStarterWeight + 'g (provides ' + starterFlourContent + 'g flour)');
   console.log('Levain build ratio: ' + activeStarterWeight + 'g starter : ' + levainWater + 'g water : ' + levainFlour + 'g flour = ' + levainTotal + 'g total');
+  
+  // Calculate actual starter percentage for validation
+  const actualStarterPercentage = (totalLevainFlour / totalFlour) * 100;
 
   // Classify dough type
   const classification = classifyDough(
@@ -420,6 +423,29 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
       solution: 'Inactive starter or cold temperature. Ensure starter doubles in 6-8 hours and maintain 75–78°F.'
     }
   ];
+  
+  // VALIDATION: Check starter percentage (optimal range: 15-25%)
+  if (actualStarterPercentage < 15) {
+    const targetFlour = Math.round(totalFlour * 0.18); // 18% target
+    const neededStarter = Math.round(targetFlour * 0.4);
+    const neededWater = Math.round(targetFlour * 0.4);
+    const neededFlour = Math.round(targetFlour * 0.4);
+    
+    troubleshootingTips.unshift({
+      issue: `⚠️ Low Starter Inoculation (${actualStarterPercentage.toFixed(0)}%)`,
+      solution: `Your levain provides only ${actualStarterPercentage.toFixed(0)}% starter flour. For reliable fermentation, aim for 15-25%. To fix: increase levain build to ${neededStarter}g starter + ${neededWater}g water + ${neededFlour}g flour (${neededStarter + neededWater + neededFlour}g total). This will give ~18% inoculation.`
+    });
+  } else if (actualStarterPercentage > 25) {
+    const targetFlour = Math.round(totalFlour * 0.20); // 20% target
+    const neededStarter = Math.round(targetFlour * 0.4);
+    const neededWater = Math.round(targetFlour * 0.4);
+    const neededFlour = Math.round(targetFlour * 0.4);
+    
+    troubleshootingTips.unshift({
+      issue: `⚠️ High Starter Inoculation (${actualStarterPercentage.toFixed(0)}%)`,
+      solution: `Your levain provides ${actualStarterPercentage.toFixed(0)}% starter flour. Above 25%, you risk sour flavor and rapid over-fermentation. To fix: reduce levain build to ${neededStarter}g starter + ${neededWater}g water + ${neededFlour}g flour (${neededStarter + neededWater + neededFlour}g total). This will give ~20% inoculation.`
+    });
+  }
   
   if (sugarPercentage > 10) {
     troubleshootingTips.push({
