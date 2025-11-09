@@ -63,6 +63,88 @@ const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
 const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
 
+// Core ingredient keywords for compound detection
+const CORE_INGREDIENTS = ['water', 'milk', 'butter', 'oil', 'egg', 'flour', 'yeast', 'sugar', 'salt', 'starter', 'honey'];
+
+// Detect and split compound ingredient lines (multiple ingredients on one line)
+function splitCompoundIngredients(line: string): string[] {
+  const lower = line.toLowerCase();
+  
+  // Count how many core ingredient keywords appear
+  const positions: Array<{ keyword: string; index: number }> = [];
+  
+  CORE_INGREDIENTS.forEach(keyword => {
+    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+    const matches = [...lower.matchAll(regex)];
+    matches.forEach(m => {
+      if (m.index !== undefined) {
+        positions.push({ keyword, index: m.index });
+      }
+    });
+  });
+  
+  // If we found multiple ingredient keywords, try to split
+  if (positions.length > 1) {
+    positions.sort((a, b) => a.index - b.index);
+    
+    console.log(`Found ${positions.length} ingredients in one line:`, line);
+    console.log('Positions:', positions.map(p => `${p.keyword} at ${p.index}`));
+    
+    const segments: string[] = [];
+    
+    // Try to find measurement patterns before each ingredient keyword
+    for (let i = 0; i < positions.length; i++) {
+      const currentPos = positions[i];
+      const nextPos = positions[i + 1];
+      
+      // Look backwards from current position to find the measurement
+      const beforeCurrent = line.substring(0, currentPos.index);
+      const measurementMatch = beforeCurrent.match(/(\d+(?:\.\d+)?(?:\/\d+)?\s*(?:g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp|°F|°C)?)\s*$/i);
+      
+      if (measurementMatch) {
+        const startIndex = measurementMatch.index || 0;
+        const endIndex = nextPos ? nextPos.index : line.length;
+        const segment = line.substring(startIndex, endIndex).trim();
+        
+        // Only add if it has a number
+        if (/\d/.test(segment)) {
+          segments.push(segment);
+          console.log(`  Extracted: "${segment}"`);
+        }
+      }
+    }
+    
+    // If we successfully extracted segments, return them
+    if (segments.length > 1) {
+      return segments;
+    }
+  }
+  
+  // No compound detected, return original
+  return [line];
+}
+
+// Enhanced egg detection pattern
+function extractEggFromLine(line: string): { count: number; fullText: string } | null {
+  const lower = line.toLowerCase();
+  
+  // Pattern: "1 large egg", "2 eggs", "1 egg, room temperature"
+  const eggPattern = /(\d+)\s*(large|medium|extra[\s-]?large|xl)?\s*eggs?(?:\s*,\s*[^,\n]+)?/i;
+  const match = lower.match(eggPattern);
+  
+  if (match) {
+    const count = parseInt(match[1]);
+    // Find the full context in the original line (preserve capitalization)
+    const fullMatch = line.match(new RegExp(match[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+    const fullText = fullMatch ? fullMatch[0] : match[0];
+    
+    console.log(`✓ Detected egg: "${fullText}" (count: ${count})`);
+    return { count, fullText };
+  }
+  
+  return null;
+}
+
 function isValidIngredientLine(line: string): boolean {
   // Skip obvious non-ingredients
   const skipPatterns = [
@@ -145,10 +227,42 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
       continue;
     }
 
-    // Parse ingredient line
-    const ingredient = parseIngredientLine(trimmed);
-    if (ingredient) {
-      ingredients.push(ingredient);
+    // PRIORITY: Check for egg first (before splitting)
+    const eggData = extractEggFromLine(trimmed);
+    if (eggData) {
+      // Create egg ingredient directly
+      const eggIngredient: ParsedIngredient = {
+        name: eggData.fullText,
+        amount: eggData.count * 50, // 50g per large egg
+        unit: 'g',
+        type: 'enrichment'
+      };
+      ingredients.push(eggIngredient);
+      console.log(`Added egg ingredient: ${eggData.count}x eggs = ${eggIngredient.amount}g`);
+      
+      // Remove the egg text from the line before processing other ingredients
+      const lineWithoutEgg = trimmed.replace(new RegExp(eggData.fullText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
+      
+      // If there's still content, process it
+      if (lineWithoutEgg && lineWithoutEgg.length > 5 && /\d/.test(lineWithoutEgg)) {
+        const segments = splitCompoundIngredients(lineWithoutEgg);
+        for (const segment of segments) {
+          const ingredient = parseIngredientLine(segment);
+          if (ingredient) {
+            ingredients.push(ingredient);
+          }
+        }
+      }
+      continue; // Move to next line
+    }
+
+    // Check for compound ingredients (multiple ingredients on one line)
+    const segments = splitCompoundIngredients(trimmed);
+    for (const segment of segments) {
+      const ingredient = parseIngredientLine(segment);
+      if (ingredient) {
+        ingredients.push(ingredient);
+      }
     }
   }
   
