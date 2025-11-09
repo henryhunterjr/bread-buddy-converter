@@ -159,36 +159,85 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
 }
 
 export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
-  // STEP 1: Identify total flour and water from yeasted recipe
+  // STEP 1: Identify total flour and base water (excluding enrichment liquids)
   const trueFlour = recipe.totalFlour;
-  const trueWater = recipe.totalLiquid;
-  const trueHydration = (trueWater / trueFlour) * 100;
   
-  // STEP 2: Build standard levain (1:2:2 ratio)
-  // 50g starter + 100g water + 100g flour = 250g total
-  const starterWeight = 50;
-  const levainWater = 100;
-  const levainFlour = 100;
-  const levainTotal = starterWeight + levainWater + levainFlour; // 250g
+  // STEP 2: Identify and separate enrichments from base water
+  // Enrichments: butter, eggs, milk, sugar, oil, etc.
+  const enrichments = recipe.ingredients.filter(i => {
+    const name = i.name.toLowerCase();
+    return i.type === 'other' && (
+      name.includes('butter') || 
+      name.includes('egg') || 
+      name.includes('milk') || 
+      name.includes('sugar') ||
+      name.includes('oil') ||
+      name.includes('honey')
+    );
+  });
   
-  // Starter breakdown (100% hydration)
-  const starterFlourContent = starterWeight / 2; // 25g
-  const starterWaterContent = starterWeight / 2; // 25g
+  // Separate milk from water (milk is an enrichment, not base water)
+  const milkIngredients = recipe.ingredients.filter(i => 
+    i.type === 'liquid' && i.name.toLowerCase().includes('milk')
+  );
   
-  // STEP 3: Calculate remaining dough ingredients
-  const doughFlour = trueFlour - levainFlour - starterFlourContent;
-  const doughWater = trueWater - levainWater - starterWaterContent;
+  // Base water = total liquid minus milk
+  const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const baseWater = recipe.totalLiquid - milkAmount;
   
-  // Remove yeast and liquids from original ingredients
-  const nonYeastNonLiquidIngredients = recipe.ingredients.filter(
-    i => i.type !== 'yeast' && i.type !== 'liquid' && i.type !== 'flour'
+  // Calculate enrichment percentages for warnings
+  const sugarAmount = enrichments
+    .filter(i => i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const fatAmount = enrichments
+    .filter(i => i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  
+  const sugarPercentage = (sugarAmount / trueFlour) * 100;
+  const fatPercentage = (fatAmount / trueFlour) * 100;
+  const isEnrichedDough = sugarAmount > 0 || fatAmount > 0 || milkAmount > 0;
+  
+  // STEP 3: Calculate proper starter amount (20% of flour for enriched, 15% for lean)
+  const starterPercentage = isEnrichedDough ? 0.20 : 0.15;
+  const targetLevainFlour = Math.round(trueFlour * starterPercentage);
+  
+  // Build levain: 1:1:1 ratio from active starter
+  // If we want targetLevainFlour total flour in levain (e.g., 100g):
+  // Total flour = (activeStarter/2) + addedFlour
+  // With 1:1:1 ratio: activeStarter = water = addedFlour
+  // So: (activeStarter/2) + activeStarter = targetLevainFlour
+  // Therefore: activeStarter = targetLevainFlour / 1.5
+  const activeStarterWeight = Math.round(targetLevainFlour / 1.5);
+  const levainWater = activeStarterWeight;
+  const levainFlour = activeStarterWeight;
+  const levainTotal = activeStarterWeight + levainWater + levainFlour;
+  
+  // Active starter breakdown (100% hydration)
+  const starterFlourContent = activeStarterWeight / 2;
+  const starterWaterContent = activeStarterWeight / 2;
+  
+  // Total flour and water in levain
+  const totalLevainFlour = levainFlour + starterFlourContent;
+  const totalLevainWater = levainWater + starterWaterContent;
+  
+  // STEP 4: Calculate remaining dough ingredients
+  const doughFlour = trueFlour - totalLevainFlour;
+  
+  // For enriched doughs, target 60-68% hydration from water alone (not counting milk)
+  const targetHydration = isEnrichedDough ? 0.65 : 0.75;
+  const targetTotalWater = Math.round(trueFlour * targetHydration);
+  const doughWater = Math.max(50, targetTotalWater - totalLevainWater); // Keep at least 50g water in dough
+  
+  // STEP 5: Keep ALL other ingredients (salt, enrichments)
+  const otherIngredients = recipe.ingredients.filter(
+    i => i.type !== 'yeast' && i.type !== 'flour' && i.type !== 'liquid'
   );
   
   // Build LEVAIN section
   const levainIngredients: ParsedIngredient[] = [
     {
-      name: 'active sourdough starter',
-      amount: starterWeight,
+      name: 'active sourdough starter (100% hydration)',
+      amount: activeStarterWeight,
       unit: 'g',
       type: 'starter'
     },
@@ -206,7 +255,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
   
-  // Build DOUGH section
+  // Build DOUGH section - include ALL original ingredients
   const doughIngredients: ParsedIngredient[] = [
     {
       name: 'all of the levain',
@@ -215,19 +264,23 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
       type: 'starter'
     },
     {
-      name: 'water (80-85°F)',
-      amount: doughWater,
-      unit: 'g',
-      type: 'liquid'
-    },
-    {
       name: 'bread flour',
       amount: doughFlour,
       unit: 'g',
       type: 'flour'
     },
-    ...nonYeastNonLiquidIngredients
+    {
+      name: 'water (80-85°F)',
+      amount: doughWater,
+      unit: 'g',
+      type: 'liquid'
+    },
+    ...milkIngredients, // Keep milk separate from water
+    ...otherIngredients // ALL enrichments (butter, eggs, sugar) and salt
   ];
+  
+  // Calculate final hydration (water + milk + liquid from eggs if any)
+  const finalHydration = ((doughWater + totalLevainWater + milkAmount) / trueFlour) * 100;
   
   const converted: ParsedRecipe = {
     ...recipe,
@@ -235,20 +288,22 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     yeastAmount: 0,
     starterAmount: levainTotal,
     totalFlour: trueFlour,
-    totalLiquid: trueWater,
-    hydration: trueHydration
+    totalLiquid: doughWater + totalLevainWater + milkAmount,
+    hydration: finalHydration
   };
 
   const methodChanges: MethodChange[] = [
     {
       step: '1. BUILD LEVAIN (Night Before)',
-      change: 'Mix 50g active starter, 100g water (80–85°F), and 100g flour. Cover loosely and rest overnight until doubled and bubbly. If you don\'t have active starter, feed yours 6–8 hours before mixing so it\'s at peak activity.',
+      change: `Mix ${activeStarterWeight}g active starter, ${levainWater}g water (80–85°F), and ${levainFlour}g flour. Cover loosely and rest overnight (8-12 hours) until doubled and bubbly. This provides ${Math.round(starterPercentage * 100)}% inoculation for ${isEnrichedDough ? 'this enriched dough' : 'optimal fermentation'}.`,
       timing: '8-12 hours overnight'
     },
     {
       step: '2. MIX DOUGH (Morning)',
-      change: 'In a large bowl, dissolve levain into 375–400g warm water. Add flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.',
-      timing: '45-60 min autolyse'
+      change: isEnrichedDough 
+        ? `In a large bowl, dissolve levain into ${doughWater}g warm water. Add flour and mix until shaggy. Rest 30-45 minutes (autolyse). Then add enrichments (butter should be softened, eggs at room temperature). Mix until just combined.`
+        : `In a large bowl, dissolve levain into ${doughWater}g warm water. Add flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
+      timing: isEnrichedDough ? '30-45 min autolyse' : '45-60 min autolyse'
     },
     {
       step: '3. ADD SALT & DEVELOP STRENGTH',
@@ -257,8 +312,10 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     },
     {
       step: '4. BULK FERMENTATION',
-      change: 'Perform 3–4 sets of stretch and folds every 30–45 minutes during the first 2–3 hours. Then let rest undisturbed for 4–6 hours total at 75–78°F. Stop when dough has risen ~50%, looks airy, and holds its shape. Fermentation is guided by dough strength and temperature, not the clock.',
-      timing: '4-6 hours at 75-78°F'
+      change: isEnrichedDough
+        ? `Perform 3-4 sets of stretch and folds every 30-45 minutes during the first 2-3 hours. Enriched doughs ferment more slowly due to sugar and fat. Bulk fermentation may take 5-7 hours at 75-78°F. Stop when dough has risen 50-75% and looks airy.`
+        : 'Perform 3–4 sets of stretch and folds every 30–45 minutes during the first 2–3 hours. Then let rest undisturbed for 4–6 hours total at 75–78°F. Stop when dough has risen ~50%, looks airy, and holds its shape. Fermentation is guided by dough strength and temperature, not the clock.',
+      timing: isEnrichedDough ? '5-7 hours at 75-78°F' : '4-6 hours at 75-78°F'
     },
     {
       step: '5. SHAPE',
@@ -267,39 +324,66 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     },
     {
       step: '6. FINAL PROOF',
-      change: 'Place shaped dough seam-side up in a floured banneton or bowl. Proof 2–4 hours at room temperature until dough springs back slowly when pressed, OR refrigerate overnight (8–12 hours) for enhanced flavor development.',
-      timing: '2-4 hours room temp or 8-12 hours cold'
+      change: isEnrichedDough
+        ? 'Place shaped dough in a greased pan or banneton. Proof 2-3 hours at room temperature until dough springs back slowly when pressed. Enriched doughs are more delicate—avoid over-proofing.'
+        : 'Place shaped dough seam-side up in a floured banneton or bowl. Proof 2–4 hours at room temperature until dough springs back slowly when pressed, OR refrigerate overnight (8–12 hours) for enhanced flavor development.',
+      timing: isEnrichedDough ? '2-3 hours room temp' : '2-4 hours room temp or 8-12 hours cold'
     },
     {
       step: '7. BAKE',
-      change: 'Preheat Dutch oven to 450°F (232°C). Score the top of the dough with a sharp blade. Bake covered for 20 minutes to trap steam, then uncover and bake 25–30 minutes more until deep golden brown and internal temperature reaches 205–210°F.',
-      timing: '45-50 min at 450°F (232°C)'
+      change: isEnrichedDough
+        ? 'Preheat oven to 375°F (190°C). Optionally brush with egg wash for shine. Bake 35-40 minutes until deep golden and internal temperature reaches 190-195°F. Enriched doughs bake at lower temperature to prevent burning the sugars.'
+        : 'Preheat Dutch oven to 450°F (232°C). Score the top of the dough with a sharp blade. Bake covered for 20 minutes to trap steam, then uncover and bake 25–30 minutes more until deep golden brown and internal temperature reaches 205–210°F.',
+      timing: isEnrichedDough ? '35-40 min at 375°F (190°C)' : '45-50 min at 450°F (232°C)'
     },
     {
       step: '8. COOL',
-      change: 'Remove from Dutch oven and cool on a wire rack for minimum 2 hours before slicing. This allows the crumb to set properly.',
-      timing: '2 hours minimum'
+      change: isEnrichedDough
+        ? 'Remove from pan and cool on a wire rack for at least 1 hour before slicing. Enriched breads set faster than lean sourdoughs.'
+        : 'Remove from Dutch oven and cool on a wire rack for minimum 2 hours before slicing. This allows the crumb to set properly.',
+      timing: isEnrichedDough ? '1 hour minimum' : '2 hours minimum'
     }
   ];
 
   const troubleshootingTips = [
     {
       issue: 'Tight Crumb',
-      solution: 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain that doubles in 6–8 hours and extend bulk fermentation until dough rises ~50% and looks airy.'
+      solution: isEnrichedDough
+        ? 'Dough was under-fermented. Enriched doughs take longer—extend bulk fermentation by 1-2 hours and watch for 50-75% rise.'
+        : 'Dough was under-fermented or starter too weak. Build a strong, bubbly levain that doubles in 6–8 hours and extend bulk fermentation until dough rises ~50% and looks airy.'
     },
     {
       issue: 'Gummy Crumb',
-      solution: 'Sliced too soon or dough overhydrated. Always cool sourdough minimum 2 hours (preferably 4+) before slicing, and verify hydration is appropriate for your flour type.'
+      solution: isEnrichedDough
+        ? 'Sliced too soon. Cool enriched breads at least 1 hour (preferably 2+) before slicing.'
+        : 'Sliced too soon or dough overhydrated. Always cool sourdough minimum 2 hours (preferably 4+) before slicing, and verify hydration is appropriate for your flour type.'
     },
     {
-      issue: 'Pale Crust',
-      solution: 'Oven temperature too low or insufficient steam. Preheat Dutch oven fully to 450°F and keep lid on for first 20 minutes to trap steam for proper oven spring and color.'
+      issue: 'Dark/Burnt Crust',
+      solution: isEnrichedDough
+        ? 'Sugar causes faster browning. Lower oven temperature to 350-375°F and tent with foil if browning too quickly.'
+        : 'Oven temperature too high. Reduce to 425°F and check internal temperature (should reach 205-210°F).'
     },
     {
       issue: 'Weak Rise',
       solution: 'Inactive starter or cold dough temperature. Ensure starter is at peak activity (doubled and bubbly) before mixing, and maintain dough temperature at 75–78°F during bulk fermentation.'
     }
   ];
+  
+  // Add enrichment-specific warnings
+  if (sugarPercentage > 10) {
+    troubleshootingTips.push({
+      issue: 'High Sugar Content Detected',
+      solution: `Sugar content is ${Math.round(sugarPercentage)}% of flour. This will slow fermentation significantly. Consider increasing starter to 25% or extending bulk fermentation by 2-3 hours.`
+    });
+  }
+  
+  if (fatPercentage > 15) {
+    troubleshootingTips.push({
+      issue: 'High Fat Content Detected',
+      solution: `Fat content is ${Math.round(fatPercentage)}% of flour. Add butter AFTER initial mixing (during first fold) to prevent coating flour particles and inhibiting gluten development.`
+    });
+  }
   
   // Add reminder note about watching the dough
   troubleshootingTips.push({
