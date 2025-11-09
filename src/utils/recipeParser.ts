@@ -428,6 +428,8 @@ function convertToGrams(amount: number, unit: string, name: string): number {
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
   // CRITICAL FIX: Clean ingredient name - remove instruction contamination
   let cleanName = name
+    // Remove "plus X for kneading" style text first (before other patterns remove the keyword)
+    .replace(/,?\s*plus\s+[\d-]+g?\s+(more\s+)?for.*/gi, '')
     .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature|room temperature|neutral).*/gi, '')
     .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling|bowl).*/gi, '')
     .replace(/\s+/g, ' ')
