@@ -162,7 +162,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   // STEP 1: Identify total flour
   const totalFlour = recipe.totalFlour;
   
-  console.log('=== YEAST TO SOURDOUGH CONVERSION ===');
+  console.log('=== YEAST TO SOURDOUGH CONVERSION (FIXED) ===');
   console.log('Total flour:', totalFlour);
   console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
@@ -227,16 +227,16 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   
   console.log('Target levain flour:', targetLevainFlour, `(${starterPercentage * 100}% of ${totalFlour}g)`);
   
-  // Build levain: 1:1:1 ratio
-  // To get targetLevainFlour (e.g., 100g) total flour in levain:
-  // activeStarter (100% hydration) = X, so X/2 is flour
-  // addedFlour = X
-  // Total flour = X/2 + X = 1.5X = targetLevainFlour
-  // Therefore X = targetLevainFlour / 1.5
-  const activeStarterWeight = Math.round(targetLevainFlour / 1.5);
-  const levainWater = activeStarterWeight;
-  const levainFlour = activeStarterWeight;
-  const levainTotal = activeStarterWeight + levainWater + levainFlour;
+  // CORRECT BUILD FORMULA:
+  // 1. targetLevainFlour = 20% of total flour (e.g., 500 * 0.20 = 100g)
+  // 2. For 100% hydration: total levain weight = targetLevainFlour * 2 = 200g
+  // 3. Use 20% inoculation: active starter = levainTotal * 0.20 = 40g
+  // 4. Remaining build = 200 - 40 = 160g, split 50/50 = 80g flour + 80g water
+  const levainTotal = targetLevainFlour * 2; // For 100% hydration levain
+  const activeStarterWeight = Math.round(levainTotal * 0.20); // 20% inoculation
+  const remainingBuild = levainTotal - activeStarterWeight;
+  const levainFlour = Math.round(remainingBuild / 2);
+  const levainWater = Math.round(remainingBuild / 2);
   
   // Starter breakdown (100% hydration)
   const starterFlourContent = activeStarterWeight / 2;
