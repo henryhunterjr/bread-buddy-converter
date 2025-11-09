@@ -43,9 +43,9 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   const trueHydration = (trueWater / trueFlour) * 100;
   
   // STEP 2: Build clean ingredient list for yeast version
-  // Remove starter and all liquid entries, then rebuild with single water entry
+  // Remove starter, liquid, and flour entries - we'll add back consolidated totals
   const nonStarterIngredients = recipe.ingredients.filter(
-    i => i.type !== 'starter' && i.type !== 'liquid'
+    i => i.type !== 'starter' && i.type !== 'liquid' && i.type !== 'flour'
   );
   
   // Calculate yeast amount: 0.7-1.1% of flour weight
