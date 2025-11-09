@@ -13,6 +13,16 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'cups water': 240,
   'cup milk': 240,
   'cups milk': 240,
+  'cup heavy cream': 240,
+  'cups heavy cream': 240,
+  'cup cream': 240,
+  'cups cream': 240,
+  'tablespoon heavy cream': 15,
+  'tablespoons heavy cream': 15,
+  'tbsp heavy cream': 15,
+  'tablespoon cream': 15,
+  'tablespoons cream': 15,
+  'tbsp cream': 15,
   'cup oil': 224,
   'cups oil': 224,
   'cup vegetable oil': 224,
@@ -21,8 +31,10 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'cup butter': 227,
   'cups butter': 227,
   'tablespoon butter': 14,
+  'tablespoons butter': 14,
   'tbsp butter': 14,
   'teaspoon butter': 5,
+  'teaspoons butter': 5,
   'tsp butter': 5,
   // YEAST
   'tablespoon yeast': 10,
@@ -59,6 +71,10 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'cups honey': 340,
   'cup sugar': 200,
   'cups sugar': 200,
+  // MILK POWDER
+  'tablespoon milk powder': 8,
+  'tablespoons milk powder': 8,
+  'tbsp milk powder': 8,
   // EGG (count, not grams)
   'egg': 50,  // 1 large egg ≈ 50g
   'large egg': 50,
@@ -66,7 +82,7 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
-const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
+const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'cream'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt', 'kosher salt', 'sea salt', 'fine salt', 'coarse salt', 'flaky salt'];
@@ -99,15 +115,17 @@ function extractEggFromLine(line: string): { count: number; fullText: string } |
   const lower = line.toLowerCase();
 
   // CRITICAL: Skip egg wash, topping, and finishing eggs (not part of dough)
+  // CHECK THESE FIRST before matching egg patterns
   const skipPatterns = [
     /egg\s+wash/i,
     /for\s+(?:egg\s+)?wash/i,
-    /beaten\s+(?:egg|eggs)/i,
+    /beaten/i,  // Broader: skip ANY line with "beaten" (usually egg wash)
     /for\s+brushing/i,
     /for\s+topping/i,
     /for\s+finishing/i,
     /for\s+glazing/i,
     /to\s+brush/i,
+    /egg,\s*beaten/i,  // "1 egg, beaten with water"
   ];
 
   if (skipPatterns.some(pattern => pattern.test(line))) {
@@ -116,7 +134,8 @@ function extractEggFromLine(line: string): { count: number; fullText: string } |
   }
 
   // Pattern: "1 large egg", "2 eggs", "1 egg, room temperature"
-  const eggPattern = /(\d+)\s*(large|medium|extra[\s-]?large|xl)?\s*eggs?(?:\s*,\s*[^,\n]+)?/i;
+  // But NOT if followed by "beaten" or other wash indicators
+  const eggPattern = /(\d+)\s*(large|medium|extra[\s-]?large|xl)?\s*eggs?(?:\s*,\s*(?!beaten)[^,\n]+)?/i;
   const match = lower.match(eggPattern);
 
   if (match) {
@@ -145,17 +164,21 @@ function isValidIngredientLine(line: string): boolean {
     /ultimate\s*dinner\s*rolls/i,      // Recipe title
     /november\s*\d+,?\s*\d{4}/i,       // "November 8, 2025"
     /prep\s*time|cook\s*time|total\s*time/i, // Metadata headers
+    /for\s+(?:brushing|finishing|topping|glazing|egg\s+wash|wash)/i,  // Finishing ingredients
+    /(?:after|before)\s+baking/i,      // Pre/post-bake finishes
+    /egg\s+wash/i,                     // Egg wash
+    /\(optional/i,                     // Optional ingredients
   ];
-  
+
   // Must contain a measurement word + ingredient word
   const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
-  const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
-  
+  const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter|cream)/i.test(line);
+
   // Skip if matches any skip pattern
   if (skipPatterns.some(pattern => pattern.test(line))) {
     return false;
   }
-  
+
   // Must have both measurement AND ingredient
   return hasMeasurement && hasIngredient;
 }
@@ -190,7 +213,7 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
   // 3. Split compound lines (multiple ingredients on one line)
   let normalized = ingredientsSection
     .replace(/\s*\*\s*/g, '\n')  // Replace asterisks with newlines
-    .replace(/\s+(\d+(?:\.\d+)?)\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+/gi, '\n$1$2 ')  // Add newline before measurements, KEEP THE UNIT
+    .replace(/\s+(\d+(?:\.\d+)?)\s+(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+/gi, '\n$1 $2 ')  // Add newline before measurements, PRESERVE SPACE BETWEEN NUMBER AND UNIT
     .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ')  // Add newline before fractions
     .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
     
@@ -430,6 +453,13 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   let cleanName = name
     .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature|room temperature|neutral).*/gi, '')
     .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling|bowl).*/gi, '')
+    .replace(/,\s*plus\s+extra.*/gi, '')  // Remove "plus extra for dusting"
+    .replace(/,\s*softened.*/gi, '')      // Remove "softened to room temperature"
+    .replace(/,\s*warmed.*/gi, '')        // Remove "warmed to 105-110°F"
+    .replace(/,\s*room\s+temperature.*/gi, '')  // Remove "room temperature"
+    .replace(/,\s*divided.*/gi, '')       // Remove "divided"
+    .replace(/,\s*melted.*/gi, '')        // Remove "melted"
+    .replace(/,\s*optional.*/gi, '')      // Remove "optional, for extra richness"
     .replace(/\s+/g, ' ')
     .trim();
   
