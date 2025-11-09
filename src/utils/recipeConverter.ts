@@ -159,60 +159,64 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
 }
 
 export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
-  // STEP 1: Identify total flour and base water (excluding enrichment liquids)
-  const trueFlour = recipe.totalFlour;
+  // STEP 1: Identify total flour
+  const totalFlour = recipe.totalFlour;
   
-  // STEP 2: Identify and separate enrichments from base water
-  // Enrichments: butter, eggs, milk, sugar, oil, etc.
-  const enrichments = recipe.ingredients.filter(i => {
-    const name = i.name.toLowerCase();
-    return i.type === 'other' && (
-      name.includes('butter') || 
-      name.includes('egg') || 
-      name.includes('milk') || 
-      name.includes('sugar') ||
-      name.includes('oil') ||
-      name.includes('honey')
-    );
-  });
+  console.log('=== YEAST TO SOURDOUGH CONVERSION ===');
+  console.log('Total flour:', totalFlour);
+  console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
-  // Separate milk from water (milk is an enrichment, not base water)
+  // STEP 2: Separate ingredients by type
+  const waterIngredients = recipe.ingredients.filter(i => 
+    i.type === 'liquid' && !i.name.toLowerCase().includes('milk')
+  );
   const milkIngredients = recipe.ingredients.filter(i => 
     i.type === 'liquid' && i.name.toLowerCase().includes('milk')
   );
+  const saltIngredients = recipe.ingredients.filter(i => i.type === 'salt');
+  const allOtherIngredients = recipe.ingredients.filter(i => i.type === 'other');
   
-  // Base water = total liquid minus milk
+  const originalWater = waterIngredients.reduce((sum, i) => sum + i.amount, 0);
   const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
-  const baseWater = recipe.totalLiquid - milkAmount;
   
-  // Calculate enrichment percentages for warnings
-  const sugarAmount = enrichments
+  console.log('Original water:', originalWater);
+  console.log('Milk amount:', milkAmount);
+  console.log('Other ingredients:', allOtherIngredients);
+  
+  // Calculate enrichment percentages
+  const sugarAmount = allOtherIngredients
     .filter(i => i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey'))
     .reduce((sum, i) => sum + i.amount, 0);
-  const fatAmount = enrichments
+  const fatAmount = allOtherIngredients
     .filter(i => i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
     .reduce((sum, i) => sum + i.amount, 0);
   
-  const sugarPercentage = (sugarAmount / trueFlour) * 100;
-  const fatPercentage = (fatAmount / trueFlour) * 100;
+  const sugarPercentage = (sugarAmount / totalFlour) * 100;
+  const fatPercentage = (fatAmount / totalFlour) * 100;
   const isEnrichedDough = sugarAmount > 0 || fatAmount > 0 || milkAmount > 0;
+  
+  console.log('Sugar:', sugarAmount, `(${sugarPercentage.toFixed(1)}%)`);
+  console.log('Fat:', fatAmount, `(${fatPercentage.toFixed(1)}%)`);
+  console.log('Is enriched:', isEnrichedDough);
   
   // STEP 3: Calculate proper starter amount (20% of flour for enriched, 15% for lean)
   const starterPercentage = isEnrichedDough ? 0.20 : 0.15;
-  const targetLevainFlour = Math.round(trueFlour * starterPercentage);
+  const targetLevainFlour = Math.round(totalFlour * starterPercentage);
   
-  // Build levain: 1:1:1 ratio from active starter
-  // If we want targetLevainFlour total flour in levain (e.g., 100g):
-  // Total flour = (activeStarter/2) + addedFlour
-  // With 1:1:1 ratio: activeStarter = water = addedFlour
-  // So: (activeStarter/2) + activeStarter = targetLevainFlour
-  // Therefore: activeStarter = targetLevainFlour / 1.5
+  console.log('Target levain flour:', targetLevainFlour, `(${starterPercentage * 100}% of ${totalFlour}g)`);
+  
+  // Build levain: 1:1:1 ratio
+  // To get targetLevainFlour (e.g., 100g) total flour in levain:
+  // activeStarter (100% hydration) = X, so X/2 is flour
+  // addedFlour = X
+  // Total flour = X/2 + X = 1.5X = targetLevainFlour
+  // Therefore X = targetLevainFlour / 1.5
   const activeStarterWeight = Math.round(targetLevainFlour / 1.5);
   const levainWater = activeStarterWeight;
   const levainFlour = activeStarterWeight;
   const levainTotal = activeStarterWeight + levainWater + levainFlour;
   
-  // Active starter breakdown (100% hydration)
+  // Starter breakdown (100% hydration)
   const starterFlourContent = activeStarterWeight / 2;
   const starterWaterContent = activeStarterWeight / 2;
   
@@ -220,18 +224,30 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   const totalLevainFlour = levainFlour + starterFlourContent;
   const totalLevainWater = levainWater + starterWaterContent;
   
+  console.log('Levain build:', {
+    activeStarter: activeStarterWeight,
+    water: levainWater,
+    flour: levainFlour,
+    total: levainTotal,
+    totalFlour: totalLevainFlour,
+    totalWater: totalLevainWater
+  });
+  
   // STEP 4: Calculate remaining dough ingredients
-  const doughFlour = trueFlour - totalLevainFlour;
+  const doughFlour = Math.round(totalFlour - totalLevainFlour);
   
-  // For enriched doughs, target 60-68% hydration from water alone (not counting milk)
-  const targetHydration = isEnrichedDough ? 0.65 : 0.75;
-  const targetTotalWater = Math.round(trueFlour * targetHydration);
-  const doughWater = Math.max(50, targetTotalWater - totalLevainWater); // Keep at least 50g water in dough
+  // CRITICAL: Use original water amount, minus what goes into levain
+  // Don't recalculate based on target hydration - trust the original recipe's balance
+  const doughWater = Math.round(Math.max(0, originalWater - totalLevainWater));
   
-  // STEP 5: Keep ALL other ingredients (salt, enrichments)
-  const otherIngredients = recipe.ingredients.filter(
-    i => i.type !== 'yeast' && i.type !== 'flour' && i.type !== 'liquid'
-  );
+  console.log('Dough flour:', doughFlour);
+  console.log('Dough water:', doughWater);
+  
+  // Calculate water-only hydration (for enriched doughs, water % is separate from total liquid)
+  const totalWater = totalLevainWater + doughWater;
+  const waterHydration = (totalWater / totalFlour) * 100;
+  
+  console.log('Water-only hydration:', waterHydration.toFixed(1) + '%');
   
   // Build LEVAIN section
   const levainIngredients: ParsedIngredient[] = [
@@ -268,29 +284,39 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
       amount: doughFlour,
       unit: 'g',
       type: 'flour'
-    },
-    {
+    }
+  ];
+  
+  // Add water ONLY if there's any left after levain
+  if (doughWater > 0) {
+    doughIngredients.push({
       name: 'water (80-85°F)',
       amount: doughWater,
       unit: 'g',
       type: 'liquid'
-    },
-    ...milkIngredients, // Keep milk separate from water
-    ...otherIngredients // ALL enrichments (butter, eggs, sugar) and salt
-  ];
+    });
+  }
   
-  // Calculate final hydration (water + milk + liquid from eggs if any)
-  const finalHydration = ((doughWater + totalLevainWater + milkAmount) / trueFlour) * 100;
+  // Add ALL other ingredients exactly as they were
+  doughIngredients.push(...milkIngredients); // Milk
+  doughIngredients.push(...saltIngredients); // Salt
+  doughIngredients.push(...allOtherIngredients); // Butter, eggs, sugar, etc.
+  
+  console.log('Final dough ingredients:', doughIngredients.map(i => `${i.amount}g ${i.name}`));
   
   const converted: ParsedRecipe = {
     ...recipe,
     ingredients: [...levainIngredients, ...doughIngredients],
     yeastAmount: 0,
     starterAmount: levainTotal,
-    totalFlour: trueFlour,
-    totalLiquid: doughWater + totalLevainWater + milkAmount,
-    hydration: finalHydration
+    totalFlour: totalFlour,
+    totalLiquid: totalWater, // Water only, not including milk
+    hydration: waterHydration // Water-only hydration for enriched doughs
   };
+  
+  console.log('Converted recipe hydration:', waterHydration.toFixed(1) + '%');
+  console.log('Starter percentage (flour from starter/total flour):', ((starterFlourContent / totalFlour) * 100).toFixed(1) + '%');
+  console.log('Levain percentage (total flour in levain/total flour):', ((totalLevainFlour / totalFlour) * 100).toFixed(1) + '%');
 
   const methodChanges: MethodChange[] = [
     {
