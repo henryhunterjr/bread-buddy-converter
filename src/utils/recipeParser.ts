@@ -34,8 +34,19 @@ const UNIT_CONVERSIONS: Record<string, number> = {
   'tsp yeast': 3,
   // SALT
   'tablespoon salt': 20,
+  'tablespoon kosher salt': 20,
+  'tablespoon sea salt': 20,
+  'tablespoon fine salt': 20,
   'tbsp salt': 20,
+  'tbsp kosher salt': 20,
+  'tbsp sea salt': 20,
+  'teaspoon salt': 6,
+  'teaspoon kosher salt': 6,
+  'teaspoon sea salt': 6,
+  'teaspoon fine salt': 6,
   'tsp salt': 6,
+  'tsp kosher salt': 6,
+  'tsp sea salt': 6,
   // OIL
   'tablespoon oil': 15,
   'tbsp oil': 15,
@@ -58,7 +69,7 @@ const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
 const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
-const SALT_KEYWORDS = ['salt'];
+const SALT_KEYWORDS = ['salt', 'kosher salt', 'sea salt', 'fine salt', 'coarse salt', 'flaky salt'];
 const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
 const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
@@ -137,7 +148,7 @@ function isValidIngredientLine(line: string): boolean {
   ];
   
   // Must contain a measurement word + ingredient word
-  const hasMeasurement = /\d+(?:\.\d+)?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
+  const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
   const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
   
   // Skip if matches any skip pattern
