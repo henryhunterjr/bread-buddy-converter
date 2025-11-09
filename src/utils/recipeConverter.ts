@@ -167,48 +167,36 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
   // STEP 2: Separate ingredients by category
+  // Use WORKING PATTERN from convertSourdoughToYeast: filter OUT what we don't want
+  const nonFlourLiquidYeastIngredients = recipe.ingredients.filter(
+    i => i.type !== 'flour' && i.type !== 'liquid' && i.type !== 'yeast'
+  );
+  
   const waterIngredients = recipe.ingredients.filter(i => 
     i.type === 'liquid' && !i.name.toLowerCase().includes('milk')
   );
   const milkIngredients = recipe.ingredients.filter(i => 
     i.type === 'liquid' && i.name.toLowerCase().includes('milk')
   );
-  const saltIngredients = recipe.ingredients.filter(i => i.type === 'salt');
-  
-  // CRITICAL: Capture ALL enrichments explicitly
-  const butterIngredients = recipe.ingredients.filter(i => 
-    i.type === 'fat' || i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil')
-  );
-  const eggIngredients = recipe.ingredients.filter(i => 
-    i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
-  );
-  const sugarIngredients = recipe.ingredients.filter(i => 
-    i.type === 'sweetener' || i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey')
-  );
-  
-  // Catch any remaining ingredients not categorized above
-  const otherIngredients = recipe.ingredients.filter(i => 
-    i.type !== 'flour' && 
-    i.type !== 'liquid' && 
-    i.type !== 'yeast' && 
-    i.type !== 'salt' &&
-    i.type !== 'fat' &&
-    i.type !== 'enrichment' &&
-    i.type !== 'sweetener'
-  );
   
   const originalWater = waterIngredients.reduce((sum, i) => sum + i.amount, 0);
   const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
-  const butterAmount = butterIngredients.reduce((sum, i) => sum + i.amount, 0);
-  const eggAmount = eggIngredients.reduce((sum, i) => sum + i.amount, 0);
-  const sugarAmount = sugarIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const butterAmount = nonFlourLiquidYeastIngredients
+    .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const eggAmount = nonFlourLiquidYeastIngredients
+    .filter(i => i.type === 'enrichment' || i.name.toLowerCase().includes('egg'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const sugarAmount = nonFlourLiquidYeastIngredients
+    .filter(i => i.type === 'sweetener' || i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey'))
+    .reduce((sum, i) => sum + i.amount, 0);
   
   console.log('Original water:', originalWater, 'g');
   console.log('Milk:', milkAmount, 'g');
   console.log('Butter:', butterAmount, 'g');
   console.log('Eggs:', eggAmount, 'g');
   console.log('Sugar:', sugarAmount, 'g');
-  console.log('Other ingredients:', otherIngredients);
+  console.log('Non-flour/liquid/yeast ingredients:', nonFlourLiquidYeastIngredients.map(i => `${i.amount}g ${i.name} [${i.type}]`));
   
   // Determine if enriched
   const isEnrichedDough = butterAmount > 0 || eggAmount > 0 || sugarAmount > 0 || milkAmount > 0;
@@ -319,38 +307,13 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     });
   }
   
-  // Add ALL enrichments explicitly
-  console.log('Adding enrichments to dough:');
-  
+  // Add milk if present
   if (milkIngredients.length > 0) {
-    console.log('  - Milk ingredients:', milkIngredients.length);
     doughIngredients.push(...milkIngredients);
   }
   
-  if (butterIngredients.length > 0) {
-    console.log('  - Butter ingredients:', butterIngredients.length);
-    doughIngredients.push(...butterIngredients);
-  }
-  
-  if (eggIngredients.length > 0) {
-    console.log('  - Egg ingredients:', eggIngredients.length);
-    doughIngredients.push(...eggIngredients);
-  }
-  
-  if (sugarIngredients.length > 0) {
-    console.log('  - Sugar ingredients:', sugarIngredients.length);
-    doughIngredients.push(...sugarIngredients);
-  }
-  
-  if (saltIngredients.length > 0) {
-    console.log('  - Salt ingredients:', saltIngredients.length);
-    doughIngredients.push(...saltIngredients);
-  }
-  
-  if (otherIngredients.length > 0) {
-    console.log('  - Other ingredients:', otherIngredients.length);
-    doughIngredients.push(...otherIngredients);
-  }
+  // WORKING PATTERN: Add ALL non-flour/liquid/yeast ingredients (salt, fat, enrichment, sweetener, other)
+  doughIngredients.push(...nonFlourLiquidYeastIngredients);
   
   console.log('Final dough ingredients:', doughIngredients.map(i => `${i.amount}g ${i.name} [${i.type}]`));
   
