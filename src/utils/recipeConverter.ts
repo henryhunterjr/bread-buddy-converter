@@ -30,6 +30,7 @@
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
 import { generateBakerWarnings } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
+import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
@@ -357,60 +358,31 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Starter percentage (flour from starter/total flour):', ((starterFlourContent / totalFlour) * 100).toFixed(1) + '%');
   console.log('Levain percentage (total flour in levain/total flour):', ((totalLevainFlour / totalFlour) * 100).toFixed(1) + '%');
 
-  const methodChanges: MethodChange[] = [
+  // Classify dough type
+  const classification = classifyDough(
+    sugarAmount,
+    butterAmount,
+    milkAmount,
+    totalFlour
+  );
+
+  console.log('Dough classification:', classification);
+
+  // Get appropriate method template
+  const methodChanges = getMethodTemplate(
+    classification,
     {
-      step: '1. BUILD LEVAIN (Night Before)',
-      change: `Mix ${activeStarterWeight}g active starter, ${levainWater}g water (80–85°F), and ${levainFlour}g flour. Cover loosely and rest overnight (8-12 hours) until doubled and bubbly. This provides ${Math.round(starterPercentage * 100)}% inoculation for ${isEnrichedDough ? 'this enriched dough' : 'optimal fermentation'}.`,
-      timing: '8-12 hours overnight'
+      starter: activeStarterWeight,
+      water: levainWater,
+      flour: levainFlour,
+      total: levainTotal
     },
     {
-      step: '2. MIX DOUGH (Morning)',
-      change: isEnrichedDough 
-        ? `In a large bowl, dissolve levain into ${doughWater > 0 ? doughWater + 'g' : 'the'} warm water${milkAmount > 0 ? ' and ' + milkAmount + 'g milk' : ''}. Add ${doughFlour}g flour and mix until shaggy. Rest 30-45 minutes (autolyse). ${butterAmount > 0 ? 'Add softened butter gradually during first fold, not in initial mix.' : ''} ${eggAmount > 0 ? 'Add eggs at room temperature after autolyse.' : ''}`
-        : `In a large bowl, dissolve levain into ${doughWater}g warm water. Add ${doughFlour}g flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
-      timing: isEnrichedDough ? '30-45 min autolyse' : '45-60 min autolyse'
-    },
-    {
-      step: '3. ADD SALT & DEVELOP STRENGTH',
-      change: `Sprinkle in ${recipe.saltAmount}g salt, mix or pinch to incorporate throughout the dough. Rest 20–30 minutes to allow salt to dissolve and gluten to relax.`,
-      timing: '20-30 min rest'
-    },
-    {
-      step: '4. BULK FERMENTATION',
-      change: isEnrichedDough
-        ? `Perform 3-4 sets of stretch and folds every 30-45 minutes during the first 2-3 hours. Enriched doughs ferment more slowly due to ${sugarAmount > 0 ? 'sugar' : ''}${sugarAmount > 0 && butterAmount > 0 ? ' and ' : ''}${butterAmount > 0 ? 'fat' : ''}. Bulk fermentation may take 5-7 hours at 75-78°F. Stop when dough has risen 50-75% and looks airy.`
-        : 'Perform 3–4 sets of stretch and folds every 30–45 minutes during the first 2–3 hours. Then let rest undisturbed for 4–6 hours total at 75–78°F. Stop when dough has risen ~50%, looks airy, and holds its shape. Fermentation is guided by dough strength and temperature, not the clock.',
-      timing: isEnrichedDough ? '5-7 hours at 75-78°F' : '4-6 hours at 75-78°F'
-    },
-    {
-      step: '5. SHAPE',
-      change: isEnrichedDough
-        ? 'Turn dough onto lightly floured surface. Shape into desired form (rolls, loaf, etc.). Enriched doughs are softer and more forgiving to shape.'
-        : 'Turn dough onto lightly floured surface. Pre-shape into a round, rest 20 minutes, then perform final shape (boule or batard). Build surface tension by pulling dough toward you while rotating.',
-      timing: '20 min bench rest + shaping'
-    },
-    {
-      step: '6. FINAL PROOF',
-      change: isEnrichedDough
-        ? 'Place shaped dough in greased pan or banneton. Proof 2-3 hours at room temperature until puffy and nearly doubled. When pressed, dough should spring back slowly.'
-        : 'Place shaped dough seam-side up in a floured banneton. Proof 2–4 hours at room temperature OR refrigerate overnight (8–12 hours).',
-      timing: isEnrichedDough ? '2-3 hours room temp' : '2-4 hours room temp or 8-12 hours cold'
-    },
-    {
-      step: '7. BAKE',
-      change: isEnrichedDough
-        ? 'Preheat oven to 375°F (190°C). Brush with egg wash if desired. Bake 25-35 minutes until deep golden and internal temperature reaches 190-195°F.'
-        : 'Preheat Dutch oven to 450°F (232°C). Score the top. Bake covered 20 minutes, then uncovered 25–30 minutes until internal temp 205–210°F.',
-      timing: isEnrichedDough ? '25-35 min at 375°F' : '45-50 min at 450°F'
-    },
-    {
-      step: '8. COOL',
-      change: isEnrichedDough
-        ? 'Cool on wire rack for at least 1 hour before slicing.'
-        : 'Cool on wire rack minimum 2 hours before slicing.',
-      timing: isEnrichedDough ? '1 hour minimum' : '2 hours minimum'
+      flour: doughFlour,
+      water: doughWater,
+      salt: recipe.saltAmount
     }
-  ];
+  );
 
   const troubleshootingTips = [
     {

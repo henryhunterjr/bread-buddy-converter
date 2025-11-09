@@ -63,6 +63,34 @@ const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
 const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
 
+function isValidIngredientLine(line: string): boolean {
+  // Skip obvious non-ingredients
+  const skipPatterns = [
+    /https?:\/\//i,                    // URLs
+    /\d{1,2}\/\d{1,2}\/\d{2,4}/,      // Dates (11/8/25)
+    /\d+\s*min\s*read/i,               // "6 min read"
+    /back\s*to\s*blog/i,               // Navigation
+    /baking\s*great\s*bread/i,         // Site name
+    /henry\s*hunter/i,                 // Author name
+    /^\s*\d+\/\d+\s*$/,                // Page numbers (1/17)
+    /ultimate\s*dinner\s*rolls/i,      // Recipe title
+    /november\s*\d+,?\s*\d{4}/i,       // "November 8, 2025"
+    /prep\s*time|cook\s*time|total\s*time/i, // Metadata headers
+  ];
+  
+  // Must contain a measurement word + ingredient word
+  const hasMeasurement = /\d+(?:\.\d+)?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
+  const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter)/i.test(line);
+  
+  // Skip if matches any skip pattern
+  if (skipPatterns.some(pattern => pattern.test(line))) {
+    return false;
+  }
+  
+  // Must have both measurement AND ingredient
+  return hasMeasurement && hasIngredient;
+}
+
 export function parseRecipe(recipeText: string): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
   let method = '';
@@ -180,6 +208,12 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
 function parseIngredientLine(line: string): ParsedIngredient | null {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length < 3) return null;
+  
+  // CRITICAL: Validate ingredient line first
+  if (!isValidIngredientLine(trimmed)) {
+    console.log(`Skipping non-ingredient line: "${trimmed}"`);
+    return null;
+  }
 
   const lower = trimmed.toLowerCase();
   
