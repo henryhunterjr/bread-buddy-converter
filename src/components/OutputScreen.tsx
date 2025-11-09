@@ -59,13 +59,63 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="p-4">
+      <div className="p-4 flex items-center justify-between">
         <img 
           src={logo} 
           alt="Baking Great Bread at Home" 
           className="h-16 md:h-20 cursor-pointer hover:opacity-80 transition-opacity" 
           onClick={onStartOver}
         />
+        
+        {/* Action buttons in upper right - hidden from PDF */}
+        <div className="hidden md:flex gap-2 print:hidden">
+          <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Save className="mr-2 h-4 w-4" />
+                Save Recipe
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Save Recipe</DialogTitle>
+                <DialogDescription>
+                  Give this recipe a name so you can easily find it later
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name-top">Recipe Name</Label>
+                  <Input
+                    id="name-top"
+                    placeholder="e.g. Cranberry Walnut Sourdough"
+                    value={recipeName}
+                    onChange={(e) => setRecipeName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveRecipe();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveRecipe}>
+                  Save
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button onClick={handleDownloadPDF}>
+            Download PDF
+          </Button>
+          <Button onClick={onStartOver} variant="secondary">
+            Start Over
+          </Button>
+        </div>
       </div>
       <div className="flex-1 p-4 py-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -268,8 +318,8 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
           </Card>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-4 justify-center flex-wrap">
+        {/* Actions - Bottom (always visible, hidden from PDF) */}
+        <div className="flex gap-4 justify-center flex-wrap print:hidden">
           <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="lg">
@@ -286,9 +336,9 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Recipe Name</Label>
+                  <Label htmlFor="name-bottom">Recipe Name</Label>
                   <Input
-                    id="name"
+                    id="name-bottom"
                     placeholder="e.g. Cranberry Walnut Sourdough"
                     value={recipeName}
                     onChange={(e) => setRecipeName(e.target.value)}
