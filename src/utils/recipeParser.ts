@@ -109,6 +109,12 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     // Skip lines that are just metadata (like "Prep Time:", "Yield:", etc.)
     if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
 
+    // CRITICAL FIX: Skip "extra for kneading/dusting" type lines
+    if (/(plus|extra|additional|more)\s+.*\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface)/i.test(trimmed)) {
+      console.log('Skipping extra/kneading line:', trimmed);
+      continue;
+    }
+
     // Parse ingredient line
     const ingredient = parseIngredientLine(trimmed);
     if (ingredient) {
@@ -280,6 +286,13 @@ function convertToGrams(amount: number, unit: string, name: string): number {
 }
 
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
+  // CRITICAL FIX: Clean ingredient name - remove instruction contamination
+  let cleanName = name
+    .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature).*/gi, '')
+    .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling).*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
   // Determine type
   let type: ParsedIngredient['type'] = 'other';
   
@@ -302,10 +315,10 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
     type = 'starter';
   }
 
-  console.log(`Created ingredient: ${amount}g ${name} [type: ${type}]`);
+  console.log(`Created ingredient: ${amount}g ${cleanName} [type: ${type}]`);
 
   return {
-    name,
+    name: cleanName,
     amount,
     unit: 'g',
     type
