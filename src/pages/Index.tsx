@@ -26,7 +26,7 @@ const Index = () => {
     setScreen('input');
   };
 
-  const handleConvert = (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
+  const handleConvert = async (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
     // Use AI-parsed data if provided, otherwise parse with regex
     const parsed = aiParsedData || parseRecipe(recipeText, starterHydration);
     
@@ -38,8 +38,31 @@ const Index = () => {
       ingredientCount: parsed.ingredients.length
     });
     
-    // Extract recipe name and description using proper validation
-    const { title, description } = extractRecipeInfo(recipeText);
+    // Extract recipe name and description using AI
+    let title = 'Converted Bread Recipe';
+    let description = '';
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-extract-title', {
+        body: { recipeText }
+      });
+      
+      if (!error && data?.success) {
+        title = data.title;
+        description = data.description;
+      } else {
+        // Fallback to local extraction
+        const fallback = extractRecipeInfo(recipeText);
+        title = fallback.title;
+        description = fallback.description;
+      }
+    } catch (error) {
+      console.error('AI title extraction failed, using fallback:', error);
+      // Fallback to local extraction
+      const fallback = extractRecipeInfo(recipeText);
+      title = fallback.title;
+      description = fallback.description;
+    }
     
     console.log('Extracted title:', title);
     console.log('Extracted description:', description);
