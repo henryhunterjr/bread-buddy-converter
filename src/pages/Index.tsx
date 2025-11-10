@@ -4,7 +4,7 @@ import InputScreen from '@/components/InputScreen';
 import OutputScreen from '@/components/OutputScreen';
 import { parseRecipe } from '@/utils/recipeParser';
 import { convertSourdoughToYeast, convertYeastToSourdough } from '@/utils/recipeConverter';
-import { ConvertedRecipe, ParsedIngredient } from '@/types/recipe';
+import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output';
@@ -24,8 +24,17 @@ const Index = () => {
     setScreen('input');
   };
 
-  const handleConvert = (recipeText: string, starterHydration: number) => {
-    const parsed = parseRecipe(recipeText, starterHydration);
+  const handleConvert = (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
+    // Use AI-parsed data if provided, otherwise parse with regex
+    const parsed = aiParsedData || parseRecipe(recipeText, starterHydration);
+    
+    console.log('handleConvert - using', aiParsedData ? 'AI-parsed data' : 'regex-parsed data');
+    console.log('Parsed recipe:', {
+      totalFlour: parsed.totalFlour,
+      totalLiquid: parsed.totalLiquid,
+      hydration: parsed.hydration,
+      ingredientCount: parsed.ingredients.length
+    });
     
     // Extract recipe name and description from first lines
     const lines = recipeText.split('\n').map(l => l.trim()).filter(l => l.length > 0);

@@ -28,7 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
-  onConvert: (recipeText: string, starterHydration: number) => void;
+  onConvert: (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => void;
   onBack: () => void;
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
 }
@@ -171,10 +171,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
             return;
           }
           
-          // AI parsing succeeded - manually trigger conversion with AI-parsed data
-          // We need to update the recipeText to reflect the AI understanding
+          // AI parsing succeeded - pass the pre-parsed data to skip re-parsing
           setErrors([]);
-          onConvert(recipeText, starterHydration);
+          onConvert(recipeText, starterHydration, aiParsed);
         } else {
           setErrors(['Could not find flour in the recipe. Please check the format and try again.']);
           setAiParseAvailable(true);
@@ -204,7 +203,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       const aiValidationErrors = validateRecipe(aiParsed);
       if (aiValidationErrors.length === 0) {
         setErrors([]);
-        onConvert(recipeText, starterHydration);
+        onConvert(recipeText, starterHydration, aiParsed);
       } else {
         setErrors(aiValidationErrors);
       }
