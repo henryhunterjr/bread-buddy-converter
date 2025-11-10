@@ -206,7 +206,7 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
     // Step label (bold)
     doc.setFont(FONTS.sans, 'bold');
     doc.setTextColor(0, 0, 0);
-    const stepLabel = `${index + 1}. ${change.step}`;
+    const stepLabel = change.step; // Already includes number from template
     doc.text(stepLabel, margin, yPos);
     yPos += 0.2;
     

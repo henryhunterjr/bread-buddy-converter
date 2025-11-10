@@ -301,35 +301,25 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   // For lean doughs: 70-78% water hydration
   const targetWaterHydration = isEnrichedDough ? 0.65 : 0.75;
   
-  // ENHANCED HYDRATION CALCULATION
-  // Account for water content in enrichment ingredients:
-  // - Eggs: 75% water
-  // - Milk: 87% water
-  // - Cream: 60% water
-  // - Honey: 17% water
-  // - Butter: 16% water
+  // HYDRATION CALCULATION (Flour + Water-Based Liquids Only)
+  // Rules for what counts as "water" in hydration:
+  // ✅ Water: 100% counts
+  // ✅ Milk: 100% counts (~87% water, close enough)
+  // ✅ Eggs: 75% counts (eggs are 75% water, 25% solids)
+  // ❌ Butter/oil: Does NOT count (it's fat, not water)
+  // ❌ Sugar/honey: Does NOT count (dissolved in water, but not water itself)
+  // ❌ Dried fruit/nuts: Does NOT count
   const liquidFromEggs = eggAmount * 0.75;
-  const liquidFromMilk = milkAmount * 0.87;
-  const creamAmount = nonFlourLiquidYeastIngredients
-    .filter(i => i.name.toLowerCase().includes('cream'))
-    .reduce((sum, i) => sum + i.amount, 0);
-  const liquidFromCream = creamAmount * 0.60;
-  const honeyAmount = nonFlourLiquidYeastIngredients
-    .filter(i => i.name.toLowerCase().includes('honey'))
-    .reduce((sum, i) => sum + i.amount, 0);
-  const liquidFromHoney = honeyAmount * 0.17;
-  const liquidFromButter = butterAmount * 0.16;
+  const liquidFromMilk = milkAmount * 1.0; // Count milk at 100%
   
-  // Total liquid contribution from enrichments
-  const totalEnrichmentLiquid = liquidFromEggs + liquidFromMilk + liquidFromCream + liquidFromHoney + liquidFromButter;
+  // Total liquid contribution from enrichments (eggs + milk ONLY)
+  const totalEnrichmentLiquid = liquidFromEggs + liquidFromMilk;
   
-  console.log('Enrichment liquid breakdown:', {
-    eggs: liquidFromEggs.toFixed(1) + 'g',
-    milk: liquidFromMilk.toFixed(1) + 'g',
-    cream: liquidFromCream.toFixed(1) + 'g',
-    honey: liquidFromHoney.toFixed(1) + 'g',
-    butter: liquidFromButter.toFixed(1) + 'g',
-    total: totalEnrichmentLiquid.toFixed(1) + 'g'
+  console.log('Liquid contributions to hydration:', {
+    eggs: liquidFromEggs.toFixed(1) + 'g (75% of ' + eggAmount + 'g)',
+    milk: liquidFromMilk.toFixed(1) + 'g (100% of ' + milkAmount + 'g)',
+    total: totalEnrichmentLiquid.toFixed(1) + 'g',
+    note: 'Butter, honey, sugar do NOT count toward hydration'
   });
   
   // Calculate adjusted water needed

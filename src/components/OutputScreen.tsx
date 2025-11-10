@@ -306,7 +306,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               {result.methodChanges.map((change, i) => (
                 <div key={i} className="border-l-4 border-primary/30 pl-3 sm:pl-4">
                   <div className="font-bold text-foreground mb-2 text-sm sm:text-base">
-                    {i + 1}. {change.step}
+                    {change.step}
                   </div>
                   <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                     {change.change}
