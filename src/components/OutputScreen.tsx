@@ -62,22 +62,24 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="p-4 flex items-center justify-between">
-        <img 
-          src={logo} 
-          alt="Baking Great Bread at Home" 
-          className="h-16 md:h-20 cursor-pointer hover:opacity-80 transition-opacity" 
-          onClick={onStartOver}
-        />
-        
-        {/* Action buttons in upper right - hidden from PDF */}
-        <div className="hidden md:flex gap-2 print:hidden">
-          <Button variant="outline" onClick={onEditExtraction}>
-            Edit Extraction
-          </Button>
+      {/* Header - optimized for mobile and print */}
+      <div className="p-4 sm:p-6 border-b border-border print:border-0">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <img 
+              src={logo} 
+              alt="Baking Great Bread at Home" 
+              className="h-12 sm:h-14 md:h-16 print:h-12" 
+            />
+            
+            {/* Action buttons - hidden from PDF and on small mobile */}
+            <div className="hidden md:flex gap-2 print:hidden">
+              <Button variant="outline" size="sm" onClick={onEditExtraction}>
+                Edit Extraction
+              </Button>
           <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" size="sm">
                 <Save className="mr-2 h-4 w-4" />
                 Save Recipe
               </Button>
@@ -115,36 +117,42 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button onClick={handleDownloadPDF}>
+          <Button onClick={handleDownloadPDF} size="sm">
             Download PDF
           </Button>
-          <Button onClick={onStartOver} variant="secondary">
+          <Button onClick={onStartOver} variant="secondary" size="sm">
             Start Over
           </Button>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flex-1 p-4 py-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="space-y-4">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground break-words">
-            {initialRecipeName}
-          </h1>
-          <p className="text-base sm:text-lg text-muted-foreground">
-            Converted: {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast' : 'Yeast → Sourdough'}
-          </p>
+      
+      {/* Main Content */}
+      <div className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Recipe Name and Conversion Direction - Centered and Balanced */}
+          <div className="text-center space-y-3 py-4 sm:py-6 print:py-3">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground break-words px-2 print:text-3xl print:text-black">
+              {initialRecipeName}
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-muted-foreground print:text-base print:text-gray-700">
+              {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast Conversion' : 'Yeast → Sourdough Conversion'}
+            </p>
+          </div>
           
           {/* Warnings */}
           {result.warnings.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 px-2">
               {result.warnings.map((warning, i) => (
                 <div 
                   key={i} 
-                  className={`p-3 rounded-lg border text-sm ${
+                  className={`p-3 sm:p-4 rounded-lg border text-sm print:border-2 print:p-3 ${
                     warning.type === 'caution' 
-                      ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200' 
+                      ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200 print:bg-white print:border-black print:text-black' 
                       : warning.type === 'warning'
-                      ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200'
-                      : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200'
+                      ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200 print:bg-white print:border-black print:text-black'
+                      : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
                   }`}
                 >
                   <span className="font-semibold">
@@ -155,12 +163,11 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
               ))}
             </div>
           )}
-        </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Original Recipe */}
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-foreground">Original Recipe</h2>
+          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Original Recipe</h2>
             <div className="space-y-2">
               {originalPercentages.map((item, i) => (
                 <div key={i} className="flex justify-between text-sm">
@@ -180,8 +187,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
           </Card>
 
           {/* Converted Recipe */}
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-foreground">Converted Recipe</h2>
+          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Converted Recipe</h2>
             <div className="space-y-2">
               {result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3 ? (
                 <>
@@ -244,8 +251,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
           </Card>
 
           {/* Method Updates */}
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-foreground">Method Updates</h2>
+          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Method Updates</h2>
             <div className="space-y-3">
               {result.methodChanges.map((change, i) => (
                 <div key={i} className="text-sm">
@@ -274,8 +281,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
         </div>
 
         {/* Troubleshooting Tips */}
-        <Card className="p-6 bg-muted/30">
-          <h2 className="text-xl font-bold mb-4 text-foreground">🔧 Troubleshooting Tips</h2>
+        <Card className="p-4 sm:p-6 bg-muted/30 print:shadow-none print:border-2 print:bg-white">
+          <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">🔧 Troubleshooting Tips</h2>
           <div className="space-y-4">
             {result.troubleshootingTips.map((tip, i) => (
               <div key={i} className="text-sm">
@@ -291,8 +298,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
 
         {/* Ingredient Substitutions */}
         {result.substitutions.length > 0 && (
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-foreground">🔄 Ingredient Substitutions</h2>
+          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">🔄 Ingredient Substitutions</h2>
             <div className="space-y-4">
               {result.substitutions.map((sub, i) => (
                 <div key={i} className="text-sm border-l-2 border-primary/30 pl-4">
@@ -319,8 +326,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
 
         {/* Method Text */}
         {result.original.method && (
-          <Card className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-foreground">Original Method</h2>
+          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Original Method</h2>
             <div className="text-sm text-muted-foreground whitespace-pre-wrap">
               {result.original.method}
             </div>
@@ -379,10 +386,12 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
             Start Over
           </Button>
         </div>
+        </div>
       </div>
-      </div>
-      <footer className="text-center py-4 text-xs text-muted-foreground">
-        Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
+      
+      {/* Footer */}
+      <footer className="text-center py-4 text-xs text-muted-foreground border-t border-border print:border-0 print:text-black print:mt-8">
+        <p className="px-4">Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved</p>
       </footer>
     </div>
   );

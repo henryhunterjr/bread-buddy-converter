@@ -127,35 +127,38 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
             <div className="lg:col-span-2 space-y-6">
               <Card className="p-6 space-y-4">
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <label className="text-sm font-medium text-foreground">
-                      Upload Recipe (PDF or Image)
+                      Upload Recipe
                     </label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex-1"
-                        disabled={isProcessing}
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        {isProcessing ? 'Processing...' : 'Upload File'}
-                      </Button>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-auto py-4"
+                      disabled={isProcessing}
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                    >
+                      <Upload className="mr-2 h-5 w-5" />
+                      <span className="text-base">{isProcessing ? 'Processing...' : 'Choose File to Upload'}</span>
+                    </Button>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span>PDF Documents</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                        <Image className="h-4 w-4" />
+                        <span>Images (JPG, PNG, WEBP)</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">Maximum file size: 20MB</p>
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-2">
-                      <FileText className="h-3 w-3" />
-                      PDF or
-                      <Image className="h-3 w-3" />
-                      Image (JPG, PNG, WEBP) • Max 20MB
-                    </p>
                   </div>
 
                   <div className="relative">
