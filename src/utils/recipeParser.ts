@@ -216,7 +216,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
   // 3. Split compound lines (multiple ingredients on one line)
   let normalized = ingredientsSection
     .replace(/\s*\*\s*/g, '\n')  // Replace asterisks with newlines
-    .replace(/\s+(\d+(?:\.\d+)?)\s+(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+/gi, '\n$1 $2 ')  // Add newline before measurements, PRESERVE SPACE BETWEEN NUMBER AND UNIT
+    .replace(/\s+(\d+(?:\.\d+)?)\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)(?=\s)/gi, '\n$1$2 ')  // Add newline before measurements (with optional space between number and unit)
     .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ')  // Add newline before fractions
     .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
     
@@ -235,16 +235,22 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     // Skip lines that are just metadata (like "Prep Time:", "Yield:", etc.)
     if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
 
-    // CRITICAL FIX: Skip lines that are ONLY "extra for kneading" (not main ingredient lines)
-    // Match lines that start with small amounts (under 100g) that are clearly just extra
-    if (/^(plus|extra|additional)?\s*\d+(?:-\d+)?\s*(?:g|grams?)\s+.*\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface)/i.test(trimmed) &&
-        !/\d{3,}/.test(trimmed)) {  // Don't skip if it has 3+ digit numbers (main ingredient amounts)
-      console.log('Skipping extra/kneading line:', trimmed);
+    // CRITICAL FIX: Remove "plus extra for kneading" notes from ingredient lines
+    // This handles cases like "500g flour, plus 25-50g more for kneading"
+    // Remove the extra portion but keep the main ingredient
+    let cleanedLine = trimmed.replace(/,?\s*(plus|extra|additional)\s+\d+(?:-\d+)?\s*(?:g|grams?)\s+.*?\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface).*$/i, '');
+    
+    // If the line was ONLY about extra (nothing left after cleaning), skip it
+    if (cleanedLine.trim().length < 5 || !/\d/.test(cleanedLine)) {
+      console.log('Skipping extra-only line:', trimmed);
       continue;
     }
+    
+    // Use the cleaned line for further processing
+    const processLine = cleanedLine.trim();
 
     // PRIORITY: Check for egg first (before splitting)
-    const eggData = extractEggFromLine(trimmed);
+    const eggData = extractEggFromLine(processLine);
     if (eggData) {
       // Create egg ingredient directly
       const eggIngredient: ParsedIngredient = {
@@ -257,7 +263,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
       console.log(`Added egg ingredient: ${eggData.count}x eggs = ${eggIngredient.amount}g`);
       
       // Remove the egg text from the line before processing other ingredients
-      const lineWithoutEgg = trimmed.replace(new RegExp(eggData.fullText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
+      const lineWithoutEgg = processLine.replace(new RegExp(eggData.fullText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
       
       // If there's still content, process it
       if (lineWithoutEgg && lineWithoutEgg.length > 5 && /\d/.test(lineWithoutEgg)) {
@@ -273,7 +279,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     }
 
     // Check for compound ingredients (multiple ingredients on one line)
-    const segments = splitCompoundIngredients(trimmed);
+    const segments = splitCompoundIngredients(processLine);
     for (const segment of segments) {
       const ingredient = parseIngredientLine(segment);
       if (ingredient) {
