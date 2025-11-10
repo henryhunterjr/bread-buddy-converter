@@ -98,6 +98,11 @@ const Index = () => {
     setScreen('landing');
   };
 
+  // FIX #7: Add handler to edit extraction from output screen
+  const handleEditExtraction = () => {
+    setScreen('confirmation');
+  };
+
   return (
     <>
       {screen === 'landing' && (
@@ -121,10 +126,11 @@ const Index = () => {
         </div>
       )}
       {screen === 'output' && result && (
-        <OutputScreen 
+        <OutputScreen
           result={result}
           originalRecipeText={originalRecipeText}
           onStartOver={handleStartOver}
+          onEditExtraction={handleEditExtraction}
         />
       )}
     </>

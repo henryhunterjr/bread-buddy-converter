@@ -30,7 +30,38 @@
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
 import { generateBakerWarnings } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
-import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
+import { classifyDough, getMethodTemplate, getYeastMethodTemplate } from '@/lib/methodTemplates';
+
+/**
+ * FIX #2: Preserve flour types and ratios during conversion
+ * Extracts flour ingredients and their ratios from the original recipe
+ */
+function preserveFlourTypes(
+  flours: ParsedIngredient[],
+  targetTotalFlour: number
+): ParsedIngredient[] {
+  if (flours.length === 0) {
+    // Fallback to bread flour if no flour ingredients found
+    return [{
+      name: 'bread flour',
+      amount: targetTotalFlour,
+      unit: 'g',
+      type: 'flour'
+    }];
+  }
+
+  // Calculate total flour weight from original ingredients
+  const originalFlourTotal = flours.reduce((sum, f) => sum + f.amount, 0);
+
+  // Preserve ratios
+  return flours.map(flour => {
+    const ratio = flour.amount / originalFlourTotal;
+    return {
+      ...flour,
+      amount: Math.round(targetTotalFlour * ratio)
+    };
+  });
+}
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
@@ -55,30 +86,39 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   console.log('Calculated trueHydration:', trueHydration);
   
   // STEP 2: Build clean ingredient list for yeast version
-  // Remove starter, liquid, and flour entries - we'll add back consolidated totals
-  const nonStarterIngredients = recipe.ingredients.filter(
-    i => i.type !== 'starter' && i.type !== 'liquid' && i.type !== 'flour'
+  // FIX #4: Preserve ALL enrichments, fats, and sweeteners
+  const mustPreserveTypes: ParsedIngredient['type'][] = ['fat', 'enrichment', 'sweetener', 'salt', 'other'];
+  const enrichments = recipe.ingredients.filter(i => mustPreserveTypes.includes(i.type));
+
+  // Also preserve milk (it's a liquid but needs to be preserved)
+  const milkIngredients = recipe.ingredients.filter(i =>
+    i.type === 'liquid' && i.name.toLowerCase().includes('milk')
   );
+
+  console.log('Preserving enrichments:', enrichments.map(e => `${e.amount}g ${e.name}`).join(', '));
+  console.log('Preserving milk:', milkIngredients.map(m => `${m.amount}g ${m.name}`).join(', '));
   
   // Calculate yeast amount: 0.7-1.1% of flour weight
   const instantYeastAmount = Math.round(trueFlour * 0.011); // 1.1%
   const activeDryYeastAmount = Math.round(instantYeastAmount * 1.25);
-  
-  // Build final ingredient list
+
+  // FIX #2: Extract and preserve flour types from original recipe
+  const originalFlours = recipe.ingredients.filter(i => i.type === 'flour');
+  const preservedFlours = preserveFlourTypes(originalFlours, trueFlour);
+
+  console.log('Preserved flour types:', preservedFlours.map(f => `${f.amount}g ${f.name}`).join(', '));
+
+  // Build final ingredient list - FIX #4: Include all enrichments and milk
   const convertedIngredients: ParsedIngredient[] = [
-    {
-      name: 'bread flour',
-      amount: trueFlour,
-      unit: 'g',
-      type: 'flour'
-    },
+    ...preservedFlours,
     {
       name: 'water (80-85°F)',
       amount: trueWater,
       unit: 'g',
       type: 'liquid'
     },
-    ...nonStarterIngredients,
+    ...milkIngredients,
+    ...enrichments,
     {
       name: `instant yeast (${instantYeastAmount}g) OR active dry yeast (${activeDryYeastAmount}g)`,
       amount: instantYeastAmount,
@@ -87,6 +127,12 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
   
+  // FIX #9: Create conversion metadata for round-trip fidelity
+  const flourRatios = originalFlours.map(f => ({
+    type: f.name,
+    ratio: f.amount / trueFlour
+  }));
+
   const converted: ParsedRecipe = {
     ...recipe,
     ingredients: convertedIngredients,
@@ -94,41 +140,42 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
     yeastAmount: instantYeastAmount,
     totalFlour: trueFlour,
     totalLiquid: trueWater,
-    hydration: trueHydration
+    hydration: trueHydration,
+    metadata: {
+      originalFlours: flourRatios,
+      originalHydration: trueHydration,
+      techniques: recipe.techniques,
+      enrichmentProfile: {
+        butter: butterAmount,
+        eggs: hasEggs ? enrichments.filter(i => i.type === 'enrichment').reduce((sum, i) => sum + i.amount, 0) : 0,
+        sugar: sugarAmount,
+        milk: milkAmount
+      }
+    }
   };
 
-  const methodChanges: MethodChange[] = [
-    {
-      step: '1. MIX & KNEAD',
-      change: 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
-      timing: '8-10 min by hand, 5-6 min mixer'
-    },
-    {
-      step: '2. FIRST RISE',
-      change: 'Place in a lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
-      timing: '1-1.5 hours'
-    },
-    {
-      step: '3. SHAPE',
-      change: 'Punch down gently, shape as desired (loaf, braid, or boule), and place on a greased pan or parchment.',
-      timing: '5-10 min'
-    },
-    {
-      step: '4. FINAL PROOF',
-      change: 'Cover and let rise 45–60 minutes, or until dough springs back slowly when gently pressed.',
-      timing: '45-60 min'
-    },
-    {
-      step: '5. BAKE',
-      change: 'Preheat oven to 375°F (190°C). Optionally brush with egg wash for a golden crust. Bake 35–40 minutes until deep golden and internal temperature is 190–195°F.',
-      timing: '35-40 min at 375°F (190°C)'
-    },
-    {
-      step: '6. COOL',
-      change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
-      timing: '1 hour minimum'
-    }
-  ];
+  // FIX #5: Classify dough type and use context-aware method template
+  const butterAmount = enrichments
+    .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const sugarAmount = enrichments
+    .filter(i => i.type === 'sweetener' || i.name.toLowerCase().includes('sugar') || i.name.toLowerCase().includes('honey'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
+  const hasEggs = enrichments.some(i => i.type === 'enrichment' || i.name.toLowerCase().includes('egg'));
+
+  const classification = classifyDough(
+    sugarAmount,
+    butterAmount,
+    milkAmount,
+    trueFlour,
+    hasEggs
+  );
+
+  console.log('Dough classification for yeast conversion:', classification);
+
+  // Get appropriate method template based on classification
+  const methodChanges = getYeastMethodTemplate(classification);
 
   const troubleshootingTips = [
     {
@@ -146,6 +193,15 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   ];
 
   const warnings = generateBakerWarnings(converted);
+
+  // FIX #3: Add warnings for special techniques
+  if (recipe.techniques && recipe.techniques.length > 0) {
+    warnings.unshift({
+      type: 'warning',
+      message: `⚠️ This recipe uses ${recipe.techniques.join(', ')}. When converting, preserve the original ${recipe.techniques[0]} instructions and timing. The technique may need adjustment for yeast-based fermentation.`
+    });
+  }
+
   const substitutions = generateSubstitutions(converted);
 
   return {
@@ -301,6 +357,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     }
   ];
   
+  // FIX #2: Preserve flour types from original recipe
+  const originalFlours = recipe.ingredients.filter(i => i.type === 'flour');
+  const preservedDoughFlours = preserveFlourTypes(originalFlours, doughFlour);
+
+  console.log('Preserved flour types in dough:', preservedDoughFlours.map(f => `${f.amount}g ${f.name}`).join(', '));
+
   // Build DOUGH section - include ALL original ingredients
   const doughIngredients: ParsedIngredient[] = [
     {
@@ -309,12 +371,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
       unit: 'g',
       type: 'starter'
     },
-    {
-      name: 'bread flour',
-      amount: doughFlour,
-      unit: 'g',
-      type: 'flour'
-    }
+    ...preservedDoughFlours
   ];
   
   // Add water ONLY if there's any left after levain
@@ -363,6 +420,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     console.error('❌ SUGAR WAS LOST IN CONVERSION!');
   }
   
+  // FIX #9: Create conversion metadata for round-trip fidelity
+  const flourRatios = originalFlours.map(f => ({
+    type: f.name,
+    ratio: f.amount / totalFlour
+  }));
+
   const converted: ParsedRecipe = {
     ...recipe,
     ingredients: [...levainIngredients, ...doughIngredients],
@@ -370,7 +433,18 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
     starterAmount: levainTotal,
     totalFlour: totalFlour,
     totalLiquid: totalWater, // Water only, not including milk
-    hydration: waterHydration // Water-only hydration for enriched doughs
+    hydration: waterHydration, // Water-only hydration for enriched doughs
+    metadata: {
+      originalFlours: flourRatios,
+      originalHydration: waterHydration,
+      techniques: recipe.techniques,
+      enrichmentProfile: {
+        butter: butterAmount,
+        eggs: eggAmount,
+        sugar: sugarAmount,
+        milk: milkAmount
+      }
+    }
   };
   
   console.log('Converted recipe hydration:', waterHydration.toFixed(1) + '%');
@@ -381,12 +455,14 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   // Calculate actual starter percentage for validation
   const actualStarterPercentage = (totalLevainFlour / totalFlour) * 100;
 
-  // Classify dough type
+  // FIX #5: Classify dough type with egg detection
+  const hasEggs = eggAmount > 0;
   const classification = classifyDough(
     sugarAmount,
     butterAmount,
     milkAmount,
-    totalFlour
+    totalFlour,
+    hasEggs
   );
 
   console.log('Dough classification:', classification);
@@ -462,6 +538,15 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   }
 
   const warnings = generateBakerWarnings(converted);
+
+  // FIX #3: Add warnings for special techniques
+  if (recipe.techniques && recipe.techniques.length > 0) {
+    warnings.unshift({
+      type: 'warning',
+      message: `⚠️ This recipe uses ${recipe.techniques.join(', ')}. When converting to sourdough, preserve the original ${recipe.techniques[0]} instructions. Sourdough fermentation will require significantly more time.`
+    });
+  }
+
   const substitutions = generateSubstitutions(converted);
 
   return {

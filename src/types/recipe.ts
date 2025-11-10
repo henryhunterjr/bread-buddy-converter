@@ -5,6 +5,18 @@ export interface ParsedIngredient {
   type: 'flour' | 'liquid' | 'starter' | 'yeast' | 'salt' | 'fat' | 'enrichment' | 'sweetener' | 'other';
 }
 
+export interface ConversionMetadata {
+  originalFlours?: Array<{ type: string; ratio: number }>; // FIX #9: Preserve flour types
+  originalHydration?: number;
+  techniques?: string[];
+  enrichmentProfile?: {
+    butter: number;
+    eggs: number;
+    sugar: number;
+    milk: number;
+  };
+}
+
 export interface ParsedRecipe {
   ingredients: ParsedIngredient[];
   method: string;
@@ -14,6 +26,8 @@ export interface ParsedRecipe {
   yeastAmount: number;
   saltAmount: number;
   hydration: number;
+  techniques?: string[]; // FIX #3: Detected special techniques
+  metadata?: ConversionMetadata; // FIX #9: Conversion metadata for round-trip fidelity
 }
 
 export interface ConvertedRecipe {

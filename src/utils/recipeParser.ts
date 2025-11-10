@@ -82,13 +82,13 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
-const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'cream'];
+const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk']; // FIX #4: Removed 'cream' - it's a fat/enrichment
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt', 'kosher salt', 'sea salt', 'fine salt', 'coarse salt', 'flaky salt'];
-const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
+const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening', 'cream']; // FIX #4: Added 'cream' as a fat
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
-const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
+const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses', 'agave']; // FIX #4: Added 'agave'
 
 // Core ingredient keywords for compound detection
 const CORE_INGREDIENTS = ['water', 'milk', 'butter', 'oil', 'egg', 'flour', 'yeast', 'sugar', 'salt', 'starter', 'honey'];
@@ -183,25 +183,57 @@ function isValidIngredientLine(line: string): boolean {
   return hasMeasurement && hasIngredient;
 }
 
+/**
+ * FIX #3: Detect special bread-making techniques in recipe text
+ * Returns array of detected technique names
+ */
+export function detectSpecialTechniques(recipeText: string): string[] {
+  const lowerText = recipeText.toLowerCase();
+  const techniques: string[] = [];
+
+  const techniquePatterns = {
+    tangzhong: /tangzhong|water roux|湯種|water-roux method/i,
+    poolish: /poolish|pre-?ferment|overnight sponge/i,
+    biga: /\bbiga\b/i,
+    autolyse: /autoly[sz]e|autoly[sz]is/i,
+    'cold ferment': /cold ferment|overnight proof|retard/i,
+    'soaker': /soaker|grain soaker/i
+  };
+
+  for (const [name, pattern] of Object.entries(techniquePatterns)) {
+    if (pattern.test(lowerText)) {
+      techniques.push(name);
+    }
+  }
+
+  return techniques;
+}
+
 export function parseRecipe(recipeText: string): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
   let method = '';
-  
+
+  // FIX #3: Detect special techniques in the recipe
+  const detectedTechniques = detectSpecialTechniques(recipeText);
+  if (detectedTechniques.length > 0) {
+    console.log('🔍 Detected special techniques:', detectedTechniques.join(', '));
+  }
+
   // First, split by common method indicators to separate ingredients from method
   const methodKeywords = ['method:', 'instructions:', 'directions:', 'steps:'];
   let ingredientsSection = recipeText;
   let methodSection = '';
-  
+
   const lowerText = recipeText.toLowerCase();
   let methodStartIndex = -1;
-  
+
   for (const keyword of methodKeywords) {
     const index = lowerText.indexOf(keyword);
     if (index !== -1 && (methodStartIndex === -1 || index < methodStartIndex)) {
       methodStartIndex = index;
     }
   }
-  
+
   if (methodStartIndex !== -1) {
     ingredientsSection = recipeText.substring(0, methodStartIndex);
     methodSection = recipeText.substring(methodStartIndex);
@@ -311,13 +343,47 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
   console.log('Liquid ingredients:', ingredients.filter(i => i.type === 'liquid').map(i => `${i.amount}g ${i.name}`));
   console.log('Starter ingredients:', ingredients.filter(i => i.type === 'starter').map(i => `${i.amount}g ${i.name}`));
 
+  // FIX #6: Calculate accurate hydration with water content factors
   // Adjust for starter (100% hydration assumed)
   const adjustedFlour = totalFlour + (starterAmount / 2);
   const adjustedLiquid = totalLiquid + (starterAmount / 2);
-  const hydration = adjustedFlour > 0 ? (adjustedLiquid / adjustedFlour) * 100 : 0;
-  
+
+  // Calculate actual water content from all ingredients
+  const waterContentFactors: Record<string, number> = {
+    water: 1.0,
+    milk: 0.87,      // Milk is 87% water
+    cream: 0.60,     // Heavy cream is 60% water
+    egg: 0.75,       // Eggs are 75% water
+    honey: 0.17,     // Honey is 17% water
+    butter: 0.16,    // Butter is 16% water
+    oil: 0.0         // Oil has no water
+  };
+
+  let totalWaterContent = 0;
+
+  for (const ingredient of ingredients) {
+    // Find matching water content factor
+    const factor = Object.entries(waterContentFactors).find(
+      ([key]) => ingredient.name.toLowerCase().includes(key)
+    )?.[1];
+
+    if (factor !== undefined) {
+      totalWaterContent += ingredient.amount * factor;
+      console.log(`Water from ${ingredient.name}: ${ingredient.amount}g × ${factor} = ${ingredient.amount * factor}g`);
+    } else if (ingredient.type === 'liquid') {
+      // Default liquids to 100% water
+      totalWaterContent += ingredient.amount;
+      console.log(`Water from ${ingredient.name} (default liquid): ${ingredient.amount}g`);
+    }
+  }
+
+  // Add water from starter (50% of starter weight)
+  totalWaterContent += starterAmount / 2;
+
+  const hydration = adjustedFlour > 0 ? (totalWaterContent / adjustedFlour) * 100 : 0;
+
   console.log('Adjusted totalFlour:', adjustedFlour);
-  console.log('Adjusted totalLiquid:', adjustedLiquid);
+  console.log('Total water content (accounting for factors):', totalWaterContent);
   console.log('Calculated hydration:', hydration);
 
   return {
@@ -328,14 +394,15 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
     starterAmount,
     yeastAmount,
     saltAmount,
-    hydration
+    hydration,
+    techniques: detectedTechniques // FIX #3: Include detected techniques
   };
 }
 
 function parseIngredientLine(line: string): ParsedIngredient | null {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length < 3) return null;
-  
+
   // CRITICAL: Validate ingredient line first
   if (!isValidIngredientLine(trimmed)) {
     console.log(`Skipping non-ingredient line: "${trimmed}"`);
@@ -343,17 +410,27 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
   }
 
   const lower = trimmed.toLowerCase();
-  
-  // Handle bullet points and dashes
-  let cleaned = lower.replace(/^[-•*]\s*/, '');
-  
+
+  // Handle bullet points, dashes, and leading symbols
+  let cleaned = lower.replace(/^[­-•·*►‒–—]\s*/, '');
+
+  // FIX #1: Handle "Ingredient – Amount" or "Ingredient: Amount" patterns
+  // Pattern: "Bread flour – 500g" or "Water: 350ml" or "Salt — 10g"
+  const nameFirstMatch = cleaned.match(/^([a-z\s]+?)(?:[­-–—‒•·*►:])\s*(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)/);
+  if (nameFirstMatch) {
+    const name = nameFirstMatch[1].trim();
+    const amount = parseFloat(nameFirstMatch[2]);
+    console.log(`Matched name-first pattern: "${name}" = ${amount}g`);
+    return createIngredient(name, amount, lower);
+  }
+
   // CRITICAL FIX: Extract grams from parentheses BEFORE removing them
-  // Pattern: "(57g / 4 tablespoons)" or "(3/4 cup)" or "(50g)"
+  // Pattern: "(57g / 4 tablespoons)" or "(3/4 cup)" or "(50g)" or "Flour (500g)"
   const gramsInParens = cleaned.match(/\((\d+(?:\.\d+)?)\s*g(?:rams?)?\s*(?:\/|\||or)?\s*[^)]*\)/);
-  
+
   // Remove parenthetical alternative measurements AFTER extracting grams
   cleaned = cleaned.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
-  
+
   // If we found grams in parentheses, use that as the primary measurement
   if (gramsInParens) {
     const amount = parseFloat(gramsInParens[1]);
@@ -363,7 +440,7 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
     console.log(`Found grams in parens: ${amount}g ${name}`);
     return createIngredient(name, amount, lower);
   }
-  
+
   // Pattern 1: "100g bread flour" or "240ml water" (grams/ml directly stated)
   const gramsFirstMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
   if (gramsFirstMatch) {
@@ -371,7 +448,7 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
     const name = gramsFirstMatch[2].trim();
     return createIngredient(name, amount, lower);
   }
-  
+
   // Pattern 2: "or 590g water" or "or 10g yeast" (prefer the gram measurement after "or")
   const orGramsMatch = cleaned.match(/or\s+(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
   if (orGramsMatch) {
@@ -379,7 +456,7 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
     const name = orGramsMatch[2].trim();
     return createIngredient(name, amount, lower);
   }
-  
+
   // Pattern 3: Fractions "2 1/2 cups flour" or "1/2 cup water"
   const fractionMatch = cleaned.match(/^(\d+)?\s*(\d+)\/(\d+)\s+([a-z]+)\s+(.+)/);
   if (fractionMatch) {
@@ -389,30 +466,30 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
     const fractionalAmount = whole + (numerator / denominator);
     const unit = fractionMatch[4];
     const name = fractionMatch[5].trim();
-    
+
     const grams = convertToGrams(fractionalAmount, unit, name);
     return createIngredient(name, grams, lower);
   }
-  
+
   // Pattern 4: "2 cups flour", "3 tablespoons yeast", etc. (number + unit + name)
   const standardMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s+([a-z]+)\s+(.+)/);
   if (standardMatch) {
     let amount = parseFloat(standardMatch[1]);
     const unit = standardMatch[2];
     const name = standardMatch[3].trim();
-    
+
     // Convert to grams if needed
     amount = convertToGrams(amount, unit, name);
     return createIngredient(name, amount, lower);
   }
-  
+
   // Pattern 5: Just "500g flour" or "240 water" (number + optional unit + name)
   const simpleMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*([a-z]+)?\s+(.+)/);
   if (simpleMatch) {
     let amount = parseFloat(simpleMatch[1]);
     const unit = simpleMatch[2] || 'g';
     const name = simpleMatch[3].trim();
-    
+
     // Convert to grams if needed
     amount = convertToGrams(amount, unit, name);
     return createIngredient(name, amount, lower);
@@ -551,31 +628,35 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
   );
   const isEnriched = hasOil || hasEggs || hasHoney;
   
-  // Hydration warnings based on dough type
+  // FIX #8: Hydration warnings with actionable suggestions
   if (isEnriched) {
     // Enriched doughs: 60-68%
     if (recipe.hydration > 68 && recipe.hydration <= 75) {
+      const excessWater = Math.round(recipe.totalFlour * (recipe.hydration - 65) / 100);
       warnings.push({
         type: 'warning',
-        message: `Hydration is ${recipe.hydration.toFixed(0)}%. For enriched doughs (with butter, eggs, or sugar), 60-68% is typical. Higher hydration may make shaping difficult.`
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%. For enriched doughs (with butter, eggs, or sugar), 60-68% is typical. Higher hydration may make shaping difficult. Consider reducing water by ${excessWater}g for 65% hydration.`
       });
     } else if (recipe.hydration > 75) {
+      const excessWater = Math.round(recipe.totalFlour * (recipe.hydration - 65) / 100);
       warnings.push({
         type: 'caution',
-        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is very high for an enriched dough. This may be too wet to handle. Consider reducing water by 5-10%.`
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is very high for an enriched dough. This may be too wet to handle. Reduce water by ${excessWater}g for 65% hydration.`
       });
     } else if (recipe.hydration < 55) {
+      const neededWater = Math.round(recipe.totalFlour * (62 - recipe.hydration) / 100);
       warnings.push({
         type: 'warning',
-        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is quite low. The dough may be stiff and dense. Consider adding 2-5% more water.`
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is quite low. The dough may be stiff and dense. Add ${neededWater}g water for 62% hydration (softer crumb).`
       });
     }
   } else {
     // Lean doughs: 70-78%
     if (recipe.hydration < 65) {
+      const neededWater = Math.round(recipe.totalFlour * (72 - recipe.hydration) / 100);
       warnings.push({
         type: 'warning',
-        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is low for a lean dough. Typical artisan breads are 70-78%. This will produce a tighter crumb.`
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%, which is low for a lean dough. Typical artisan breads are 70-78%. Add ${neededWater}g water for 72% hydration (more open crumb).`
       });
     } else if (recipe.hydration > 82) {
       warnings.push({
@@ -585,17 +666,19 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
     }
   }
   
-  // Salt percentage warnings
+  // FIX #8: Salt percentage warnings with actionable suggestions
   const saltPercentage = (recipe.saltAmount / recipe.totalFlour) * 100;
   if (saltPercentage < 1.5 && saltPercentage > 0) {
+    const neededSalt = Math.round(recipe.totalFlour * 0.02 - recipe.saltAmount);
     warnings.push({
       type: 'info',
-      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight. Professional bakers typically use 2%. The bread may taste bland.`
+      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight. Professional bakers typically use 2%. Add ${neededSalt}g salt for better flavor.`
     });
   } else if (saltPercentage > 2.5 && saltPercentage <= 3.5) {
+    const excessSalt = Math.round(recipe.saltAmount - recipe.totalFlour * 0.02);
     warnings.push({
       type: 'warning',
-      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight, which is higher than the typical 2%. The bread will taste quite salty.`
+      message: `Salt is at ${saltPercentage.toFixed(1)}% of flour weight, which is higher than the typical 2%. Reduce by ${excessSalt}g to avoid overly salty bread.`
     });
   }
   

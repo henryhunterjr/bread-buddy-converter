@@ -5,29 +5,32 @@ export interface DoughClassification {
   sugarPercent: number;
   fatPercent: number;
   milkPercent: number;
+  hasEggs?: boolean; // FIX #5: Track if dough has eggs
 }
 
 export function classifyDough(
   sugarAmount: number,
   fatAmount: number,
   milkAmount: number,
-  totalFlour: number
+  totalFlour: number,
+  hasEggs: boolean = false // FIX #5: Add egg parameter
 ): DoughClassification {
   const sugarPercent = (sugarAmount / totalFlour) * 100;
   const fatPercent = (fatAmount / totalFlour) * 100;
   const milkPercent = (milkAmount / totalFlour) * 100;
 
   let type: 'lean' | 'enriched' | 'sweet';
-  
+
+  // FIX #5: Consider eggs in classification
   if (sugarPercent > 15 || fatPercent > 15) {
     type = 'sweet';
-  } else if (sugarPercent > 5 || fatPercent > 5 || milkPercent > 20) {
+  } else if (sugarPercent > 5 || fatPercent > 5 || milkPercent > 20 || hasEggs) {
     type = 'enriched';
   } else {
     type = 'lean';
   }
 
-  return { type, sugarPercent, fatPercent, milkPercent };
+  return { type, sugarPercent, fatPercent, milkPercent, hasEggs };
 }
 
 export function getMethodTemplate(
@@ -125,6 +128,89 @@ export function getMethodTemplate(
       step: '8. COOL',
       change: 'Cool on wire rack minimum 2 hours before slicing.',
       timing: '2 hours minimum'
+    }
+  ];
+}
+
+/**
+ * FIX #5: Yeast method templates based on dough type
+ * Returns appropriate method steps for yeast-based bread
+ */
+export function getYeastMethodTemplate(
+  classification: DoughClassification
+): MethodChange[] {
+  const { type, hasEggs } = classification;
+
+  if (type === 'enriched' || type === 'sweet') {
+    return [
+      {
+        step: '1. MIX & KNEAD',
+        change: hasEggs
+          ? 'Combine flour, yeast, salt, sugar, and liquids. Add eggs at room temperature. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes. Add softened butter gradually during the last 2-3 minutes of kneading. Dough should be smooth and pass the windowpane test.'
+          : 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
+        timing: '8-10 min by hand, 5-6 min mixer'
+      },
+      {
+        step: '2. FIRST RISE',
+        change: 'Place in a lightly oiled bowl, cover, and let rise 1.5–2 hours at 75–78°F until doubled in size. Enriched doughs rise more slowly than lean doughs.',
+        timing: '1.5-2 hours'
+      },
+      {
+        step: '3. SHAPE',
+        change: 'Punch down gently, shape as desired (loaf, rolls, braid, or boule), and place on a greased pan or parchment.',
+        timing: '5-10 min'
+      },
+      {
+        step: '4. FINAL PROOF',
+        change: 'Cover and let rise 60–90 minutes, or until dough springs back slowly when gently pressed.',
+        timing: '60-90 min'
+      },
+      {
+        step: '5. BAKE',
+        change: hasEggs
+          ? 'Preheat oven to 350°F (175°C) for enriched doughs with eggs. Optionally brush with egg wash for a golden crust. Bake 30–35 minutes until deep golden and internal temperature is 190–195°F.'
+          : 'Preheat oven to 375°F (190°C). Optionally brush with egg wash or butter for a golden crust. Bake 35–40 minutes until deep golden and internal temperature is 190–195°F.',
+        timing: hasEggs ? '30-35 min at 350°F (175°C)' : '35-40 min at 375°F (190°C)'
+      },
+      {
+        step: '6. COOL',
+        change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
+        timing: '1 hour minimum'
+      }
+    ];
+  }
+
+  // LEAN DOUGH TEMPLATE
+  return [
+    {
+      step: '1. MIX & KNEAD',
+      change: 'Combine all ingredients in a bowl. Knead by hand for 10–12 minutes or with a stand mixer (dough hook) for 6–8 minutes until smooth and elastic. Dough should pass the windowpane test.',
+      timing: '10-12 min by hand, 6-8 min mixer'
+    },
+    {
+      step: '2. FIRST RISE',
+      change: 'Place in a lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
+      timing: '1-1.5 hours'
+    },
+    {
+      step: '3. SHAPE',
+      change: 'Punch down gently, shape into a tight boule or batard, and place on parchment or in a banneton.',
+      timing: '5-10 min'
+    },
+    {
+      step: '4. FINAL PROOF',
+      change: 'Cover and let rise 45–60 minutes, or until dough springs back slowly when gently pressed.',
+      timing: '45-60 min'
+    },
+    {
+      step: '5. BAKE',
+      change: 'Preheat oven to 425°F (220°C). Score the top. Bake in a preheated Dutch oven (covered 20 minutes, uncovered 20-25 minutes) OR bake with steam for 40-45 minutes until deep golden and internal temperature is 200–205°F.',
+      timing: '40-45 min at 425°F (220°C)'
+    },
+    {
+      step: '6. COOL',
+      change: 'Cool on wire rack minimum 1 hour before slicing.',
+      timing: '1 hour minimum'
     }
   ];
 }
