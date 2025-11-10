@@ -82,11 +82,11 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
-const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'cream'];
+const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt', 'kosher salt', 'sea salt', 'fine salt', 'coarse salt', 'flaky salt'];
-const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening'];
+const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening', 'cream', 'heavy cream'];
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
 const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
 
@@ -182,6 +182,9 @@ function isValidIngredientLine(line: string): boolean {
   // Must have both measurement AND ingredient
   return hasMeasurement && hasIngredient;
 }
+
+// Export for use in converter
+export { detectSpecialTechniques };
 
 export function parseRecipe(recipeText: string): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
@@ -534,6 +537,49 @@ export function validateRecipe(recipe: ParsedRecipe): string[] {
   }
 
   return errors;
+}
+
+// Special technique detection
+function detectSpecialTechniques(recipeText: string): Array<{ type: 'info' | 'warning' | 'caution'; message: string }> {
+  const warnings: Array<{ type: 'info' | 'warning' | 'caution'; message: string }> = [];
+  const lowerText = recipeText.toLowerCase();
+  
+  if (lowerText.includes('tangzhong')) {
+    warnings.push({
+      type: 'warning',
+      message: '🌾 Tangzhong Detected: This recipe uses a cooked flour-water roux. Maintain this step in your converted recipe for the signature soft texture. Cook 1 part flour with 5 parts liquid until thick, cool completely before adding to dough.'
+    });
+  }
+  
+  if (lowerText.includes('poolish') || lowerText.includes('biga')) {
+    warnings.push({
+      type: 'warning',
+      message: '🕐 Pre-ferment Detected: This recipe uses a poolish or biga. When converting, replace this pre-ferment with the levain (for sourdough) or skip it (for yeast). Adjust water/flour in main dough accordingly.'
+    });
+  }
+  
+  if (lowerText.includes('autolyse') || lowerText.includes('autolyze')) {
+    warnings.push({
+      type: 'info',
+      message: '💧 Autolyse Detected: This recipe includes an autolyse rest. Keep this step in your converted recipe—it improves gluten development and dough extensibility regardless of leavening method.'
+    });
+  }
+  
+  if (lowerText.includes('cold ferment') || lowerText.includes('refrigerat') && (lowerText.includes('overnight') || lowerText.includes('8') || lowerText.includes('12'))) {
+    warnings.push({
+      type: 'info',
+      message: '❄️ Cold Fermentation Detected: This recipe includes cold fermentation. This technique works for both yeast and sourdough—it develops flavor and makes timing more flexible.'
+    });
+  }
+  
+  if (lowerText.includes('soaker')) {
+    warnings.push({
+      type: 'warning',
+      message: '🌰 Soaker Detected: This recipe pre-soaks grains, seeds, or dried fruit. Maintain this step in your converted recipe—it prevents dry pockets and improves texture. Soak overnight in equal weight water.'
+    });
+  }
+  
+  return warnings;
 }
 
 export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info' | 'warning' | 'caution'; message: string }> {

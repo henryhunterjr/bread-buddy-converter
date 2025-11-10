@@ -24,9 +24,10 @@ interface OutputScreenProps {
   result: ConvertedRecipe;
   originalRecipeText: string;
   onStartOver: () => void;
+  onEditExtraction: () => void;
 }
 
-export default function OutputScreen({ result, originalRecipeText, onStartOver }: OutputScreenProps) {
+export default function OutputScreen({ result, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -70,6 +71,9 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
         
         {/* Action buttons in upper right - hidden from PDF */}
         <div className="hidden md:flex gap-2 print:hidden">
+          <Button variant="outline" onClick={onEditExtraction}>
+            Edit Extraction
+          </Button>
           <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -321,6 +325,9 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver }
 
         {/* Actions - Bottom (always visible, hidden from PDF) */}
         <div className="flex gap-4 justify-center flex-wrap print:hidden">
+          <Button onClick={onEditExtraction} variant="outline" size="lg">
+            Edit Extraction
+          </Button>
           <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="lg">

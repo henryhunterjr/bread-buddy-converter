@@ -28,11 +28,11 @@
  */
 
 import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
-import { generateBakerWarnings } from './recipeParser';
+import { generateBakerWarnings, detectSpecialTechniques } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 
-export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
+export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
   // Starter is 100% hydration: 50% flour, 50% water
   const starterFlour = recipe.starterAmount / 2;
@@ -147,6 +147,12 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
 
   const warnings = generateBakerWarnings(converted);
   const substitutions = generateSubstitutions(converted);
+  
+  // Add special technique warnings if original recipe text provided
+  if (originalRecipeText) {
+    const techniqueWarnings = detectSpecialTechniques(originalRecipeText);
+    warnings.unshift(...techniqueWarnings);
+  }
 
   return {
     original: recipe,
@@ -159,7 +165,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe): ConvertedRecipe {
   };
 }
 
-export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
+export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText?: string): ConvertedRecipe {
   // STEP 1: Identify total flour
   const totalFlour = recipe.totalFlour;
   
@@ -260,20 +266,48 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
   // For lean doughs: 70-78% water hydration
   const targetWaterHydration = isEnrichedDough ? 0.65 : 0.75;
   
-  // Account for liquid from eggs (approximate 75% of egg weight is liquid)
+  // ENHANCED HYDRATION CALCULATION
+  // Account for water content in enrichment ingredients:
+  // - Eggs: 75% water
+  // - Milk: 87% water
+  // - Cream: 60% water
+  // - Honey: 17% water
+  // - Butter: 16% water
   const liquidFromEggs = eggAmount * 0.75;
+  const liquidFromMilk = milkAmount * 0.87;
+  const creamAmount = nonFlourLiquidYeastIngredients
+    .filter(i => i.name.toLowerCase().includes('cream'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const liquidFromCream = creamAmount * 0.60;
+  const honeyAmount = nonFlourLiquidYeastIngredients
+    .filter(i => i.name.toLowerCase().includes('honey'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const liquidFromHoney = honeyAmount * 0.17;
+  const liquidFromButter = butterAmount * 0.16;
+  
+  // Total liquid contribution from enrichments
+  const totalEnrichmentLiquid = liquidFromEggs + liquidFromMilk + liquidFromCream + liquidFromHoney + liquidFromButter;
+  
+  console.log('Enrichment liquid breakdown:', {
+    eggs: liquidFromEggs.toFixed(1) + 'g',
+    milk: liquidFromMilk.toFixed(1) + 'g',
+    cream: liquidFromCream.toFixed(1) + 'g',
+    honey: liquidFromHoney.toFixed(1) + 'g',
+    butter: liquidFromButter.toFixed(1) + 'g',
+    total: totalEnrichmentLiquid.toFixed(1) + 'g'
+  });
   
   // Calculate adjusted water needed
-  // Total water needed = (total flour × target hydration) - water from levain - liquid from eggs
+  // Total water needed = (total flour × target hydration) - water from levain - liquid from enrichments
   const totalWaterNeeded = Math.round(totalFlour * targetWaterHydration);
-  const doughWater = Math.round(Math.max(0, totalWaterNeeded - totalLevainWater - liquidFromEggs));
+  const doughWater = Math.round(Math.max(0, totalWaterNeeded - totalLevainWater - totalEnrichmentLiquid));
   
   console.log('Dough flour:', doughFlour);
   console.log('Dough water:', doughWater);
   console.log('Target water hydration:', (targetWaterHydration * 100).toFixed(0) + '%');
   
-  // Calculate actual water-only hydration (for enriched doughs, water % is separate from total liquid)
-  const totalWater = totalLevainWater + doughWater + liquidFromEggs;
+  // Calculate actual water-only hydration (accounting for all liquid sources)
+  const totalWater = totalLevainWater + doughWater + totalEnrichmentLiquid;
   const waterHydration = (totalWater / totalFlour) * 100;
   
   console.log('Actual water hydration:', waterHydration.toFixed(1) + '%');
@@ -463,6 +497,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe): ConvertedRecipe {
 
   const warnings = generateBakerWarnings(converted);
   const substitutions = generateSubstitutions(converted);
+  
+  // Add special technique warnings if original recipe text provided
+  if (originalRecipeText) {
+    const techniqueWarnings = detectSpecialTechniques(originalRecipeText);
+    warnings.unshift(...techniqueWarnings);
+  }
 
   return {
     original: recipe,

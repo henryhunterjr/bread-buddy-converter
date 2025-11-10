@@ -68,10 +68,10 @@ const Index = () => {
     updatedRecipe.saltAmount = saltAmount;
     updatedRecipe.hydration = hydration;
     
-    // Now run the actual conversion
+    // Now run the actual conversion with original recipe text for technique detection
     const converted = direction === 'sourdough-to-yeast' 
-      ? convertSourdoughToYeast(updatedRecipe)
-      : convertYeastToSourdough(updatedRecipe);
+      ? convertSourdoughToYeast(updatedRecipe, originalRecipeText)
+      : convertYeastToSourdough(updatedRecipe, originalRecipeText);
     
     setResult(converted);
     setScreen('output');
@@ -79,6 +79,10 @@ const Index = () => {
 
   const handleRejectIngredients = () => {
     setScreen('input');
+  };
+  
+  const handleEditExtraction = () => {
+    setScreen('confirmation');
   };
 
   const handleLoadSaved = (recipeText: string, savedResult: ConvertedRecipe) => {
@@ -125,6 +129,7 @@ const Index = () => {
           result={result}
           originalRecipeText={originalRecipeText}
           onStartOver={handleStartOver}
+          onEditExtraction={handleEditExtraction}
         />
       )}
     </>
