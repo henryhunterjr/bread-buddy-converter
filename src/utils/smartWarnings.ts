@@ -112,19 +112,29 @@ function getHydrationWarnings(recipe: ParsedRecipe, comp: DoughComposition): Rec
   // HIGH HYDRATION WARNINGS (context-aware)
   if (hydration > 75) {
     if (comp.isEnriched) {
+      const targetHydrationLow = 70;
+      const targetHydrationHigh = 75;
+      const suggestedWaterLow = Math.round(recipe.totalFlour * targetHydrationLow / 100);
+      const suggestedWaterHigh = Math.round(recipe.totalFlour * targetHydrationHigh / 100);
       warnings.push({
         type: 'caution',
-        message: `High hydration (${hydration.toFixed(0)}%) with enrichments makes sticky dough. Enriched doughs typically work best at 60-68% hydration. Consider reducing water by 5-10% for easier handling.`
+        message: `Hydration is ${hydration.toFixed(0)}%, which is very high for an enriched dough. This may be too wet to handle. Consider reducing water to ${suggestedWaterLow}-${suggestedWaterHigh}g (${targetHydrationLow}-${targetHydrationHigh}% hydration) for easier handling.`
       });
     } else if (comp.hasAllPurpose && !comp.hasBreadFlour) {
+      const targetHydrationLow = 72;
+      const targetHydrationHigh = 75;
+      const suggestedWaterLow = Math.round(recipe.totalFlour * targetHydrationLow / 100);
+      const suggestedWaterHigh = Math.round(recipe.totalFlour * targetHydrationHigh / 100);
       warnings.push({
         type: 'caution',
-        message: `All-purpose flour at ${hydration.toFixed(0)}% hydration can be challenging. All-purpose handles 70-75% max. Consider switching to bread flour or reducing hydration to 72-75%.`
+        message: `All-purpose flour at ${hydration.toFixed(0)}% hydration can be challenging. All-purpose handles 70-75% max. Consider switching to bread flour or reducing water to ${suggestedWaterLow}-${suggestedWaterHigh}g (${targetHydrationLow}-${targetHydrationHigh}% hydration).`
       });
     } else if (hydration > 85) {
+      const targetHydration = 80;
+      const suggestedWater = Math.round(recipe.totalFlour * targetHydration / 100);
       warnings.push({
         type: 'warning',
-        message: `Very high hydration (${hydration.toFixed(0)}%) creates extremely sticky dough. This requires excellent gluten development and gentle handling techniques. Consider autolyse and stretch-and-fold instead of kneading.`
+        message: `Very high hydration (${hydration.toFixed(0)}%) creates extremely sticky dough. This requires excellent gluten development and gentle handling techniques. Consider reducing water to ${suggestedWater}g (${targetHydration}% hydration) or use autolyse and stretch-and-fold instead of kneading.`
       });
     } else if (hydration > 78 && !comp.hasBreadFlour) {
       warnings.push({
@@ -136,17 +146,23 @@ function getHydrationWarnings(recipe: ParsedRecipe, comp: DoughComposition): Rec
   
   // LOW HYDRATION WARNINGS
   if (hydration < 60 && !comp.isEnriched) {
+    const targetHydration = 65;
+    const suggestedWater = Math.round(recipe.totalFlour * targetHydration / 100);
     warnings.push({
       type: 'info',
-      message: `Lower hydration (${hydration.toFixed(0)}%) creates a stiffer dough. This is typical for bagels or some artisan loaves, but may be drier than expected for standard bread. Increase water if you want a softer crumb.`
+      message: `Lower hydration (${hydration.toFixed(0)}%) creates a stiffer dough. This is typical for bagels or some artisan loaves, but may be drier than expected for standard bread. Consider increasing water to ${suggestedWater}g (${targetHydration}% hydration) if you want a softer crumb.`
     });
   }
   
   // WHOLE WHEAT HYDRATION
   if (comp.hasWholeWheat && hydration < 70) {
+    const targetHydrationLow = Math.round(hydration * 1.05);
+    const targetHydrationHigh = Math.round(hydration * 1.10);
+    const suggestedWaterLow = Math.round(recipe.totalFlour * targetHydrationLow / 100);
+    const suggestedWaterHigh = Math.round(recipe.totalFlour * targetHydrationHigh / 100);
     warnings.push({
       type: 'info',
-      message: 'Whole wheat flour absorbs more water than white flour. Consider increasing hydration by 5-10% for a softer texture, or allow longer autolyse time for better water absorption.'
+      message: `Whole wheat flour absorbs more water than white flour. Consider increasing water to ${suggestedWaterLow}-${suggestedWaterHigh}g (${targetHydrationLow}-${targetHydrationHigh}% hydration) for a softer texture, or allow longer autolyse time.`
     });
   }
   

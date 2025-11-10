@@ -229,7 +229,19 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
           {/* Converted Recipe */}
           <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Converted Recipe</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground print:text-black">Converted Recipe</h2>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help print:hidden" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">Highlighted ingredients are new or changed from the original recipe</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <div className="space-y-2">
               {result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3 ? (
                 <>
