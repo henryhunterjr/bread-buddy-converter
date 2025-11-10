@@ -33,15 +33,35 @@ VALIDATION RULES:
    - Missing ingredients (e.g., didn't detect flour in "4 cups all-purpose")
    - Wrong unit conversions
 4. Flag ingredients that need user verification
-5. Calculate confidence score (0-100) for final result
+5. Calculate confidence score (0-100) using the enhanced scoring system below
 
-CONFIDENCE SCORING:
-- 90-100: Both parsers agree, all ingredients found
-- 70-89: Minor discrepancies, mostly correct
-- 50-69: Significant differences, needs review
-- Below 50: Major parsing issues, user must verify
+ENHANCED CONFIDENCE SCORING SYSTEM:
+Base score: 100
 
-Return JSON with this structure:
+CRITICAL PENALTIES:
+- No flour detected: -50 points
+- No leavening (yeast or starter): -30 points
+- Unrealistic hydration (<40% or >100%): -20 points
+
+QUALITY PENALTIES/BONUSES:
+- Very few ingredients (<3): -15 points
+- Good ingredient coverage (≥5): +5 points
+- Detailed method provided (>100 chars): +10 points
+- Limited method details (<50 chars): -10 points
+
+AGREEMENT BONUSES:
+- Both parsers agree on flour (±50g): +15 points
+- Parsers show similar flour (±100g): +5 points
+- Clear leavening type (only starter OR only yeast): +10 points
+- Salt detected: +5 points
+
+CONFIDENCE LEVELS:
+- 90-100: High - Both parsers agreed, all critical ingredients found, realistic ratios
+- 70-89: Medium - Minor discrepancies, some missing details, but workable
+- 50-69: Low - Significant issues, missing ingredients, or unclear data
+- 0-49: Estimated - Major problems, heavy interpretation required
+
+Return JSON with this structure (INCLUDE confidenceReasons array):
 {
   "validatedRecipe": {
     "ingredients": [
@@ -63,6 +83,13 @@ Return JSON with this structure:
     "hydration": 70,
     "parserUsed": "hybrid",
     "confidence": 95,
+    "confidenceReasons": [
+      "Both parsers agreed on flour amount",
+      "Clear leavening type",
+      "Salt detected",
+      "Good ingredient coverage",
+      "Detailed method provided"
+    ],
     "corrections": []
   },
   "needsReview": false,

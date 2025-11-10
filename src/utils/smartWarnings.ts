@@ -29,6 +29,15 @@ export function generateSmartWarnings(recipe: ParsedRecipe): RecipeWarning[] {
   // 5. HANDLING WARNINGS
   warnings.push(...getHandlingWarnings(recipe, composition));
   
+  // 6. TEMPERATURE & ENVIRONMENT WARNINGS
+  warnings.push(...getTemperatureWarnings(recipe, composition));
+  
+  // 7. MIXING METHOD WARNINGS
+  warnings.push(...getMixingWarnings(recipe, composition));
+  
+  // 8. SCORING PATTERN WARNINGS
+  warnings.push(...getScoringWarnings(recipe, composition));
+  
   return warnings;
 }
 
@@ -246,6 +255,94 @@ function getHandlingWarnings(recipe: ParsedRecipe, comp: DoughComposition): Reci
     warnings.push({
       type: 'info',
       message: 'Very wet dough requires gentle touch. Use stretch-and-fold technique instead of traditional kneading. Flour your hands, not the dough, and work with confidence to maintain structure.'
+    });
+  }
+  
+  return warnings;
+}
+
+function getTemperatureWarnings(recipe: ParsedRecipe, comp: DoughComposition): RecipeWarning[] {
+  const warnings: RecipeWarning[] = [];
+  
+  if (comp.isEnriched && recipe.starterAmount > 0) {
+    warnings.push({
+      type: 'info',
+      message: 'Enriched sourdough benefits from slightly warmer environment (78-82°F vs standard 75-78°F). The extra warmth helps offset fermentation slowdown from fats and sugars.'
+    });
+  }
+  
+  if (recipe.hydration > 75 && !comp.isEnriched) {
+    warnings.push({
+      type: 'info',
+      message: 'High-hydration doughs are temperature-sensitive. Keep environment at 75-78°F for best control. Warmer temps speed fermentation but can make sticky dough even harder to handle.'
+    });
+  }
+  
+  if (comp.hasMilk && recipe.yeastAmount > 0) {
+    warnings.push({
+      type: 'info',
+      message: 'Milk-based doughs create softer crumb but can slow yeast activity if milk is cold. Warm milk to 100-110°F before mixing for optimal fermentation speed.'
+    });
+  }
+  
+  return warnings;
+}
+
+function getMixingWarnings(recipe: ParsedRecipe, comp: DoughComposition): RecipeWarning[] {
+  const warnings: RecipeWarning[] = [];
+  
+  if (comp.isEnriched && comp.fatPercentage > 15) {
+    warnings.push({
+      type: 'info',
+      message: 'High-fat enriched doughs benefit from stand mixer with dough hook. Hand kneading is possible but takes 15-20 minutes to fully develop gluten through the fat barrier.'
+    });
+  }
+  
+  if (recipe.hydration > 80 && !comp.isEnriched) {
+    warnings.push({
+      type: 'caution',
+      message: 'Very wet doughs are difficult to knead traditionally. Use stretch-and-fold or coil fold technique instead. These gentle methods build strength without overworking the delicate gluten network.'
+    });
+  }
+  
+  if (comp.hasWholeWheat && recipe.hydration < 65) {
+    warnings.push({
+      type: 'info',
+      message: 'Whole wheat flour benefits from 30-60 minute autolyse (flour + water rest) before adding salt and leavening. This allows bran particles to hydrate fully and softens the final texture.'
+    });
+  }
+  
+  if (comp.hasButter && comp.hasSugar && recipe.yeastAmount > 0) {
+    warnings.push({
+      type: 'info',
+      message: 'Enriched yeast doughs work best when butter is added after initial gluten development. Mix flour, liquid, yeast, and sugar first for 3-5 minutes, then gradually add softened butter.'
+    });
+  }
+  
+  return warnings;
+}
+
+function getScoringWarnings(recipe: ParsedRecipe, comp: DoughComposition): RecipeWarning[] {
+  const warnings: RecipeWarning[] = [];
+  
+  if (comp.isEnriched && recipe.starterAmount > 0) {
+    warnings.push({
+      type: 'info',
+      message: 'Enriched sourdough breads need shallower scoring (1/4 inch vs 1/2 inch deep). Rich doughs have weaker gluten structure and won\'t spring as dramatically in the oven.'
+    });
+  }
+  
+  if (recipe.hydration > 78 && !comp.isEnriched) {
+    warnings.push({
+      type: 'info',
+      message: 'High-hydration doughs spread rather than rise when scored. Use confident, swift cuts at 30-45° angle. Hesitant scoring can deflate airy structure you\'ve built during fermentation.'
+    });
+  }
+  
+  if (comp.hasMilk || comp.hasSugar) {
+    warnings.push({
+      type: 'caution',
+      message: 'Enriched doughs brown faster due to milk proteins and sugars. Start baking at 375-400°F (not 450°F). Watch closely after 20 minutes and tent with foil if browning too quickly.'
     });
   }
   
