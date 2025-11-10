@@ -17,18 +17,13 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           alt="Baking workspace with rustic bread and baking tools" 
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <img 
-          src={logo} 
-          alt="Baking Great Bread at Home logo" 
-          className="absolute bottom-3 right-3 h-12 md:h-16 drop-shadow-lg"
-        />
       </div>
       
       {/* Main Content */}
-      <div className="flex-1 flex items-start justify-center p-4 md:p-6 pt-6 md:pt-8">
-        <div className="max-w-4xl w-full space-y-6 md:space-y-8">
-          <Card className="w-full p-6 md:p-10 space-y-6 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
-            <div className="text-center space-y-4">
+      <div className="flex-1 flex items-start justify-center p-4 md:p-6 pt-4 md:pt-6">
+        <div className="max-w-4xl w-full space-y-4 md:space-y-6">
+          <Card className="w-full p-5 md:p-8 space-y-4 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
+            <div className="text-center space-y-3">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
                 Baking Great Bread at Home
               </h1>
