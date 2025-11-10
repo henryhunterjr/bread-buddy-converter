@@ -16,10 +16,11 @@ const COLORS = {
 const FONTS = {
   serif: 'times', // Using Times for more traditional serif look
   sans: 'helvetica',
-  titleSize: 24,
+  titleSize: 22,
   subtitleSize: 12,
   headingSize: 14,
-  bodySize: 12,      // Increased from 11 to 12 for better readability
+  bodySize: 12,
+  notesSize: 11,
   smallSize: 10,
   footerSize: 9
 };
@@ -70,7 +71,9 @@ export function generatePDF(
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'in',
-    format: 'letter'
+    format: 'letter',
+    putOnlyUsedFonts: true,
+    compress: true
   });
   
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -101,14 +104,14 @@ export function generatePDF(
   doc.setFont(FONTS.sans, 'italic');
   doc.setTextColor(100, 100, 100);
   const conversionLabel = result.direction === 'sourdough-to-yeast'
-    ? 'Sourdough → Yeast'
-    : 'Yeast → Sourdough';
+    ? 'Sourdough to Yeast'
+    : 'Yeast to Sourdough';
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
   });
-  const subtitle = `Converted from ${conversionLabel}  •  Hydration ${result.converted.hydration.toFixed(0)}%  •  ${currentDate}`;
+  const subtitle = `Converted from ${conversionLabel}  -  Hydration ${result.converted.hydration.toFixed(0)}%  -  ${currentDate}`;
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 0.2;
 
@@ -142,11 +145,16 @@ export function generatePDF(
   const convertedPercentages = calculateBakersPercentages(result.converted);
   const ingredientGroups = groupIngredients(convertedPercentages, result.direction);
 
-  // Section heading
+  // Section heading with divider
+  doc.setDrawColor(214, 199, 180);
+  doc.setLineWidth(0.005);
+  doc.line(margin, yPos - 0.05, pageWidth - margin, yPos - 0.05);
+  yPos += 0.1;
+  
   doc.setFontSize(FONTS.headingSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
-  doc.text('Ingredients', margin, yPos);
+  doc.text('INGREDIENTS', margin, yPos);
   yPos += 0.3;
 
   // Render ingredients as bullet list
@@ -182,7 +190,7 @@ export function generatePDF(
       const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.4);
       ingredientLines.forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
-        yPos += 0.18;
+        yPos += 0.18; // 1.5x line spacing
       });
     });
 
@@ -203,10 +211,16 @@ export function generatePDF(
     yPos = topMargin;
   }
 
+  // Section heading with divider
+  doc.setDrawColor(214, 199, 180);
+  doc.setLineWidth(0.005);
+  doc.line(margin, yPos - 0.05, pageWidth - margin, yPos - 0.05);
+  yPos += 0.1;
+  
   doc.setFontSize(FONTS.headingSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
-  doc.text('Method', margin, yPos);
+  doc.text('METHOD', margin, yPos);
   yPos += 0.3;
 
   doc.setFontSize(FONTS.bodySize);
@@ -233,7 +247,7 @@ export function generatePDF(
         yPos = topMargin;
       }
       doc.text(line, margin, yPos);
-      yPos += 0.18;
+      yPos += 0.18; // 1.5x line spacing
     });
 
     // Timing if available (italicized, as per spec)
@@ -271,11 +285,11 @@ export function generatePDF(
     doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text("Notes", margin + 0.15, yPos);
+    doc.text("NOTES", margin + 0.15, yPos);
     yPos += 0.25;
 
     // Tips
-    doc.setFontSize(FONTS.bodySize);
+    doc.setFontSize(FONTS.notesSize);
     doc.setFont(FONTS.serif, 'normal');
     doc.setTextColor(0, 0, 0);
 
@@ -293,7 +307,7 @@ export function generatePDF(
       const issueLines = doc.splitTextToSize(tip.issue, contentWidth - 0.3);
       issueLines.forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
-        yPos += 0.18;
+        yPos += 0.18; // 1.5x line spacing
       });
 
       // Solution (regular)
@@ -305,7 +319,7 @@ export function generatePDF(
           yPos = topMargin;
         }
         doc.text(line, margin + 0.3, yPos);
-        yPos += 0.18;
+        yPos += 0.18; // 1.5x line spacing
       });
 
       yPos += 0.15;
@@ -336,10 +350,10 @@ export function generatePDF(
     doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text('Substitutions', margin + 0.15, yPos);
+    doc.text('SUBSTITUTIONS', margin + 0.15, yPos);
     yPos += 0.25;
 
-    doc.setFontSize(FONTS.bodySize);
+    doc.setFontSize(FONTS.notesSize);
     doc.setFont(FONTS.serif, 'normal');
     doc.setTextColor(0, 0, 0);
 
@@ -384,8 +398,8 @@ export function generatePDF(
     doc.setFontSize(FONTS.bodySize);
     doc.setFont(FONTS.sans, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text('Tip for Sourdough Flavor:', margin, yPos);
-    yPos += 0.18;
+    doc.text('TIP FOR SOURDOUGH FLAVOR:', margin, yPos);
+    yPos += 0.18; // 1.5x line spacing
     
     doc.setFont(FONTS.sans, 'normal');
     doc.setTextColor(0, 0, 0);
@@ -395,7 +409,7 @@ export function generatePDF(
     );
     tipLines.forEach((line: string) => {
       doc.text(line, margin, yPos);
-      yPos += 0.18;
+      yPos += 0.18; // 1.5x line spacing
     });
   }
   
@@ -412,7 +426,7 @@ export function generatePDF(
   doc.setFont(FONTS.sans, 'normal');
   doc.setTextColor(170, 170, 170); // Light grey
   doc.text(
-    'Converted with Bread Buddy • BakingGreatBread.com',
+    'Converted with Bread Buddy - BakingGreatBread.com',
     pageWidth / 2,
     footerY,
     { align: 'center' }
