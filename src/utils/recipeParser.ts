@@ -351,8 +351,12 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
 
   const lower = trimmed.toLowerCase();
   
-  // Handle bullet points and dashes
-  let cleaned = lower.replace(/^[-•*]\s*/, '');
+  // Enhanced cleaning - handle en-dash, em-dash, colon separators, and OR alternatives
+  let cleaned = lower
+    .replace(/^[-•*]\s*/, '')                    // Leading bullets
+    .replace(/\s*[–—:]\s*/g, ' ')                // Replace en-dash, em-dash, colon with space
+    .replace(/\s+or\s+\d+[gml]/i, '')            // Remove "OR 10g yeast" alternatives (keep first amount)
+    .trim();
   
   // CRITICAL FIX: Extract grams from parentheses BEFORE removing them
   // Pattern: "(57g / 4 tablespoons)" or "(3/4 cup)" or "(50g)"
@@ -475,12 +479,13 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   let type: ParsedIngredient['type'] = 'other';
   
   // Check enrichments BEFORE flour (egg might have "flour" in contaminated text)
+  // Check cream specifically as fat BEFORE checking generic liquids
   if (ENRICHMENT_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'enrichment';
   } else if (SWEETENER_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'sweetener';
-  } else if (FAT_KEYWORDS.some(k => lowerLine.includes(k))) {
-    type = 'fat';
+  } else if (lowerLine.includes('cream') || FAT_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'fat'; // CREAM IS FAT, not liquid
   } else if (FLOUR_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'flour';
   } else if (YEAST_KEYWORDS.some(k => lowerLine.includes(k))) {

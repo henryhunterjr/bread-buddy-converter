@@ -57,8 +57,9 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   console.log('Calculated trueWater:', trueWater);
   console.log('Calculated trueHydration:', trueHydration);
   
-  // STEP 2: Build clean ingredient list for yeast version
-  // Remove starter, liquid, and flour entries - we'll add back consolidated totals
+  // STEP 2: Build clean ingredient list for yeast version - PRESERVE multi-flour ratios
+  // Separate flour ingredients from non-flour ingredients
+  const flourIngredients = recipe.ingredients.filter(i => i.type === 'flour');
   const nonStarterIngredients = recipe.ingredients.filter(
     i => i.type !== 'starter' && i.type !== 'liquid' && i.type !== 'flour'
   );
@@ -67,14 +68,13 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   const instantYeastAmount = Math.round(trueFlour * 0.011); // 1.1%
   const activeDryYeastAmount = Math.round(instantYeastAmount * 1.25);
   
-  // Build final ingredient list
+  // Build final ingredient list - PRESERVE multi-flour ratios
   const convertedIngredients: ParsedIngredient[] = [
-    {
-      name: 'bread flour',
-      amount: trueFlour,
-      unit: 'g',
-      type: 'flour'
-    },
+    ...flourIngredients.map(f => ({
+      ...f,
+      // Remove any starter-related notes from flour names
+      name: f.name.replace(/for levain|in levain|levain/gi, '').trim()
+    })),
     {
       name: 'water (80-85°F)',
       amount: trueWater,
@@ -100,11 +100,35 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     hydration: trueHydration
   };
 
+  // Detect special techniques and dough type for method tailoring
+  const specialTechniques = originalRecipeText ? detectSpecialTechniques(originalRecipeText) : [];
+  const hasTangzhong = specialTechniques.some(t => t.message.includes('Tangzhong'));
+  const hasAutolyse = specialTechniques.some(t => t.message.includes('Autolyse'));
+  
+  const hasEggs = convertedIngredients.some(i => 
+    i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
+  );
+  const butterAmount = nonStarterIngredients
+    .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const sugarAmount = nonStarterIngredients
+    .filter(i => i.type === 'sweetener' || i.name.toLowerCase().includes('sugar'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const isEnriched = hasEggs || butterAmount > 0 || sugarAmount > 0;
+
   const methodChanges: MethodChange[] = [
+    // Step 0: Tangzhong (if detected)
+    ...(hasTangzhong ? [{
+      step: '0. TANGZHONG (WATER ROUX)',
+      change: 'Combine 1 part flour with 5 parts liquid (water or milk from recipe). Cook over medium heat, stirring constantly, until thick paste forms (149-150°F). Cool completely before using.',
+      timing: '5-10 min cook + 30 min cool'
+    }] : []),
     {
-      step: '1. MIX & KNEAD',
-      change: 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
-      timing: '8-10 min by hand, 5-6 min mixer'
+      step: '1. MIX' + (hasAutolyse ? ' & AUTOLYSE' : ' & KNEAD'),
+      change: hasAutolyse 
+        ? 'Mix flour and water only. Rest 20-60 minutes (autolyse). Then add remaining ingredients and knead 8-10 minutes by hand or 5-6 minutes by mixer until smooth and elastic.'
+        : 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
+      timing: hasAutolyse ? '20-60 min autolyse + 8-10 min knead' : '8-10 min by hand, 5-6 min mixer'
     },
     {
       step: '2. FIRST RISE',
@@ -123,8 +147,10 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     },
     {
       step: '5. BAKE',
-      change: 'Preheat oven to 375°F (190°C). Optionally brush with egg wash for a golden crust. Bake 35–40 minutes until deep golden and internal temperature is 190–195°F.',
-      timing: '35-40 min at 375°F (190°C)'
+      change: isEnriched
+        ? 'Preheat oven to 350°F (175°C). Brush with egg wash or milk for a golden crust. Bake 30–35 minutes until deep golden and internal temperature is 190–195°F.'
+        : 'Preheat oven to 450°F (230°C). Score the top and optionally spray with water for steam. Bake 35–40 minutes until deep brown and internal temperature is 205–210°F.',
+      timing: isEnriched ? '30-35 min at 350°F' : '35-40 min at 450°F'
     },
     {
       step: '6. COOL',
@@ -230,28 +256,28 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   console.log('Fat %:', fatPercentage.toFixed(1));
   
   // STEP 3: Calculate starter amount (20% of flour)
-  // For 20% inoculation, we need starter flour to be ~18-20% of total flour
+  // For 20% inoculation, we need starter flour to be ~20% of total flour
   const starterPercentage = 0.20;
   const starterFlourNeeded = Math.round(totalFlour * starterPercentage); // 100g for 500g flour
   
   console.log('Target starter flour contribution:', starterFlourNeeded, `(${starterPercentage * 100}% of ${totalFlour}g)`);
   
-  // FIXED BUILD FORMULA - 1:1:1 ratio
-  // For 100g starter flour needed from 100% hydration starter:
-  // We need total 200g of starter (100g flour + 100g water)
-  // Build with 40% active starter + 40% water + 40% flour
-  const activeStarterWeight = Math.round(starterFlourNeeded * 0.4); // 40g
-  const levainWater = Math.round(starterFlourNeeded * 0.4); // 40g
-  const levainFlour = Math.round(starterFlourNeeded * 0.4); // 40g
-  const levainTotal = activeStarterWeight + levainWater + levainFlour; // 120g total
+  // FIXED: Use 1:5:5 build for true 20% inoculation
+  // For 100g starter flour needed with 100% hydration starter:
+  // Build: 20g starter : 100g flour : 100g water = 220g total
+  // This gives: (20g * 0.5) + 100g = 110g flour ≈ 22% inoculation ✓
+  const activeStarterWeight = Math.round(starterFlourNeeded * 0.2); // 20g for 100g target
+  const levainWater = starterFlourNeeded; // 100g
+  const levainFlour = starterFlourNeeded; // 100g
+  const levainTotal = activeStarterWeight + levainWater + levainFlour; // 220g total
   
   // Starter breakdown (100% hydration starter means 50% flour, 50% water)
-  const starterFlourContent = activeStarterWeight / 2; // 20g flour from 40g starter
-  const starterWaterContent = activeStarterWeight / 2; // 20g water from 40g starter
+  const starterFlourContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Flour from active starter
+  const starterWaterContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Water from active starter
   
   // Total flour and water in levain
-  const totalLevainFlour = levainFlour + starterFlourContent; // 40g + 20g = 60g
-  const totalLevainWater = levainWater + starterWaterContent; // 40g + 20g = 60g
+  const totalLevainFlour = levainFlour + starterFlourContent; // 100g + 10g = 110g
+  const totalLevainWater = levainWater + starterWaterContent; // 100g + 10g = 110g
   
   console.log('Levain build:', {
     activeStarter: activeStarterWeight,
@@ -317,7 +343,18 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   console.log('Actual water hydration:', waterHydration.toFixed(1) + '%');
   console.log('Note: Milk (' + milkAmount + 'g) not counted in water hydration for enriched doughs');
   
-  // Build LEVAIN section with specified hydration
+  // Get flour breakdown from original recipe for multi-flour support
+  const flourIngredients = recipe.ingredients.filter(i => i.type === 'flour');
+  
+  // Calculate how much flour goes in levain (20% of total) and dough (80%)
+  const flourProportions = flourIngredients.map(f => ({
+    ...f,
+    proportionOfTotal: f.amount / totalFlour,
+    levainAmount: Math.round((f.amount / totalFlour) * totalLevainFlour),
+    doughAmount: Math.round((f.amount / totalFlour) * doughFlour)
+  }));
+  
+  // Build LEVAIN section with proportional flour mix
   const levainIngredients: ParsedIngredient[] = [
     {
       name: `active sourdough starter (${starterHydration}% hydration)`,
@@ -331,15 +368,15 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       unit: 'g',
       type: 'liquid'
     },
-    {
-      name: 'bread flour',
-      amount: levainFlour,
-      unit: 'g',
-      type: 'flour'
-    }
+    ...flourProportions.map(f => ({
+      name: f.name,
+      amount: f.levainAmount,
+      unit: 'g' as const,
+      type: 'flour' as const
+    }))
   ];
   
-  // Build DOUGH section - include ALL original ingredients
+  // Build DOUGH section with remaining flour proportions
   const doughIngredients: ParsedIngredient[] = [
     {
       name: 'all of the levain',
@@ -347,12 +384,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       unit: 'g',
       type: 'starter'
     },
-    {
-      name: 'bread flour',
-      amount: doughFlour,
-      unit: 'g',
-      type: 'flour'
-    }
+    ...flourProportions.map(f => ({
+      name: f.name,
+      amount: f.doughAmount,
+      unit: 'g' as const,
+      type: 'flour' as const
+    }))
   ];
   
   // Add water ONLY if there's any left after levain
