@@ -105,3 +105,175 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Print Styles - Optimize for browser printing */
+@media print {
+  /* Hide all interactive and navigation elements */
+  .print\:hidden,
+  button,
+  [role="button"],
+  nav,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset colors for print - ensure good contrast */
+  * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* Typography optimization */
+  h1 {
+    font-size: 20pt !important;
+    font-weight: bold !important;
+    margin-bottom: 12pt !important;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 16pt !important;
+    font-weight: bold !important;
+    margin-top: 12pt !important;
+    margin-bottom: 8pt !important;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 13pt !important;
+    font-weight: bold !important;
+    margin-top: 10pt !important;
+    margin-bottom: 6pt !important;
+    page-break-after: avoid;
+  }
+
+  /* Prevent orphans and widows */
+  p, li, div {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Keep content together */
+  .card,
+  .space-y-4 > div,
+  .space-y-2 > div {
+    page-break-inside: avoid;
+    border: 1px solid #ddd !important;
+    padding: 12pt;
+    margin-bottom: 12pt;
+  }
+
+  /* Tables and ingredient lists */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background: #f0f0f0 !important;
+    border: 1px solid #999 !important;
+    padding: 6pt;
+    font-weight: bold !important;
+  }
+
+  td {
+    border: 1px solid #ddd !important;
+    padding: 6pt;
+  }
+
+  /* Ensure images fit on page */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Link URLs for print */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 9pt;
+    font-style: italic;
+  }
+
+  /* Don't show URLs for internal links or buttons */
+  a[href^="#"]:after,
+  a[href^="javascript:"]:after {
+    content: "";
+  }
+
+  /* Optimize spacing for print */
+  .p-4, .p-6, .px-4, .py-4, .px-6, .py-6 {
+    padding: 8pt !important;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 12pt !important;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 8pt !important;
+  }
+
+  .space-y-2 > * + * {
+    margin-top: 4pt !important;
+  }
+
+  /* Grid layout for print */
+  .grid {
+    display: block !important;
+  }
+
+  .grid > * {
+    margin-bottom: 12pt !important;
+    page-break-inside: avoid;
+  }
+
+  /* Warning and info boxes */
+  [class*="bg-red"],
+  [class*="bg-yellow"],
+  [class*="bg-blue"] {
+    border: 2px solid #000 !important;
+    padding: 8pt !important;
+    margin-bottom: 8pt !important;
+  }
+
+  /* Logo sizing for print */
+  img[alt*="Baking Great Bread"] {
+    max-height: 60pt !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* Ensure proper contrast for text */
+  .text-muted-foreground {
+    color: #555 !important;
+  }
+
+  /* Page breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+}
