@@ -33,6 +33,17 @@ import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 import { generateSmartWarnings } from './smartWarnings';
 
+/**
+ * Computes the total levain weight from its components
+ * This ensures consistency across the application and prevents display mismatches
+ */
+export function computeLevainTotal(levain: { starter: number; flour: number; water: number }): number {
+  const starter = Number(levain.starter || 0);
+  const flour = Number(levain.flour || 0);
+  const water = Number(levain.water || 0);
+  return starter + flour + water;
+}
+
 export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
   // Starter hydration ratio calculation
@@ -289,7 +300,21 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   const activeStarterWeight = Math.round(starterFlourNeeded * 0.2); // 4% of total flour
   const levainFlour = starterFlourNeeded; // 20% of total flour
   const levainWater = Math.round(starterFlourNeeded * originalHydration); // KEY FIX: Use ORIGINAL hydration!
-  const levainTotal = activeStarterWeight + levainWater + levainFlour;
+
+  // Calculate levain total using helper function to ensure consistency
+  const levainTotal = computeLevainTotal({
+    starter: activeStarterWeight,
+    flour: levainFlour,
+    water: levainWater
+  });
+
+  // Dev-mode validation to catch any display mismatches
+  if (process.env.NODE_ENV !== 'production') {
+    const expectedTotal = activeStarterWeight + levainWater + levainFlour;
+    if (expectedTotal !== levainTotal) {
+      console.warn(`Levain total mismatch: expected ${expectedTotal}g but computed ${levainTotal}g`);
+    }
+  }
   
   // Starter breakdown (100% hydration starter means 50% flour, 50% water)
   const starterFlourContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Flour from active starter
@@ -304,6 +329,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     water: levainWater,
     flour: levainFlour,
     total: levainTotal,
+    calculatedTotal: `${activeStarterWeight}g + ${levainWater}g + ${levainFlour}g = ${levainTotal}g`,
     totalFlour: totalLevainFlour,
     totalWater: totalLevainWater
   });
@@ -363,10 +389,23 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   ];
   
   // Build DOUGH section with remaining flour proportions
+  // Validate levain total before adding to dough ingredients
+  const validatedLevainTotal = computeLevainTotal({
+    starter: activeStarterWeight,
+    flour: levainFlour,
+    water: levainWater
+  });
+
+  if (process.env.NODE_ENV !== 'production' && validatedLevainTotal !== levainTotal) {
+    console.error(`❌ CRITICAL: Levain total mismatch when creating dough ingredient!`);
+    console.error(`Expected: ${validatedLevainTotal}g (${activeStarterWeight}g + ${levainFlour}g + ${levainWater}g)`);
+    console.error(`Got: ${levainTotal}g`);
+  }
+
   const doughIngredients: ParsedIngredient[] = [
     {
       name: 'all of the levain',
-      amount: levainTotal,
+      amount: validatedLevainTotal,
       unit: 'g',
       type: 'starter'
     },
@@ -501,7 +540,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       starter: activeStarterWeight,
       water: levainWater,
       flour: levainFlour,
-      total: levainTotal
+      total: validatedLevainTotal // Use validated total for consistency
     },
     {
       flour: doughFlour,
