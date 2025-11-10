@@ -6,7 +6,7 @@ import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/pdfGenerator';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
-import { Save } from 'lucide-react';
+import { Save, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -19,6 +19,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
@@ -144,23 +150,47 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
           {/* Warnings */}
           {result.warnings.length > 0 && (
             <div className="space-y-2 px-2">
-              {result.warnings.map((warning, i) => (
-                <div 
-                  key={i} 
-                  className={`p-3 sm:p-4 rounded-lg border text-sm print:border-2 print:p-3 ${
-                    warning.type === 'caution' 
-                      ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200 print:bg-white print:border-black print:text-black' 
-                      : warning.type === 'warning'
-                      ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200 print:bg-white print:border-black print:text-black'
-                      : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
-                  }`}
-                >
-                  <span className="font-semibold">
-                    {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
-                  </span>{' '}
-                  {warning.message}
-                </div>
-              ))}
+              {result.warnings.map((warning, i) => {
+                // Check if this is a hydration-related warning
+                const isHydrationWarning = /hydration/i.test(warning.message);
+                
+                return (
+                  <div 
+                    key={i} 
+                    className={`p-3 sm:p-4 rounded-lg border text-sm print:border-2 print:p-3 ${
+                      warning.type === 'caution' 
+                        ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200 print:bg-white print:border-black print:text-black' 
+                        : warning.type === 'warning'
+                        ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200 print:bg-white print:border-black print:text-black'
+                        : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <span className="font-semibold">
+                          {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
+                        </span>{' '}
+                        {warning.message}
+                      </div>
+                      {isHydrationWarning && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 flex-shrink-0 cursor-help mt-0.5" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">
+                                This calculation assumes your starter is 100% hydration (equal parts flour and water) by default. 
+                                If your starter uses a different hydration level, you can adjust it in the input screen.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

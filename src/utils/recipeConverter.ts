@@ -32,17 +32,20 @@ import { generateBakerWarnings, detectSpecialTechniques } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 
-export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string): ConvertedRecipe {
+export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
-  // Starter is 100% hydration: 50% flour, 50% water
-  const starterFlour = recipe.starterAmount / 2;
-  const starterWater = recipe.starterAmount / 2;
+  // Starter hydration ratio calculation
+  const starterFlourRatio = 100 / (100 + starterHydration);
+  const starterWaterRatio = starterHydration / (100 + starterHydration);
+  const starterFlour = recipe.starterAmount * starterFlourRatio;
+  const starterWater = recipe.starterAmount * starterWaterRatio;
   
   // Debug logging
   console.log('=== SOURDOUGH TO YEAST CONVERSION ===');
   console.log('Input recipe.totalFlour:', recipe.totalFlour);
   console.log('Input recipe.totalLiquid:', recipe.totalLiquid);
   console.log('Input recipe.starterAmount:', recipe.starterAmount);
+  console.log('Starter hydration:', starterHydration + '%');
   console.log('Parsed ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
   // TRUE totals including what's IN the starter
@@ -165,12 +168,13 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   };
 }
 
-export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText?: string): ConvertedRecipe {
+export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Identify total flour
   const totalFlour = recipe.totalFlour;
   
   console.log('=== YEAST TO SOURDOUGH CONVERSION (FIXED) ===');
   console.log('Total flour:', totalFlour);
+  console.log('Starter hydration:', starterHydration + '%');
   console.log('Input ingredients:', recipe.ingredients.map(i => `${i.amount}g ${i.name} (type: ${i.type})`));
   
   console.log('=== CONVERSION DEBUG ===');
@@ -313,10 +317,10 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   console.log('Actual water hydration:', waterHydration.toFixed(1) + '%');
   console.log('Note: Milk (' + milkAmount + 'g) not counted in water hydration for enriched doughs');
   
-  // Build LEVAIN section
+  // Build LEVAIN section with specified hydration
   const levainIngredients: ParsedIngredient[] = [
     {
-      name: 'active sourdough starter (100% hydration)',
+      name: `active sourdough starter (${starterHydration}% hydration)`,
       amount: activeStarterWeight,
       unit: 'g',
       type: 'starter'

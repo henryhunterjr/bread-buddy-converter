@@ -186,7 +186,7 @@ function isValidIngredientLine(line: string): boolean {
 // Export for use in converter
 export { detectSpecialTechniques };
 
-export function parseRecipe(recipeText: string): ParsedRecipe {
+export function parseRecipe(recipeText: string, starterHydration: number = 100): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
   let method = '';
   
@@ -310,13 +310,17 @@ export function parseRecipe(recipeText: string): ParsedRecipe {
   console.log('Raw totalFlour:', totalFlour);
   console.log('Raw totalLiquid:', totalLiquid);
   console.log('Raw starterAmount:', starterAmount);
+  console.log('Starter hydration:', starterHydration + '%');
   console.log('Flour ingredients:', ingredients.filter(i => i.type === 'flour').map(i => `${i.amount}g ${i.name}`));
   console.log('Liquid ingredients:', ingredients.filter(i => i.type === 'liquid').map(i => `${i.amount}g ${i.name}`));
   console.log('Starter ingredients:', ingredients.filter(i => i.type === 'starter').map(i => `${i.amount}g ${i.name}`));
 
-  // Adjust for starter (100% hydration assumed)
-  const adjustedFlour = totalFlour + (starterAmount / 2);
-  const adjustedLiquid = totalLiquid + (starterAmount / 2);
+  // Adjust for starter using specified hydration
+  // Formula: if starter is X% hydration, then flour = starter / (1 + X/100), water = starter * (X/100) / (1 + X/100)
+  const starterFlourRatio = 100 / (100 + starterHydration);
+  const starterWaterRatio = starterHydration / (100 + starterHydration);
+  const adjustedFlour = totalFlour + (starterAmount * starterFlourRatio);
+  const adjustedLiquid = totalLiquid + (starterAmount * starterWaterRatio);
   const hydration = adjustedFlour > 0 ? (adjustedLiquid / adjustedFlour) * 100 : 0;
   
   console.log('Adjusted totalFlour:', adjustedFlour);

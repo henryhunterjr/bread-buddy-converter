@@ -4,17 +4,30 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image, Info } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { extractTextFromFile } from '@/utils/fileExtractor';
 import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { ConvertedRecipe } from '@/types/recipe';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
-  onConvert: (recipeText: string) => void;
+  onConvert: (recipeText: string, starterHydration: number) => void;
   onBack: () => void;
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
 }
@@ -32,7 +45,11 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [starterHydration, setStarterHydration] = useState(100);
   const { toast } = useToast();
+  
+  // Detect if recipe contains starter/levain
+  const hasStarter = /starter|levain|sourdough starter/i.test(recipeText);
 
   const handleLoadRecipe = (recipe: SavedRecipe) => {
     onLoadSaved(recipe.originalText, recipe.convertedRecipe);
@@ -86,7 +103,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
 
   const handleConvert = () => {
     try {
-      const parsed = parseRecipe(recipeText);
+      const parsed = parseRecipe(recipeText, starterHydration);
       const validationErrors = validateRecipe(parsed);
       
       if (validationErrors.length > 0) {
@@ -95,7 +112,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       }
 
       setErrors([]);
-      onConvert(recipeText);
+      onConvert(recipeText, starterHydration);
     } catch (error) {
       setErrors(['Could not parse recipe. Please check the format and try again.']);
     }
@@ -184,6 +201,46 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
                       Include ingredient amounts (grams preferred) and your method. Don't worry about perfect formatting—I'll figure it out.
                     </p>
                   </div>
+
+                  {hasStarter && (
+                    <div className="space-y-2 bg-muted/50 p-4 rounded-lg border border-border">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-foreground">
+                          Starter Hydration (optional)
+                        </label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">
+                                We assume your starter is 100% hydration (equal parts flour and water) by default. 
+                                If your starter uses a different ratio, select it here for accurate calculations.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <Select 
+                        value={starterHydration.toString()} 
+                        onValueChange={(value) => setStarterHydration(Number(value))}
+                      >
+                        <SelectTrigger className="w-full bg-background">
+                          <SelectValue placeholder="100% (default)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="50">50% (stiff starter)</SelectItem>
+                          <SelectItem value="75">75%</SelectItem>
+                          <SelectItem value="100">100% (equal parts - default)</SelectItem>
+                          <SelectItem value="125">125% (liquid starter)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Most sourdough starters are maintained at 100% hydration.
+                      </p>
+                    </div>
+                  )}
 
                   {errors.length > 0 && (
                     <Alert variant="destructive">

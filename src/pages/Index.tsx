@@ -23,8 +23,8 @@ const Index = () => {
     setScreen('input');
   };
 
-  const handleConvert = (recipeText: string) => {
-    const parsed = parseRecipe(recipeText);
+  const handleConvert = (recipeText: string, starterHydration: number) => {
+    const parsed = parseRecipe(recipeText, starterHydration);
     
     // Extract recipe name from first non-empty line
     const lines = recipeText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -33,7 +33,7 @@ const Index = () => {
     // Show confirmation screen before converting
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(parsed.ingredients);
-    setParsedRecipeForConfirmation(parsed);
+    setParsedRecipeForConfirmation({ ...parsed, starterHydration });
     setRecipeName(extractedName);
     setScreen('confirmation');
   };
@@ -44,6 +44,9 @@ const Index = () => {
       ...parsedRecipeForConfirmation,
       ingredients: confirmedIngredients
     };
+    
+    // Get starter hydration from parsed recipe
+    const starterHydration = parsedRecipeForConfirmation?.starterHydration || 100;
     
     // Recalculate totals based on confirmed ingredients
     const totalFlour = confirmedIngredients
@@ -62,9 +65,11 @@ const Index = () => {
       .filter(i => i.type === 'salt')
       .reduce((sum, i) => sum + i.amount, 0);
 
-    // Adjust for starter (100% hydration)
-    const adjustedFlour = totalFlour + (starterAmount / 2);
-    const adjustedLiquid = totalLiquid + (starterAmount / 2);
+    // Adjust for starter using specified hydration
+    const starterFlourRatio = 100 / (100 + starterHydration);
+    const starterWaterRatio = starterHydration / (100 + starterHydration);
+    const adjustedFlour = totalFlour + (starterAmount * starterFlourRatio);
+    const adjustedLiquid = totalLiquid + (starterAmount * starterWaterRatio);
     const hydration = adjustedFlour > 0 ? (adjustedLiquid / adjustedFlour) * 100 : 0;
 
     updatedRecipe.totalFlour = adjustedFlour;
@@ -76,8 +81,8 @@ const Index = () => {
     
     // Now run the actual conversion with original recipe text for technique detection
     const converted = direction === 'sourdough-to-yeast' 
-      ? convertSourdoughToYeast(updatedRecipe, originalRecipeText)
-      : convertYeastToSourdough(updatedRecipe, originalRecipeText);
+      ? convertSourdoughToYeast(updatedRecipe, originalRecipeText, starterHydration)
+      : convertYeastToSourdough(updatedRecipe, originalRecipeText, starterHydration);
     
     setResult(converted);
     setScreen('output');
