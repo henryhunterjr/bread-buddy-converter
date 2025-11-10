@@ -1,73 +1,71 @@
-# Welcome to your Lovable project
+# Bread Buddy Converter
 
-## Project info
+A professional sourdough↔yeast recipe converter built for home bakers. Accurately extracts ingredients, calculates baker's percentages, and provides reliable conversions using proper bread science.
 
-**URL**: https://lovable.dev/projects/d0f5bbed-853d-4f28-90ba-7781f1963723
+## What It Does
 
-## How can I edit this code?
+- Converts commercial yeast recipes to sourdough starter (and vice versa)
+- Extracts ingredients with smart parsing (handles parenthetical measurements, compound ingredients, finishing ingredients)
+- Calculates accurate hydration percentages
+- Provides detailed conversion instructions
+- Handles enriched doughs (eggs, butter, milk, sugar)
 
-There are several ways of editing your application.
+## How It Works
 
-**Use Lovable**
+1. Paste your recipe (any format)
+2. Select conversion direction (sourdough→yeast or yeast→sourdough)
+3. Get your converted recipe with baker's percentages and method adjustments
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/d0f5bbed-853d-4f28-90ba-7781f1963723) and start prompting.
+## Live Demo
 
-Changes made via Lovable will be committed automatically to this repo.
+https://bread-buddy-converter.lovable.app/
 
-**Use your preferred IDE**
+## Built With
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
+- React + TypeScript
 - Tailwind CSS
+- Vite
+- shadcn/ui components
 
-## How can I deploy this project?
+## Key Features
 
-Simply open [Lovable](https://lovable.dev/projects/d0f5bbed-853d-4f28-90ba-7781f1963723) and click on Share -> Publish.
+- **Smart Ingredient Detection**: Distinguishes between dough ingredients and finishing ingredients (egg wash, finishing butter, etc.)
+- **Baker's Math**: Accurate calculations using industry-standard percentages
+- **Enriched Dough Support**: Handles milk, eggs, butter, sugar, honey
+- **Flexible Parsing**: Works with metric, volume, or mixed measurements
+- **Hydration Validation**: Warns about unusual hydration levels
 
-## Can I connect a custom domain to my Lovable project?
+## Testing
 
-Yes, you can!
+Thoroughly tested with:
+- Simple lean doughs
+- Enriched doughs (brioche, challah, milk bread)
+- Complex multi-stage recipes (tangzhong, levain builds)
+- Edge cases (compound ingredients, optional ingredients, finishing ingredients)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Known Limitations
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Conversions are estimates based on standard baker's percentages
+- Some recipe formats may require manual cleanup
+- Assumes 100% hydration sourdough starter
+- Not suitable for unleavened breads or flatbreads
+
+## Contributing
+
+Built and maintained by Henry Hunter for the Baking Great Bread at Home community.
+
+Bug reports and suggestions: henrysbreadkitchen@gmail.com
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Disclaimer
+
+This tool provides recipe conversions as estimates. Always use your judgment and adjust based on your specific flour, environment, and experience. Not responsible for baking outcomes. See DISCLAIMER.md for full terms.
+
+## About
+
+Created by Henry Hunter
+Blog: https://www.BakingGreatBread.com
+Community: Baking Great Bread at Home (50,000+ members)
