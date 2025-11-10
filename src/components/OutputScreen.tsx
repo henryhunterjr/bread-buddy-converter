@@ -158,11 +158,10 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             )}
           </div>
           
-          {/* Warnings */}
+        {/* Warnings */}
           {result.warnings.length > 0 && (
             <div className="space-y-2 px-2">
               {result.warnings.map((warning, i) => {
-                // Check if this is a hydration-related warning
                 const isHydrationWarning = /hydration/i.test(warning.message);
                 
                 return (
@@ -205,187 +204,177 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             </div>
           )}
 
-        <div className="grid sm:grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Original Recipe */}
+          {/* Ingredients Table - PDF Style */}
           <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Original Recipe</h2>
-            <div className="space-y-2">
-              {originalPercentages.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-foreground">{item.ingredient}</span>
-                  <span className="text-muted-foreground">
-                    {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
-                  </span>
-                </div>
-              ))}
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground">Hydration</span>
-                  <span className="text-foreground">{result.original.hydration.toFixed(0)}%</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Converted Recipe */}
-          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg sm:text-xl font-bold text-foreground print:text-black">Converted Recipe</h2>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help print:hidden" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-sm">Highlighted ingredients are new or changed from the original recipe</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="space-y-2">
-              {result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3 ? (
-                <>
-                  {/* LEVAIN Section */}
-                  <div className="mb-4">
-                    <div className="text-xs font-bold text-primary mb-2 uppercase tracking-wide">
-                      Levain (build night before)
-                    </div>
-                    {convertedPercentages.slice(0, 3).map((item, i) => (
-                      <div key={i} className="flex justify-between text-sm pl-2">
-                        <span className="text-foreground">{item.ingredient}</span>
-                        <span className="text-muted-foreground">
-                          {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Ingredients</h2>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-border">
+                    <th className="text-left py-2 px-2 text-sm font-bold text-foreground">Ingredient</th>
+                    <th className="text-right py-2 px-2 text-sm font-bold text-foreground">Amount</th>
+                    <th className="text-right py-2 px-2 text-sm font-bold text-foreground">Baker's %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.direction === 'yeast-to-sourdough' && convertedPercentages.length > 3 ? (
+                    <>
+                      {/* Levain Section */}
+                      <tr className="border-b border-border/50">
+                        <td colSpan={3} className="py-3 px-2">
+                          <div className="text-xs font-bold text-primary uppercase tracking-wide">
+                            Levain / Starter
+                          </div>
+                        </td>
+                      </tr>
+                      {convertedPercentages.slice(0, 3).map((item, i) => (
+                        <tr key={`levain-${i}`} className="border-b border-border/30">
+                          <td className="py-2 px-2 text-sm text-foreground">{item.ingredient}</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.amount.toFixed(0)}g</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.percentage.toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                      
+                      {/* Dough Section */}
+                      <tr className="border-b border-border/50">
+                        <td colSpan={3} className="py-3 px-2">
+                          <div className="text-xs font-bold text-primary uppercase tracking-wide">
+                            Dough
+                          </div>
+                        </td>
+                      </tr>
+                      {convertedPercentages.slice(3).map((item, i) => (
+                        <tr key={`dough-${i}`} className="border-b border-border/30">
+                          <td className="py-2 px-2 text-sm text-foreground">{item.ingredient}</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.amount.toFixed(0)}g</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.percentage.toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </>
+                  ) : (
+                    /* Single list for sourdough-to-yeast conversions */
+                    convertedPercentages.map((item, i) => {
+                      const isChanged = !originalPercentages.find(
+                        orig => orig.ingredient === item.ingredient && Math.abs(orig.amount - item.amount) < 1
+                      );
+                      return (
+                        <tr 
+                          key={i} 
+                          className={`border-b border-border/30 ${isChanged ? 'bg-highlight' : ''}`}
+                        >
+                          <td className="py-2 px-2 text-sm text-foreground">{item.ingredient}</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.amount.toFixed(0)}g</td>
+                          <td className="py-2 px-2 text-sm text-right text-muted-foreground">{item.percentage.toFixed(0)}%</td>
+                        </tr>
+                      );
+                    })
+                  )}
                   
-                  {/* DOUGH Section */}
-                  <div>
-                    <div className="text-xs font-bold text-primary mb-2 uppercase tracking-wide">
-                      Dough
-                    </div>
-                    {convertedPercentages.slice(3).map((item, i) => (
-                      <div key={i} className="flex justify-between text-sm pl-2">
-                        <span className="text-foreground">{item.ingredient}</span>
-                        <span className="text-muted-foreground">
-                          {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                /* Single list for yeast conversions */
-                convertedPercentages.map((item, i) => {
-                  const isChanged = !originalPercentages.find(
-                    orig => orig.ingredient === item.ingredient && Math.abs(orig.amount - item.amount) < 1
-                  );
-                  return (
-                    <div 
-                      key={i} 
-                      className={`flex justify-between text-sm ${isChanged ? 'bg-highlight rounded px-2 py-1' : ''}`}
-                    >
-                      <span className="text-foreground">{item.ingredient}</span>
-                      <span className="text-muted-foreground">
-                        {item.amount.toFixed(0)}g ({item.percentage.toFixed(0)}%)
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground">Total Hydration</span>
-                  <span className="text-foreground">{result.converted.hydration.toFixed(0)}%</span>
-                </div>
-              </div>
+                  {/* Total Hydration Row */}
+                  <tr className="border-t-2 border-border">
+                    <td className="py-3 px-2 text-sm font-bold text-foreground" colSpan={2}>
+                      Total Hydration
+                    </td>
+                    <td className="py-3 px-2 text-sm font-bold text-right text-foreground">
+                      {result.converted.hydration.toFixed(0)}%
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            
+            {/* Highlighting Legend */}
+            {result.direction === 'sourdough-to-yeast' && (
+              <div className="mt-4 pt-4 border-t border-border/30">
+                <TooltipProvider>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-4 h-4 bg-highlight rounded"></div>
+                    <span>Highlighted ingredients are new or changed from the original recipe</span>
+                  </div>
+                </TooltipProvider>
+              </div>
+            )}
           </Card>
 
-          {/* Method Updates */}
+          {/* Method Steps */}
           <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Method Updates</h2>
-            <div className="space-y-3">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Method</h2>
+            <div className="space-y-4">
               {result.methodChanges.map((change, i) => (
-                <div key={i} className="text-sm">
-                  <div className="font-bold text-foreground">✓ {change.step}</div>
-                  <div className="text-muted-foreground">{change.change}</div>
+                <div key={i} className="border-l-4 border-primary/30 pl-4">
+                  <div className="font-bold text-foreground mb-2 text-base">
+                    {i + 1}. {change.step}
+                  </div>
+                  <div className="text-sm text-muted-foreground leading-relaxed">
+                    {change.change}
+                  </div>
                   {change.timing && (
-                    <div className="text-xs text-muted-foreground italic mt-1">
-                      Timing: {change.timing}
+                    <div className="text-xs text-muted-foreground italic mt-2 opacity-75">
+                      ⏱ {change.timing}
                     </div>
                   )}
                 </div>
               ))}
               
               {result.direction === 'sourdough-to-yeast' && (
-                <div className="mt-4 pt-4 border-t">
-                  <div className="text-sm">
-                    <div className="font-bold text-foreground">💡 Tip: Sourdough Flavor</div>
-                    <div className="text-muted-foreground">
-                      To mimic sourdough tang, add 15g (1 tbsp) lemon juice or plain yogurt to the liquid ingredients.
+                <div className="mt-6 pt-4 border-t border-border/30 bg-muted/20 -mx-4 -mb-4 px-4 py-4 rounded-b-lg">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">💡</span>
+                    <div>
+                      <div className="font-bold text-foreground text-sm">Tip: Mimic Sourdough Flavor</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Add 15g (1 tbsp) lemon juice or plain yogurt to the liquid ingredients for a subtle tang.
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
           </Card>
-        </div>
 
-        {/* Troubleshooting Tips */}
-        <Card className="p-4 sm:p-6 bg-muted/30 print:shadow-none print:border-2 print:bg-white">
-          <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">🔧 Troubleshooting Tips</h2>
-          <div className="space-y-4">
-            {result.troubleshootingTips.map((tip, i) => (
-              <div key={i} className="text-sm">
-                <div className="font-bold text-foreground">{tip.issue}</div>
-                <div className="text-muted-foreground mt-1">{tip.solution}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t text-xs text-muted-foreground italic">
-            💡 Remember: Watch the dough, not the clock. Fermentation times vary with temperature and flour type.
-          </div>
-        </Card>
-
-        {/* Ingredient Substitutions */}
-        {result.substitutions.length > 0 && (
-          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">🔄 Ingredient Substitutions</h2>
+          {/* Troubleshooting Tips */}
+          <Card className="p-4 sm:p-6 bg-muted/30 print:shadow-none print:border-2 print:bg-white">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Baker's Notes</h2>
             <div className="space-y-4">
-              {result.substitutions.map((sub, i) => (
-                <div key={i} className="text-sm border-l-2 border-primary/30 pl-4">
-                  <div className="font-bold text-foreground">
-                    {sub.original} → {sub.substitute}
-                  </div>
-                  <div className="text-muted-foreground mt-1">
-                    <span className="font-semibold">Ratio:</span> {sub.ratio}
-                  </div>
-                  {sub.hydrationAdjustment !== 0 && (
-                    <div className="text-muted-foreground mt-1">
-                      <span className="font-semibold">Hydration:</span>{' '}
-                      {sub.hydrationAdjustment > 0 ? '+' : ''}{sub.hydrationAdjustment}%
-                    </div>
-                  )}
-                  <div className="text-muted-foreground mt-1 text-xs">
-                    {sub.notes}
-                  </div>
+              {result.troubleshootingTips.map((tip, i) => (
+                <div key={i} className="border-l-4 border-primary/30 pl-4">
+                  <div className="font-bold text-foreground text-sm">{tip.issue}</div>
+                  <div className="text-sm text-muted-foreground mt-1 leading-relaxed">{tip.solution}</div>
                 </div>
               ))}
             </div>
-          </Card>
-        )}
-
-        {/* Method Text */}
-        {result.original.method && (
-          <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Original Method</h2>
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {result.original.method}
+            <div className="mt-6 pt-4 border-t border-border/30 text-xs text-muted-foreground italic flex items-center gap-2">
+              <span>💡</span>
+              <span>Watch the dough, not the clock. Fermentation times vary with temperature and flour type.</span>
             </div>
           </Card>
-        )}
+
+          {/* Ingredient Substitutions */}
+          {result.substitutions.length > 0 && (
+            <Card className="p-4 sm:p-6 print:shadow-none print:border-2">
+              <h2 className="text-lg sm:text-xl font-bold mb-4 text-foreground print:text-black">Substitutions</h2>
+              <div className="space-y-4">
+                {result.substitutions.map((sub, i) => (
+                  <div key={i} className="border-l-4 border-primary/30 pl-4">
+                    <div className="font-bold text-foreground text-sm mb-2">
+                      {sub.original} → {sub.substitute}
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <div><span className="font-semibold">Ratio:</span> {sub.ratio}</div>
+                      {sub.hydrationAdjustment !== 0 && (
+                        <div>
+                          <span className="font-semibold">Hydration adjustment:</span>{' '}
+                          {sub.hydrationAdjustment > 0 ? '+' : ''}{sub.hydrationAdjustment}%
+                        </div>
+                      )}
+                      <div className="text-xs opacity-75 mt-2">{sub.notes}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
         {/* Actions - Bottom (always visible, hidden from PDF) */}
         <div className="flex gap-4 justify-center flex-wrap print:hidden">
