@@ -17,6 +17,7 @@ const Index = () => {
   const [extractedIngredients, setExtractedIngredients] = useState<ParsedIngredient[]>([]);
   const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<any>(null);
   const [recipeName, setRecipeName] = useState<string>('Converted Recipe');
+  const [recipeDescription, setRecipeDescription] = useState<string>('');
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -26,15 +27,36 @@ const Index = () => {
   const handleConvert = (recipeText: string, starterHydration: number) => {
     const parsed = parseRecipe(recipeText, starterHydration);
     
-    // Extract recipe name from first non-empty line
+    // Extract recipe name and description from first lines
     const lines = recipeText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    const extractedName = lines[0] || 'Converted Recipe';
+    const firstLine = lines[0] || 'Converted Recipe';
+    
+    // Split first line at first sentence ending (period, exclamation, or question mark)
+    const sentenceMatch = firstLine.match(/^([^.!?]+[.!?])\s*(.*)$/);
+    let extractedName: string;
+    let extractedDescription: string;
+    
+    if (sentenceMatch) {
+      // If we found a sentence ending, split there
+      extractedName = sentenceMatch[1].trim();
+      extractedDescription = sentenceMatch[2].trim();
+    } else {
+      // If no sentence ending, use the whole first line as title
+      extractedName = firstLine;
+      extractedDescription = '';
+    }
+    
+    // If description is still empty, try to grab the second line
+    if (!extractedDescription && lines.length > 1) {
+      extractedDescription = lines.slice(1, 4).join(' '); // Take up to 3 more lines
+    }
     
     // Show confirmation screen before converting
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(parsed.ingredients);
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });
     setRecipeName(extractedName);
+    setRecipeDescription(extractedDescription);
     setScreen('confirmation');
   };
 
@@ -139,6 +161,7 @@ const Index = () => {
         <OutputScreen 
           result={result}
           recipeName={recipeName}
+          recipeDescription={recipeDescription}
           originalRecipeText={originalRecipeText}
           onStartOver={handleStartOver}
           onEditExtraction={handleEditExtraction}

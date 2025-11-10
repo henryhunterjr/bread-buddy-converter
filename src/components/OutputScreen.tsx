@@ -29,12 +29,13 @@ import {
 interface OutputScreenProps {
   result: ConvertedRecipe;
   recipeName: string;
+  recipeDescription?: string;
   originalRecipeText: string;
   onStartOver: () => void;
   onEditExtraction: () => void;
 }
 
-export default function OutputScreen({ result, recipeName: initialRecipeName, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
+export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -137,14 +138,24 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, or
       {/* Main Content */}
       <div className="flex-1 p-4 sm:p-6 overflow-auto">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Recipe Name and Conversion Direction - Centered and Balanced */}
-          <div className="text-center space-y-3 py-4 sm:py-6 print:py-3">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground break-words px-2 print:text-3xl print:text-black">
+          {/* Recipe Title and Description - Professional Cookbook Style */}
+          <div className="text-center space-y-3 py-4 sm:py-6 print:py-3 border-b border-border/30 print:border-b-0">
+            {/* Recipe Title - Large Serif */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground break-words px-2 print:text-4xl print:text-black leading-tight">
               {initialRecipeName}
             </h1>
-            <p className="text-sm sm:text-base md:text-lg text-muted-foreground print:text-base print:text-gray-700">
-              {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast Conversion' : 'Yeast → Sourdough Conversion'}
+            
+            {/* Conversion Direction - Small Caps */}
+            <p className="text-xs sm:text-sm tracking-wide uppercase text-muted-foreground print:text-xs print:text-gray-600">
+              {result.direction === 'sourdough-to-yeast' ? 'Converted from Sourdough → Yeast' : 'Converted from Yeast → Sourdough'} • Hydration {result.converted.hydration.toFixed(0)}% • {new Date().toLocaleDateString()}
             </p>
+            
+            {/* Recipe Description - Smaller Sans-Serif */}
+            {recipeDescription && (
+              <p className="text-sm sm:text-base max-w-3xl mx-auto text-muted-foreground leading-relaxed px-4 pt-2 print:text-sm print:text-gray-800">
+                {recipeDescription}
+              </p>
+            )}
           </div>
           
           {/* Warnings */}
