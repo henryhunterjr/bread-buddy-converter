@@ -25,6 +25,35 @@ const FONTS = {
   footerSize: 9
 };
 
+/**
+ * Clean text for PDF to avoid UTF-8 encoding issues
+ * Replaces common problem characters with ASCII equivalents
+ */
+function cleanTextForPDF(text: string): string {
+  if (!text) return '';
+  
+  return text
+    // Smart quotes to straight quotes
+    .replace(/['']/g, "'")
+    .replace(/[""]/g, '"')
+    // Various dashes to simple dash
+    .replace(/[–—]/g, '-')
+    // Bullet points to dash
+    .replace(/[•●]/g, '-')
+    // Degree symbol to 'F' or 'C'
+    .replace(/°F/g, 'F')
+    .replace(/°C/g, 'C')
+    .replace(/°/g, ' degrees')
+    // Multiplication sign
+    .replace(/×/g, 'x')
+    // Ellipsis
+    .replace(/…/g, '...')
+    // Non-breaking space
+    .replace(/\u00A0/g, ' ')
+    // Remove any remaining non-ASCII characters
+    .replace(/[^\x00-\x7F]/g, '');
+}
+
 interface IngredientGroup {
   section: string;
   ingredients: BakersPercentage[];
@@ -68,15 +97,10 @@ export function generatePDF(
   recipeDescription: string = '',
   sourceFileName?: string
 ) {
-  // Clean recipe name to avoid encoding issues
-  const cleanRecipeName = recipeName
-    .replace(/•/g, '-')
-    .replace(/–/g, '-')
-    .replace(/—/g, '-')
-    .replace(/'/g, "'")
-    .replace(/'/g, "'")
-    .replace(/"/g, '"')
-    .replace(/"/g, '"');
+  // Clean all input text to avoid encoding issues
+  const cleanRecipeName = cleanTextForPDF(recipeName || 'Converted Recipe');
+  const cleanDescription = cleanTextForPDF(recipeDescription);
+  const cleanSourceFileName = cleanTextForPDF(sourceFileName || '');
   
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -126,11 +150,11 @@ export function generatePDF(
   yPos += 0.2;
 
   // Source filename (if provided)
-  if (sourceFileName) {
+  if (cleanSourceFileName) {
     doc.setFontSize(FONTS.smallSize);
     doc.setFont(FONTS.sans, 'normal');
     doc.setTextColor(120, 120, 120);
-    doc.text(`Source: ${sourceFileName}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`Source: ${cleanSourceFileName}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 0.3;
   } else {
     yPos += 0.2;
@@ -138,11 +162,11 @@ export function generatePDF(
   
   // ========== 2. INTRO / DESCRIPTION BLOCK ==========
   // Add description if provided - using serif font for better readability
-  if (recipeDescription) {
+  if (cleanDescription) {
     doc.setFontSize(FONTS.bodySize);
     doc.setFont(FONTS.serif, 'normal');
     doc.setTextColor(60, 47, 35); // Warm brown instead of gray for better readability
-    const descLines = doc.splitTextToSize(recipeDescription, contentWidth);
+    const descLines = doc.splitTextToSize(cleanDescription, contentWidth);
     // Left-aligned for better readability of longer paragraphs
     descLines.forEach((line: string) => {
       doc.text(line, margin, yPos);
@@ -179,7 +203,7 @@ export function generatePDF(
     doc.setFontSize(FONTS.bodySize);
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text(group.section, margin, yPos);
+    doc.text(cleanTextForPDF(group.section), margin, yPos);
     yPos += 0.25;
 
     // Ingredients in this group
@@ -195,8 +219,8 @@ export function generatePDF(
       // Bullet point - using simple dash for UTF-8 safety
       doc.text('-', margin + 0.1, yPos);
 
-      // Ingredient name and amount
-      const ingredientText = `${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`;
+      // Ingredient name and amount - clean the text
+      const ingredientText = cleanTextForPDF(`${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`);
       const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.4);
       ingredientLines.forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
@@ -245,13 +269,13 @@ export function generatePDF(
     // Step label (bold) - using serif for consistency
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(0, 0, 0);
-    const stepLabel = change.step; // Already includes number from template
+    const stepLabel = cleanTextForPDF(change.step); // Already includes number from template
     doc.text(stepLabel, margin, yPos);
     yPos += 0.2;
 
     // Step content (serif for readability)
     doc.setFont(FONTS.serif, 'normal');
-    const changeLines = doc.splitTextToSize(change.change, contentWidth);
+    const changeLines = doc.splitTextToSize(cleanTextForPDF(change.change), contentWidth);
     changeLines.forEach((line: string) => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
@@ -265,7 +289,7 @@ export function generatePDF(
     if (change.timing) {
       doc.setFont(FONTS.serif, 'italic');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Timing: ${change.timing}`, margin + 0.1, yPos);
+      doc.text(cleanTextForPDF(`Timing: ${change.timing}`), margin + 0.1, yPos);
       yPos += 0.18;
     }
 
@@ -315,7 +339,7 @@ export function generatePDF(
 
       // Issue (bold)
       doc.setFont(FONTS.serif, 'bold');
-      const issueLines = doc.splitTextToSize(tip.issue, contentWidth - 0.3);
+      const issueLines = doc.splitTextToSize(cleanTextForPDF(tip.issue), contentWidth - 0.3);
       issueLines.forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
         yPos += 0.18; // 1.5x line spacing
@@ -323,7 +347,7 @@ export function generatePDF(
 
       // Solution (regular)
       doc.setFont(FONTS.serif, 'normal');
-      const solutionLines = doc.splitTextToSize(tip.solution, contentWidth - 0.3);
+      const solutionLines = doc.splitTextToSize(cleanTextForPDF(tip.solution), contentWidth - 0.3);
       solutionLines.forEach((line: string) => {
         if (yPos > pageHeight - 1) {
           doc.addPage();
@@ -379,15 +403,15 @@ export function generatePDF(
 
       // Original to Substitute (bold)
       doc.setFont(FONTS.serif, 'bold');
-      doc.text(`${sub.original} to ${sub.substitute}`, margin + 0.3, yPos);
+      doc.text(cleanTextForPDF(`${sub.original} to ${sub.substitute}`), margin + 0.3, yPos);
       yPos += 0.18;
 
       // Ratio and notes
       doc.setFont(FONTS.serif, 'normal');
-      doc.text(`Ratio: ${sub.ratio}`, margin + 0.3, yPos);
+      doc.text(cleanTextForPDF(`Ratio: ${sub.ratio}`), margin + 0.3, yPos);
       yPos += 0.15;
 
-      const notesLines = doc.splitTextToSize(sub.notes, contentWidth - 0.45);
+      const notesLines = doc.splitTextToSize(cleanTextForPDF(sub.notes), contentWidth - 0.45);
       notesLines.slice(0, 2).forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
         yPos += 0.15;
