@@ -22,12 +22,13 @@ import { Label } from "@/components/ui/label";
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
+  recipeName: string;
   originalRecipeText: string;
   onStartOver: () => void;
   onEditExtraction: () => void;
 }
 
-export default function OutputScreen({ result, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
+export default function OutputScreen({ result, recipeName: initialRecipeName, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -36,7 +37,7 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver, 
   const convertedPercentages = calculateBakersPercentages(result.converted);
 
   const handleDownloadPDF = () => {
-    const name = recipeName.trim() || 'Converted Recipe';
+    const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
     generatePDF(result, name);
   };
 
@@ -125,9 +126,12 @@ export default function OutputScreen({ result, originalRecipeText, onStartOver, 
       <div className="flex-1 p-4 py-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="space-y-4">
-          <h1 className="text-3xl font-bold text-foreground">
-            Recipe Converted: {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast' : 'Yeast → Sourdough'}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground break-words">
+            {initialRecipeName}
           </h1>
+          <p className="text-base sm:text-lg text-muted-foreground">
+            Converted: {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast' : 'Yeast → Sourdough'}
+          </p>
           
           {/* Warnings */}
           {result.warnings.length > 0 && (

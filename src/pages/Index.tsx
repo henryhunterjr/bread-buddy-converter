@@ -16,6 +16,7 @@ const Index = () => {
   const [originalRecipeText, setOriginalRecipeText] = useState<string>('');
   const [extractedIngredients, setExtractedIngredients] = useState<ParsedIngredient[]>([]);
   const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<any>(null);
+  const [recipeName, setRecipeName] = useState<string>('Converted Recipe');
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -25,10 +26,15 @@ const Index = () => {
   const handleConvert = (recipeText: string) => {
     const parsed = parseRecipe(recipeText);
     
+    // Extract recipe name from first non-empty line
+    const lines = recipeText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const extractedName = lines[0] || 'Converted Recipe';
+    
     // Show confirmation screen before converting
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(parsed.ingredients);
     setParsedRecipeForConfirmation(parsed);
+    setRecipeName(extractedName);
     setScreen('confirmation');
   };
 
@@ -127,6 +133,7 @@ const Index = () => {
       {screen === 'output' && result && (
         <OutputScreen 
           result={result}
+          recipeName={recipeName}
           originalRecipeText={originalRecipeText}
           onStartOver={handleStartOver}
           onEditExtraction={handleEditExtraction}
