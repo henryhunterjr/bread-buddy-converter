@@ -11,37 +11,35 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Hero Banner Section */}
-      <div className="relative w-full h-[300px] md:h-[400px] overflow-hidden">
+      <div className="relative w-full h-[180px] md:h-[220px] overflow-hidden">
         <img 
           src={heroBanner} 
           alt="Baking workspace with rustic bread and baking tools" 
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-bread-wheat/90 via-bread-cream/80 to-bread-wheat/90 flex items-center justify-center">
-          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl font-bold text-bread-earth px-4 text-center">
-            Baking Great Bread at Home
-          </h1>
-        </div>
         <img 
           src={logo} 
           alt="Baking Great Bread at Home logo" 
-          className="absolute bottom-4 right-4 h-16 md:h-20 drop-shadow-lg"
+          className="absolute bottom-3 right-3 h-12 md:h-16 drop-shadow-lg"
         />
       </div>
       
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="max-w-4xl w-full space-y-8 md:space-y-12">
-          <Card className="w-full p-6 md:p-12 space-y-8 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
-            <div className="text-center space-y-6">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
+      <div className="flex-1 flex items-start justify-center p-4 md:p-6 pt-6 md:pt-8">
+        <div className="max-w-4xl w-full space-y-6 md:space-y-8">
+          <Card className="w-full p-6 md:p-10 space-y-6 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
+            <div className="text-center space-y-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
+                Baking Great Bread at Home
+              </h1>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground font-serif">
                 Sourdough & Yeast Bread Recipe Converter
               </h2>
-              <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
                 Convert any bread recipe between commercial yeast and sourdough starter instantly with precise baker's percentages
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6 md:pt-8">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 md:pt-6">
                 <Button
                   size="lg"
                   className="text-base md:text-lg px-6 md:px-8 py-5 md:py-6 bg-gradient-to-r from-bread-gold to-bread-wheat hover:from-bread-wheat hover:to-bread-gold transition-all duration-300 shadow-lg hover:shadow-bread-gold/50 hover:scale-105 text-bread-earth font-semibold border-2 border-bread-earth/20"
