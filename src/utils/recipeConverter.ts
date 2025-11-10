@@ -265,14 +265,16 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   
   console.log('Target starter flour contribution:', starterFlourNeeded, `(${starterPercentage * 100}% of ${totalFlour}g)`);
   
-  // FIXED: Use 1:5:5 build for true 20% inoculation
-  // For 100g starter flour needed with 100% hydration starter:
-  // Build: 20g starter : 100g flour : 100g water = 220g total
-  // This gives: (20g * 0.5) + 100g = 110g flour ≈ 22% inoculation ✓
-  const activeStarterWeight = Math.round(starterFlourNeeded * 0.2); // 20g for 100g target
-  const levainWater = starterFlourNeeded; // 100g
-  const levainFlour = starterFlourNeeded; // 100g
-  const levainTotal = activeStarterWeight + levainWater + levainFlour; // 220g total
+  // LEVAIN BUILD FORMULA for 100% hydration:
+  // For X% inoculation (default 20%):
+  // - Starter seed: 4% of total flour (e.g., 40g for 1000g flour)
+  // - Levain flour: X% of total flour (e.g., 200g = 20% of 1000g)
+  // - Levain water: X% of total flour (e.g., 200g = 20% of 1000g) - SAME as flour
+  // Result: 40g + 200g + 200g = 440g levain at 100% hydration
+  const activeStarterWeight = Math.round(starterFlourNeeded * 0.2); // 4% of total flour
+  const levainWater = starterFlourNeeded; // 20% of total flour
+  const levainFlour = starterFlourNeeded; // 20% of total flour (EQUAL to water)
+  const levainTotal = activeStarterWeight + levainWater + levainFlour;
   
   // Starter breakdown (100% hydration starter means 50% flour, 50% water)
   const starterFlourContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Flour from active starter
@@ -350,10 +352,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   const flourIngredients = recipe.ingredients.filter(i => i.type === 'flour');
   
   // Calculate how much flour goes in levain (20% of total) and dough (80%)
+  // CRITICAL: Use levainFlour (not totalLevainFlour) to get the ADDED flour amount
+  // This ensures 100% hydration: if we add 200g flour + 200g water to 40g starter, we get 100% hydration
   const flourProportions = flourIngredients.map(f => ({
     ...f,
     proportionOfTotal: f.amount / totalFlour,
-    levainAmount: Math.round((f.amount / totalFlour) * totalLevainFlour),
+    levainAmount: Math.round((f.amount / totalFlour) * levainFlour),  // Use levainFlour for 100% hydration
     doughAmount: Math.round((f.amount / totalFlour) * doughFlour)
   }));
   
