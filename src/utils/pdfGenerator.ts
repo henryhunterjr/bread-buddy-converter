@@ -68,6 +68,16 @@ export function generatePDF(
   recipeDescription: string = '',
   sourceFileName?: string
 ) {
+  // Clean recipe name to avoid encoding issues
+  const cleanRecipeName = recipeName
+    .replace(/•/g, '-')
+    .replace(/–/g, '-')
+    .replace(/—/g, '-')
+    .replace(/'/g, "'")
+    .replace(/'/g, "'")
+    .replace(/"/g, '"')
+    .replace(/"/g, '"');
+  
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'in',
@@ -95,13 +105,13 @@ export function generatePDF(
   doc.setFontSize(FONTS.titleSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35); // #3c2f23
-  const titleLines = doc.splitTextToSize(recipeName, contentWidth);
+  const titleLines = doc.splitTextToSize(cleanRecipeName, contentWidth);
   doc.text(titleLines, pageWidth / 2, yPos, { align: 'center' });
   yPos += (titleLines.length * 0.3) + 0.15;
   
   // Subtitle line
   doc.setFontSize(FONTS.subtitleSize);
-  doc.setFont(FONTS.sans, 'italic');
+  doc.setFont(FONTS.sans, 'normal');
   doc.setTextColor(100, 100, 100);
   const conversionLabel = result.direction === 'sourdough-to-yeast'
     ? 'Sourdough to Yeast'
@@ -111,7 +121,7 @@ export function generatePDF(
     month: 'short',
     day: 'numeric'
   });
-  const subtitle = `Converted from ${conversionLabel}  -  Hydration ${result.converted.hydration.toFixed(0)}%  -  ${currentDate}`;
+  const subtitle = `Converted from ${conversionLabel} | Hydration ${result.converted.hydration.toFixed(0)}% | ${currentDate}`;
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 0.2;
 
@@ -147,15 +157,15 @@ export function generatePDF(
 
   // Section heading with divider
   doc.setDrawColor(214, 199, 180);
-  doc.setLineWidth(0.005);
-  doc.line(margin, yPos - 0.05, pageWidth - margin, yPos - 0.05);
-  yPos += 0.1;
+  doc.setLineWidth(0.02);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 0.2;
   
   doc.setFontSize(FONTS.headingSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
   doc.text('INGREDIENTS', margin, yPos);
-  yPos += 0.3;
+  yPos += 0.35;
 
   // Render ingredients as bullet list
   ingredientGroups.forEach((group, groupIndex) => {
@@ -182,8 +192,8 @@ export function generatePDF(
         yPos = topMargin;
       }
 
-      // Bullet point (●)
-      doc.text('●', margin + 0.1, yPos);
+      // Bullet point - using simple dash for UTF-8 safety
+      doc.text('-', margin + 0.1, yPos);
 
       // Ingredient name and amount
       const ingredientText = `${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`;
@@ -194,15 +204,16 @@ export function generatePDF(
       });
     });
 
-    yPos += 0.15; // Space between groups
+    yPos += 0.75 / 12 * FONTS.bodySize; // 0.75em space between groups
   });
 
   // Total Hydration (after ingredients)
+  yPos += 0.1;
   doc.setFontSize(FONTS.bodySize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
   doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin, yPos);
-  yPos += 0.4;
+  yPos += 0.5;
   
   // ========== 4. METHOD SECTION ==========
   // Check if we need a new page
@@ -213,15 +224,15 @@ export function generatePDF(
 
   // Section heading with divider
   doc.setDrawColor(214, 199, 180);
-  doc.setLineWidth(0.005);
-  doc.line(margin, yPos - 0.05, pageWidth - margin, yPos - 0.05);
-  yPos += 0.1;
+  doc.setLineWidth(0.02);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 0.2;
   
   doc.setFontSize(FONTS.headingSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
   doc.text('METHOD', margin, yPos);
-  yPos += 0.3;
+  yPos += 0.35;
 
   doc.setFontSize(FONTS.bodySize);
   result.methodChanges.forEach((change, index) => {
@@ -254,11 +265,11 @@ export function generatePDF(
     if (change.timing) {
       doc.setFont(FONTS.serif, 'italic');
       doc.setTextColor(100, 100, 100);
-      doc.text(`⏱ ${change.timing}`, margin + 0.1, yPos);
+      doc.text(`Timing: ${change.timing}`, margin + 0.1, yPos);
       yPos += 0.18;
     }
 
-    yPos += 0.2; // Space between steps
+    yPos += 0.75 / 12 * FONTS.bodySize; // 0.75em space between steps
   });
 
   yPos += 0.2;
@@ -299,8 +310,8 @@ export function generatePDF(
         yPos = topMargin;
       }
 
-      // Bullet point (●)
-      doc.text('●', margin + 0.15, yPos);
+      // Bullet point - using simple dash for UTF-8 safety
+      doc.text('-', margin + 0.15, yPos);
 
       // Issue (bold)
       doc.setFont(FONTS.serif, 'bold');
@@ -363,12 +374,12 @@ export function generatePDF(
         yPos = topMargin;
       }
 
-      // Bullet point (●)
-      doc.text('●', margin + 0.15, yPos);
+      // Bullet point - using simple dash for UTF-8 safety
+      doc.text('-', margin + 0.15, yPos);
 
-      // Original → Substitute (bold)
+      // Original to Substitute (bold)
       doc.setFont(FONTS.serif, 'bold');
-      doc.text(`${sub.original} → ${sub.substitute}`, margin + 0.3, yPos);
+      doc.text(`${sub.original} to ${sub.substitute}`, margin + 0.3, yPos);
       yPos += 0.18;
 
       // Ratio and notes
@@ -441,8 +452,8 @@ export function generatePDF(
     { align: 'right' }
   );
   
-  // Generate filename
-  const cleanName = recipeName.replace(/[^a-zA-Z0-9]/g, '');
+  // Generate filename - use cleaned name
+  const cleanName = cleanRecipeName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
   const conversionType = result.direction === 'sourdough-to-yeast' ? 'SourdoughToYeast' : 'YeastToSourdough';
   const filename = `${cleanName}_BreadBuddy_${conversionType}.pdf`;
   
