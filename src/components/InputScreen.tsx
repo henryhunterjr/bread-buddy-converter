@@ -4,7 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image, Info, Sparkles } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { extractTextFromFile } from '@/utils/fileExtractor';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
+import { 
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
@@ -33,14 +38,12 @@ interface InputScreenProps {
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
 }
 
-const EXAMPLE_TEXT = `Example format:
-500g bread flour
-350g water
-100g active starter (or 3g instant yeast)
-10g salt
+const PLACEHOLDER_TEXT = `Paste your recipe here...
 
-Method:
-Mix flour and water, rest 30 min...`;
+Example:
+500g flour, 350g water, 10g salt, 3g yeast
+
+Method: Mix, rest 30 min, fold, shape, proof, bake`;
 
 export default function InputScreen({ direction, onConvert, onBack, onLoadSaved }: InputScreenProps) {
   const [recipeText, setRecipeText] = useState('');
@@ -49,6 +52,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
   const [isAIParsing, setIsAIParsing] = useState(false);
   const [starterHydration, setStarterHydration] = useState(100);
   const [aiParseAvailable, setAiParseAvailable] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showSavedRecipes, setShowSavedRecipes] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
   const { toast } = useToast();
   
   // Detect if recipe contains starter/levain
@@ -83,15 +89,17 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
 
     setIsProcessing(true);
     setErrors([]);
+    setUploadedFileName(file.name);
     
     try {
       const extractedText = await extractTextFromFile(file);
       setRecipeText(extractedText);
       toast({
-        title: "Recipe extracted",
-        description: "Review the text below and edit if needed before converting",
+        title: "✓ Recipe extracted",
+        description: `From ${file.name} - Review and edit if needed`,
       });
     } catch (error) {
+      setUploadedFileName('');
       toast({
         title: "Extraction failed",
         description: error instanceof Error ? error.message : "Could not extract text from file",
@@ -265,171 +273,267 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <div className="p-4">
-        <img src={logo} alt="Baking Great Bread at Home" className="h-16 md:h-20" />
-      </div>
-      
-      <div className="flex-1 p-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-4 mb-6">
-            <Button variant="outline" onClick={onBack}>
-              ← Back
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground">
-              Convert: {directionText}
-            </h1>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Left column: Recipe Input */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="p-6 space-y-4">
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground">
-                      Upload Recipe
-                    </label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-auto py-4"
-                      disabled={isProcessing}
-                      onClick={() => document.getElementById('file-upload')?.click()}
-                    >
-                      <Upload className="mr-2 h-5 w-5" />
-                      <span className="text-base">{isProcessing ? 'Processing...' : 'Choose File to Upload'}</span>
-                    </Button>
-                    <input
-                      id="file-upload"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.webp"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span>PDF Documents</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-                        <Image className="h-4 w-4" />
-                        <span>Images (JPG, PNG, WEBP)</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground text-center">Maximum file size: 20MB</p>
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">Or</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">
-                      Paste your recipe below
-                    </label>
-                    <Textarea
-                      placeholder={EXAMPLE_TEXT}
-                      value={recipeText}
-                      onChange={(e) => setRecipeText(e.target.value)}
-                      className="min-h-[300px] font-mono text-sm"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Include ingredient amounts (grams preferred) and your method. Don't worry about perfect formatting—I'll figure it out.
-                    </p>
-                  </div>
-
-                  {hasStarter && (
-                    <div className="space-y-2 bg-muted/50 p-4 rounded-lg border border-border">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-foreground">
-                          Starter Hydration (optional)
-                        </label>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p className="text-sm">
-                                We assume your starter is 100% hydration (equal parts flour and water) by default. 
-                                If your starter uses a different ratio, select it here for accurate calculations.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <Select 
-                        value={starterHydration.toString()} 
-                        onValueChange={(value) => setStarterHydration(Number(value))}
-                      >
-                        <SelectTrigger className="w-full bg-background">
-                          <SelectValue placeholder="100% (default)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="50">50% (stiff starter)</SelectItem>
-                          <SelectItem value="75">75%</SelectItem>
-                          <SelectItem value="100">100% (equal parts - default)</SelectItem>
-                          <SelectItem value="125">125% (liquid starter)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Most sourdough starters are maintained at 100% hydration.
-                      </p>
-                    </div>
-                  )}
-
-                  {errors.length > 0 && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        <ul className="list-disc list-inside space-y-1">
-                          {errors.map((error, i) => (
-                            <li key={i}>{error}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-2">
-                    <Button 
-                      onClick={handleConvert} 
-                      className="w-full"
-                      disabled={!recipeText.trim() || isProcessing || isAIParsing}
-                    >
-                      {isProcessing ? 'Processing...' : 'Convert Recipe'}
-                    </Button>
-                    
-                    {aiParseAvailable && (
-                      <Button 
-                        onClick={handleManualAIParse}
-                        variant="outline"
-                        className="w-full"
-                        disabled={!recipeText.trim() || isAIParsing}
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {isAIParsing ? 'Parsing with AI...' : 'Try AI Parser'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Right column: Saved Recipes */}
-            <div className="lg:col-span-1">
-              <SavedRecipes onLoadRecipe={handleLoadRecipe} />
-            </div>
-          </div>
+      {/* Header */}
+      <div className="p-3 sm:p-4 border-b border-border">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <img src={logo} alt="Baking Great Bread" className="h-12 sm:h-14 md:h-16" />
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowSavedRecipes(!showSavedRecipes)}
+            className="flex items-center gap-2"
+          >
+            <Archive className="h-4 w-4" />
+            <span className="hidden sm:inline">Saved</span>
+          </Button>
         </div>
       </div>
       
-      <footer className="text-center py-4 text-xs text-muted-foreground">
+      {/* Main Content */}
+      <div className="flex-1 p-3 sm:p-6 py-4 sm:py-8">
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+          
+          {/* Back Button and Title */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Button variant="outline" onClick={onBack} size="sm" className="shrink-0">
+              ← Back
+            </Button>
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">
+                Convert: {directionText}
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                Paste any bread recipe below. We handle all the math automatically.
+              </p>
+            </div>
+          </div>
+
+          {/* Help Section */}
+          <Card className="border-primary/20 bg-primary/5">
+            <Collapsible open={showHelp} onOpenChange={setShowHelp}>
+              <CollapsibleTrigger className="w-full p-3 sm:p-4 flex items-center justify-between hover:bg-primary/10 transition-colors">
+                <div className="flex items-center gap-2 text-sm sm:text-base font-medium text-foreground">
+                  <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span>How does this work?</span>
+                </div>
+                {showHelp ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3 text-xs sm:text-sm text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground mb-1">✓ What we need:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Ingredient amounts (grams work best)</li>
+                    <li>Your method/instructions</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground mb-1">✓ Example format:</p>
+                  <pre className="bg-background/50 p-2 sm:p-3 rounded text-xs overflow-x-auto">
+500g bread flour
+350g water  
+10g salt
+3g instant yeast
+
+Method:
+Mix flour and water, rest 30 min...
+                  </pre>
+                </div>
+                <div>
+                  <p className="font-medium text-foreground mb-1">✓ What you'll get:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Converted ingredient list with baker's percentages</li>
+                    <li>Updated method with new timing</li>
+                    <li>Downloadable PDF recipe</li>
+                  </ul>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+
+          {/* Step 1: Paste Recipe */}
+          <Card className="p-4 sm:p-6 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm sm:text-base shrink-0">
+                1
+              </div>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Paste Your Recipe</h2>
+            </div>
+            
+            <Textarea
+              placeholder={PLACEHOLDER_TEXT}
+              value={recipeText}
+              onChange={(e) => setRecipeText(e.target.value)}
+              className="min-h-[200px] sm:min-h-[280px] font-mono text-xs sm:text-sm resize-none"
+            />
+
+            {uploadedFileName && (
+              <div className="flex items-center gap-2 p-2 sm:p-3 bg-muted/50 rounded-md text-xs sm:text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                <span className="text-muted-foreground truncate">Uploaded: {uploadedFileName}</span>
+              </div>
+            )}
+
+            {/* Upload Option */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or Upload File</span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full h-auto py-3 sm:py-4"
+              disabled={isProcessing}
+              onClick={() => document.getElementById('file-upload')?.click()}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <span className="text-sm sm:text-base">Extracting recipe...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-5 w-5" />
+                  <span className="text-sm sm:text-base">Choose PDF or Image</span>
+                </>
+              )}
+            </Button>
+            <input
+              id="file-upload"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <p className="text-xs text-center text-muted-foreground">
+              Max 20MB • Accepts: PDF, JPG, PNG, WEBP
+            </p>
+          </Card>
+
+          {/* Step 2: Starter Hydration (Conditional) */}
+          {hasStarter && (
+            <Card className="p-4 sm:p-6 space-y-4 border-orange-200 bg-orange-50/50 dark:border-orange-900/30 dark:bg-orange-950/20">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm sm:text-base shrink-0">
+                  2
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-base sm:text-lg font-semibold text-foreground">Starter Hydration</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Most starters are 100% hydration (equal parts flour/water)</p>
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        We assume 100% hydration by default. If your starter uses a different ratio, select it here for accurate calculations.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              <Select 
+                value={starterHydration.toString()} 
+                onValueChange={(value) => setStarterHydration(Number(value))}
+              >
+                <SelectTrigger className="w-full bg-background h-11 sm:h-12 text-sm sm:text-base">
+                  <SelectValue placeholder="100% (default)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">50% (stiff starter)</SelectItem>
+                  <SelectItem value="75">75%</SelectItem>
+                  <SelectItem value="100">100% (equal parts - default)</SelectItem>
+                  <SelectItem value="125">125% (liquid starter)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Card>
+          )}
+
+          {/* Errors */}
+          {errors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm">
+                  {errors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Step 3: Convert */}
+          <Card className="p-4 sm:p-6 space-y-3 sm:space-y-4 border-green-200 bg-green-50/50 dark:border-green-900/30 dark:bg-green-950/20">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm sm:text-base shrink-0">
+                {hasStarter ? '3' : '2'}
+              </div>
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Convert Recipe</h2>
+            </div>
+
+            {/* Sticky convert button on mobile */}
+            <div className="space-y-2">
+              <Button 
+                onClick={handleConvert} 
+                size="lg"
+                className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold sticky bottom-4 z-10 shadow-lg"
+                disabled={!recipeText.trim() || isProcessing || isAIParsing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  '⚡ Convert Recipe'
+                )}
+              </Button>
+              
+              {aiParseAvailable && (
+                <Button 
+                  onClick={handleManualAIParse}
+                  variant="outline"
+                  size="lg"
+                  className="w-full h-11 sm:h-12"
+                  disabled={!recipeText.trim() || isAIParsing}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {isAIParsing ? 'Parsing with AI...' : 'Try AI Parser'}
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Saved Recipes (Mobile/Tablet Drawer) */}
+          {showSavedRecipes && (
+            <Card className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base sm:text-lg font-semibold">Saved Recipes</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowSavedRecipes(false)}
+                >
+                  Close
+                </Button>
+              </div>
+              <SavedRecipes onLoadRecipe={handleLoadRecipe} />
+            </Card>
+          )}
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <footer className="text-center py-3 sm:py-4 text-[10px] sm:text-xs text-muted-foreground border-t border-border">
         Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
       </footer>
     </div>
