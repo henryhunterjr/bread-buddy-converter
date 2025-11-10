@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { ConvertedRecipe, BakersPercentage } from '@/types/recipe';
 import { calculateBakersPercentages } from './recipeConverter';
 
@@ -15,12 +14,12 @@ const COLORS = {
 
 // Typography settings
 const FONTS = {
-  serif: 'helvetica', // jsPDF doesn't support custom fonts easily, using helvetica as fallback
+  serif: 'times', // Using Times for more traditional serif look
   sans: 'helvetica',
   titleSize: 24,
   subtitleSize: 12,
   headingSize: 14,
-  bodySize: 11,
+  bodySize: 12,      // Increased from 11 to 12 for better readability
   smallSize: 10,
   footerSize: 9
 };
@@ -62,7 +61,12 @@ function groupIngredients(percentages: BakersPercentage[], direction: string): I
   }
 }
 
-export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Converted Recipe', recipeDescription: string = '') {
+export function generatePDF(
+  result: ConvertedRecipe,
+  recipeName: string = 'Converted Recipe',
+  recipeDescription: string = '',
+  sourceFileName?: string
+) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'in',
@@ -96,88 +100,98 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
   doc.setFontSize(FONTS.subtitleSize);
   doc.setFont(FONTS.sans, 'italic');
   doc.setTextColor(100, 100, 100);
-  const conversionLabel = result.direction === 'sourdough-to-yeast' 
-    ? 'Sourdough → Yeast' 
+  const conversionLabel = result.direction === 'sourdough-to-yeast'
+    ? 'Sourdough → Yeast'
     : 'Yeast → Sourdough';
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   });
   const subtitle = `Converted from ${conversionLabel}  •  Hydration ${result.converted.hydration.toFixed(0)}%  •  ${currentDate}`;
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
-  yPos += 0.4;
-  
-  // ========== 2. INTRO / DESCRIPTION BLOCK ==========
-  // Add description if provided
-  if (recipeDescription) {
-    doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.sans, 'italic');
-    doc.setTextColor(102, 102, 102); // Gray text
-    const descLines = doc.splitTextToSize(recipeDescription, contentWidth);
-    doc.text(descLines, pageWidth / 2, yPos, { align: 'center' });
-    yPos += (descLines.length * 0.15) + 0.3;
+  yPos += 0.2;
+
+  // Source filename (if provided)
+  if (sourceFileName) {
+    doc.setFontSize(FONTS.smallSize);
+    doc.setFont(FONTS.sans, 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Source: ${sourceFileName}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 0.3;
+  } else {
+    yPos += 0.2;
   }
   
-  // ========== 3. INGREDIENTS TABLE ==========
+  // ========== 2. INTRO / DESCRIPTION BLOCK ==========
+  // Add description if provided - using serif font for better readability
+  if (recipeDescription) {
+    doc.setFontSize(FONTS.bodySize);
+    doc.setFont(FONTS.serif, 'normal');
+    doc.setTextColor(60, 47, 35); // Warm brown instead of gray for better readability
+    const descLines = doc.splitTextToSize(recipeDescription, contentWidth);
+    // Left-aligned for better readability of longer paragraphs
+    descLines.forEach((line: string) => {
+      doc.text(line, margin, yPos);
+      yPos += 0.18;
+    });
+    yPos += 0.25; // Extra space after description
+  }
+  
+  // ========== 3. INGREDIENTS SECTION ==========
   const convertedPercentages = calculateBakersPercentages(result.converted);
   const ingredientGroups = groupIngredients(convertedPercentages, result.direction);
-  
-  // Build table data with section headers
-  const tableData: any[] = [];
+
+  // Section heading
+  doc.setFontSize(FONTS.headingSize);
+  doc.setFont(FONTS.serif, 'bold');
+  doc.setTextColor(60, 47, 35);
+  doc.text('Ingredients', margin, yPos);
+  yPos += 0.3;
+
+  // Render ingredients as bullet list
   ingredientGroups.forEach((group, groupIndex) => {
-    // Add section header row
-    tableData.push([
-      { content: group.section, colSpan: 3, styles: { 
-        fillColor: [248, 245, 240],
-        fontStyle: 'bold',
-        fontSize: FONTS.bodySize,
-        textColor: [60, 47, 35]
-      }}
-    ]);
-    
-    // Add ingredients in this section
+    // Check if we need a new page
+    if (yPos > pageHeight - 2) {
+      doc.addPage();
+      yPos = topMargin;
+    }
+
+    // Group subheading (bold)
+    doc.setFontSize(FONTS.bodySize);
+    doc.setFont(FONTS.serif, 'bold');
+    doc.setTextColor(60, 47, 35);
+    doc.text(group.section, margin, yPos);
+    yPos += 0.25;
+
+    // Ingredients in this group
+    doc.setFont(FONTS.serif, 'normal');
+    doc.setTextColor(0, 0, 0);
     group.ingredients.forEach(item => {
-      tableData.push([
-        item.ingredient,
-        `${item.amount.toFixed(0)}g`,
-        `${item.percentage.toFixed(0)}%`
-      ]);
+      // Check if we need a new page
+      if (yPos > pageHeight - 1) {
+        doc.addPage();
+        yPos = topMargin;
+      }
+
+      // Bullet point (●)
+      doc.text('●', margin + 0.1, yPos);
+
+      // Ingredient name and amount
+      const ingredientText = `${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`;
+      const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.4);
+      ingredientLines.forEach((line: string) => {
+        doc.text(line, margin + 0.3, yPos);
+        yPos += 0.18;
+      });
     });
+
+    yPos += 0.15; // Space between groups
   });
-  
-  autoTable(doc, {
-    startY: yPos,
-    head: [['Ingredient', 'Amount', "Baker's %"]],
-    body: tableData,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [255, 253, 248],
-      textColor: [60, 47, 35],
-      fontStyle: 'bold',
-      fontSize: FONTS.subtitleSize,
-      halign: 'left'
-    },
-    bodyStyles: {
-      fontSize: FONTS.bodySize,
-      textColor: [0, 0, 0]
-    },
-    alternateRowStyles: {
-      fillColor: [248, 245, 240]
-    },
-    columnStyles: {
-      0: { cellWidth: contentWidth * 0.5 },
-      1: { cellWidth: contentWidth * 0.25, halign: 'right' },
-      2: { cellWidth: contentWidth * 0.25, halign: 'right' }
-    },
-    margin: { left: margin, right: margin }
-  });
-  
-  yPos = (doc as any).lastAutoTable.finalY + 0.3;
-  
-  // Total Hydration (after table)
+
+  // Total Hydration (after ingredients)
   doc.setFontSize(FONTS.bodySize);
-  doc.setFont(FONTS.sans, 'bold');
+  doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
   doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin, yPos);
   yPos += 0.4;
@@ -188,13 +202,13 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
     doc.addPage();
     yPos = topMargin;
   }
-  
+
   doc.setFontSize(FONTS.headingSize);
   doc.setFont(FONTS.serif, 'bold');
   doc.setTextColor(60, 47, 35);
-  doc.text('METHOD', margin, yPos);
-  yPos += 0.25;
-  
+  doc.text('Method', margin, yPos);
+  yPos += 0.3;
+
   doc.setFontSize(FONTS.bodySize);
   result.methodChanges.forEach((change, index) => {
     // Check if we need a new page
@@ -202,16 +216,16 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
       doc.addPage();
       yPos = topMargin;
     }
-    
-    // Step label (bold)
-    doc.setFont(FONTS.sans, 'bold');
+
+    // Step label (bold) - using serif for consistency
+    doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(0, 0, 0);
     const stepLabel = change.step; // Already includes number from template
     doc.text(stepLabel, margin, yPos);
     yPos += 0.2;
-    
-    // Step content (regular)
-    doc.setFont(FONTS.sans, 'normal');
+
+    // Step content (serif for readability)
+    doc.setFont(FONTS.serif, 'normal');
     const changeLines = doc.splitTextToSize(change.change, contentWidth);
     changeLines.forEach((line: string) => {
       if (yPos > pageHeight - 1) {
@@ -221,18 +235,18 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
       doc.text(line, margin, yPos);
       yPos += 0.18;
     });
-    
-    // Timing if available
+
+    // Timing if available (italicized, as per spec)
     if (change.timing) {
-      doc.setFont(FONTS.sans, 'italic');
+      doc.setFont(FONTS.serif, 'italic');
       doc.setTextColor(100, 100, 100);
       doc.text(`⏱ ${change.timing}`, margin + 0.1, yPos);
       yPos += 0.18;
     }
-    
-    yPos += 0.15; // Space between steps
+
+    yPos += 0.2; // Space between steps
   });
-  
+
   yPos += 0.2;
   
   // ========== 5. TROUBLESHOOTING / TIPS ==========
@@ -252,35 +266,38 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
     doc.rect(margin, boxStartY, contentWidth, boxHeight, 'FD');
     
     yPos += 0.15;
-    
+
     // Title
-    doc.setFontSize(FONTS.subtitleSize);
+    doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text("BAKER'S NOTES", margin + 0.15, yPos);
+    doc.text("Notes", margin + 0.15, yPos);
     yPos += 0.25;
-    
+
     // Tips
     doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.sans, 'normal');
+    doc.setFont(FONTS.serif, 'normal');
     doc.setTextColor(0, 0, 0);
-    
+
     result.troubleshootingTips.slice(0, 4).forEach(tip => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
         yPos = topMargin;
       }
-      
-      // Bullet with checkmark
-      doc.text('✓', margin + 0.15, yPos);
-      
+
+      // Bullet point (●)
+      doc.text('●', margin + 0.15, yPos);
+
       // Issue (bold)
-      doc.setFont(FONTS.sans, 'bold');
-      doc.text(tip.issue, margin + 0.3, yPos);
-      yPos += 0.18;
-      
+      doc.setFont(FONTS.serif, 'bold');
+      const issueLines = doc.splitTextToSize(tip.issue, contentWidth - 0.3);
+      issueLines.forEach((line: string) => {
+        doc.text(line, margin + 0.3, yPos);
+        yPos += 0.18;
+      });
+
       // Solution (regular)
-      doc.setFont(FONTS.sans, 'normal');
+      doc.setFont(FONTS.serif, 'normal');
       const solutionLines = doc.splitTextToSize(tip.solution, contentWidth - 0.3);
       solutionLines.forEach((line: string) => {
         if (yPos > pageHeight - 1) {
@@ -290,8 +307,8 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
         doc.text(line, margin + 0.3, yPos);
         yPos += 0.18;
       });
-      
-      yPos += 0.1;
+
+      yPos += 0.15;
     });
     
     yPos += 0.2;
@@ -314,41 +331,44 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
     doc.rect(margin, boxStartY, contentWidth, boxHeight, 'FD');
     
     yPos += 0.15;
-    
+
     // Title
-    doc.setFontSize(FONTS.subtitleSize);
+    doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.serif, 'bold');
     doc.setTextColor(60, 47, 35);
-    doc.text('SUBSTITUTIONS', margin + 0.15, yPos);
+    doc.text('Substitutions', margin + 0.15, yPos);
     yPos += 0.25;
-    
+
     doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.sans, 'normal');
+    doc.setFont(FONTS.serif, 'normal');
     doc.setTextColor(0, 0, 0);
-    
+
     result.substitutions.slice(0, 4).forEach(sub => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
         yPos = topMargin;
       }
-      
+
+      // Bullet point (●)
+      doc.text('●', margin + 0.15, yPos);
+
       // Original → Substitute (bold)
-      doc.setFont(FONTS.sans, 'bold');
-      doc.text(`• ${sub.original} → ${sub.substitute}`, margin + 0.15, yPos);
+      doc.setFont(FONTS.serif, 'bold');
+      doc.text(`${sub.original} → ${sub.substitute}`, margin + 0.3, yPos);
       yPos += 0.18;
-      
+
       // Ratio and notes
-      doc.setFont(FONTS.sans, 'normal');
-      doc.text(`  Ratio: ${sub.ratio}`, margin + 0.3, yPos);
+      doc.setFont(FONTS.serif, 'normal');
+      doc.text(`Ratio: ${sub.ratio}`, margin + 0.3, yPos);
       yPos += 0.15;
-      
+
       const notesLines = doc.splitTextToSize(sub.notes, contentWidth - 0.45);
       notesLines.slice(0, 2).forEach((line: string) => {
         doc.text(line, margin + 0.3, yPos);
         yPos += 0.15;
       });
-      
-      yPos += 0.1;
+
+      yPos += 0.15;
     });
     
     yPos += 0.2;
@@ -390,12 +410,21 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
   // Footer text
   doc.setFontSize(FONTS.footerSize);
   doc.setFont(FONTS.sans, 'normal');
-  doc.setTextColor(136, 136, 136);
+  doc.setTextColor(170, 170, 170); // Light grey
   doc.text(
-    'Recipe conversion powered by Bread Buddy Converter • BakingGreatBread.com',
+    'Converted with Bread Buddy • BakingGreatBread.com',
     pageWidth / 2,
     footerY,
     { align: 'center' }
+  );
+
+  // Page number
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  doc.text(
+    `Page ${pageCount}`,
+    pageWidth - margin,
+    footerY,
+    { align: 'right' }
   );
   
   // Generate filename
