@@ -45,7 +45,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
   const handleDownloadPDF = () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
-    generatePDF(result, name);
+    generatePDF(result, name, recipeDescription || '');
   };
 
   const handleSaveRecipe = () => {

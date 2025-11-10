@@ -62,7 +62,7 @@ function groupIngredients(percentages: BakersPercentage[], direction: string): I
   }
 }
 
-export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Converted Recipe') {
+export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Converted Recipe', recipeDescription: string = '') {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'in',
@@ -109,8 +109,15 @@ export function generatePDF(result: ConvertedRecipe, recipeName: string = 'Conve
   yPos += 0.4;
   
   // ========== 2. INTRO / DESCRIPTION BLOCK ==========
-  // Optional - could be added if we have description field in future
-  // For now, skip to ingredients
+  // Add description if provided
+  if (recipeDescription) {
+    doc.setFontSize(FONTS.bodySize);
+    doc.setFont(FONTS.sans, 'italic');
+    doc.setTextColor(102, 102, 102); // Gray text
+    const descLines = doc.splitTextToSize(recipeDescription, contentWidth);
+    doc.text(descLines, pageWidth / 2, yPos, { align: 'center' });
+    yPos += (descLines.length * 0.15) + 0.3;
+  }
   
   // ========== 3. INGREDIENTS TABLE ==========
   const convertedPercentages = calculateBakersPercentages(result.converted);

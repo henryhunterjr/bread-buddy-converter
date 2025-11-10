@@ -7,6 +7,7 @@ import { convertSourdoughToYeast, convertYeastToSourdough } from '@/utils/recipe
 import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
 import { supabase } from '@/integrations/supabase/client';
+import { extractRecipeInfo } from '@/utils/titleExtractor';
 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output';
 
@@ -37,36 +38,18 @@ const Index = () => {
       ingredientCount: parsed.ingredients.length
     });
     
-    // Extract recipe name and description from first lines
-    const lines = recipeText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    const firstLine = lines[0] || 'Converted Recipe';
+    // Extract recipe name and description using proper validation
+    const { title, description } = extractRecipeInfo(recipeText);
     
-    // Split first line at first sentence ending (period, exclamation, or question mark)
-    const sentenceMatch = firstLine.match(/^([^.!?]+[.!?])\s*(.*)$/);
-    let extractedName: string;
-    let extractedDescription: string;
-    
-    if (sentenceMatch) {
-      // If we found a sentence ending, split there
-      extractedName = sentenceMatch[1].trim();
-      extractedDescription = sentenceMatch[2].trim();
-    } else {
-      // If no sentence ending, use the whole first line as title
-      extractedName = firstLine;
-      extractedDescription = '';
-    }
-    
-    // If description is still empty, try to grab the second line
-    if (!extractedDescription && lines.length > 1) {
-      extractedDescription = lines.slice(1, 4).join(' '); // Take up to 3 more lines
-    }
+    console.log('Extracted title:', title);
+    console.log('Extracted description:', description);
     
     // Show confirmation screen before converting
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(parsed.ingredients);
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });
-    setRecipeName(extractedName);
-    setRecipeDescription(extractedDescription);
+    setRecipeName(title);
+    setRecipeDescription(description);
     setScreen('confirmation');
   };
 
