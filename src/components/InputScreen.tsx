@@ -4,13 +4,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image, Info } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image, Info, Sparkles } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { extractTextFromFile } from '@/utils/fileExtractor';
 import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';
-import { ConvertedRecipe } from '@/types/recipe';
+import { ConvertedRecipe, ParsedRecipe } from '@/types/recipe';
 import { 
   Select, 
   SelectContent, 
@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
@@ -45,7 +46,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAIParsing, setIsAIParsing] = useState(false);
   const [starterHydration, setStarterHydration] = useState(100);
+  const [aiParseAvailable, setAiParseAvailable] = useState(false);
   const { toast } = useToast();
   
   // Detect if recipe contains starter/levain
@@ -101,20 +104,110 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
     }
   };
 
-  const handleConvert = () => {
+  const parseWithAI = async (): Promise<ParsedRecipe | null> => {
+    setIsAIParsing(true);
+    setErrors([]);
+
     try {
+      const { data, error } = await supabase.functions.invoke('ai-parse-recipe', {
+        body: { 
+          recipeText, 
+          starterHydration 
+        }
+      });
+
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || 'AI parsing failed');
+      }
+
+      toast({
+        title: "AI parsing successful",
+        description: "Recipe parsed using AI - please review the results",
+        duration: 3000,
+      });
+
+      return data.recipe;
+    } catch (error) {
+      console.error('AI parse error:', error);
+      toast({
+        title: "AI parsing failed",
+        description: error instanceof Error ? error.message : 'Could not parse recipe with AI',
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsAIParsing(false);
+    }
+  };
+
+  const handleConvert = async () => {
+    setIsProcessing(true);
+    setAiParseAvailable(false);
+    
+    try {
+      // Try regex parsing first
       const parsed = parseRecipe(recipeText, starterHydration);
       const validationErrors = validateRecipe(parsed);
       
+      // Check if flour was found
+      const hasFlour = parsed.totalFlour > 0;
+      
+      if (!hasFlour) {
+        // No flour detected - automatically try AI parsing
+        toast({
+          title: "No flour detected",
+          description: "Trying AI-powered parsing...",
+          duration: 2000,
+        });
+        
+        const aiParsed = await parseWithAI();
+        if (aiParsed) {
+          // Validate AI-parsed result
+          const aiValidationErrors = validateRecipe(aiParsed);
+          if (aiValidationErrors.length > 0) {
+            setErrors(aiValidationErrors);
+            return;
+          }
+          
+          // AI parsing succeeded - manually trigger conversion with AI-parsed data
+          // We need to update the recipeText to reflect the AI understanding
+          setErrors([]);
+          onConvert(recipeText, starterHydration);
+        } else {
+          setErrors(['Could not find flour in the recipe. Please check the format and try again.']);
+          setAiParseAvailable(true);
+        }
+        return;
+      }
+      
       if (validationErrors.length > 0) {
         setErrors(validationErrors);
+        setAiParseAvailable(true); // Allow manual AI retry
         return;
       }
 
       setErrors([]);
       onConvert(recipeText, starterHydration);
     } catch (error) {
-      setErrors(['Could not parse recipe. Please check the format and try again.']);
+      setErrors(['Could not parse recipe. Please check the format.']);
+      setAiParseAvailable(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleManualAIParse = async () => {
+    const aiParsed = await parseWithAI();
+    if (aiParsed) {
+      const aiValidationErrors = validateRecipe(aiParsed);
+      if (aiValidationErrors.length === 0) {
+        setErrors([]);
+        onConvert(recipeText, starterHydration);
+      } else {
+        setErrors(aiValidationErrors);
+      }
     }
   };
 
@@ -255,13 +348,27 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
                     </Alert>
                   )}
 
-                  <Button 
-                    onClick={handleConvert} 
-                    className="w-full"
-                    disabled={!recipeText.trim() || isProcessing}
-                  >
-                    Convert Recipe
-                  </Button>
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={handleConvert} 
+                      className="w-full"
+                      disabled={!recipeText.trim() || isProcessing || isAIParsing}
+                    >
+                      {isProcessing ? 'Processing...' : 'Convert Recipe'}
+                    </Button>
+                    
+                    {aiParseAvailable && (
+                      <Button 
+                        onClick={handleManualAIParse}
+                        variant="outline"
+                        className="w-full"
+                        disabled={!recipeText.trim() || isAIParsing}
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        {isAIParsing ? 'Parsing with AI...' : 'Try AI Parser'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
             </div>

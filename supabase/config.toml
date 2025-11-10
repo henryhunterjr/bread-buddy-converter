@@ -1,0 +1,4 @@
+project_id = "uarkvbjvpzgdkizhkbhd"
+
+[functions.ai-parse-recipe]
+verify_jwt = false
