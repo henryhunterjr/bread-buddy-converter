@@ -3,6 +3,9 @@ export interface ParsedIngredient {
   amount: number;
   unit: string;
   type: 'flour' | 'liquid' | 'starter' | 'yeast' | 'salt' | 'fat' | 'enrichment' | 'sweetener' | 'other';
+  confidence?: 'high' | 'medium' | 'low';
+  source?: 'regex' | 'ai' | 'corrected' | 'estimated';
+  aiSuggestion?: string;
 }
 
 export interface ParsedRecipe {
@@ -14,6 +17,9 @@ export interface ParsedRecipe {
   yeastAmount: number;
   saltAmount: number;
   hydration: number;
+  parserUsed?: 'regex' | 'ai' | 'hybrid';
+  confidence?: number; // 0-100
+  corrections?: string[];
 }
 
 export interface ConvertedRecipe {

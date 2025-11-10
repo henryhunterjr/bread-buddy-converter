@@ -2,3 +2,9 @@ project_id = "uarkvbjvpzgdkizhkbhd"
 
 [functions.ai-parse-recipe]
 verify_jwt = false
+
+[functions.ai-validate-recipe]
+verify_jwt = false
+
+[functions.log-correction]
+verify_jwt = false

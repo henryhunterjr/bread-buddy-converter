@@ -6,6 +6,7 @@ import { parseRecipe } from '@/utils/recipeParser';
 import { convertSourdoughToYeast, convertYeastToSourdough } from '@/utils/recipeConverter';
 import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
+import { supabase } from '@/integrations/supabase/client';
 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output';
 
@@ -69,7 +70,47 @@ const Index = () => {
     setScreen('confirmation');
   };
 
-  const handleConfirmIngredients = (confirmedIngredients: ParsedIngredient[]) => {
+  const handleConfirmIngredients = async (confirmedIngredients: ParsedIngredient[]) => {
+    // Detect if user made corrections
+    const userCorrections = confirmedIngredients
+      .map((confirmed, idx) => {
+        const original = extractedIngredients[idx];
+        if (!original) return null;
+        
+        const changes = [];
+        if (confirmed.amount !== original.amount) {
+          changes.push({ field: 'amount', from: original.amount, to: confirmed.amount });
+        }
+        if (confirmed.type !== original.type) {
+          changes.push({ field: 'type', from: original.type, to: confirmed.type });
+        }
+        if (confirmed.name !== original.name) {
+          changes.push({ field: 'name', from: original.name, to: confirmed.name });
+        }
+        
+        return changes.length > 0 ? { name: confirmed.name, changes } : null;
+      })
+      .filter(Boolean);
+    
+    // Log corrections for learning if any were made
+    if (userCorrections.length > 0) {
+      console.log('User made corrections:', userCorrections);
+      
+      // Send to learning system (non-blocking)
+      supabase.functions.invoke('log-correction', {
+        body: {
+          recipeText: originalRecipeText,
+          originalParsed: parsedRecipeForConfirmation,
+          correctedIngredients: confirmedIngredients,
+          userCorrections,
+          timestamp: new Date().toISOString()
+        }
+      }).then(({ data, error }) => {
+        if (error) console.error('Failed to log correction:', error);
+        else console.log('✓ Correction logged for learning:', data?.correctionId);
+      });
+    }
+    
     // Update the parsed recipe with confirmed ingredients
     const updatedRecipe = {
       ...parsedRecipeForConfirmation,

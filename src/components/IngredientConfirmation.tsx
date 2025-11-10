@@ -3,7 +3,14 @@ import { ParsedIngredient } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Pencil, Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Pencil, Check, AlertCircle, CheckCircle, HelpCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface IngredientConfirmationProps {
   ingredients: ParsedIngredient[];
@@ -19,6 +26,73 @@ export function IngredientConfirmation({
   const [editMode, setEditMode] = useState(false);
   const [edited, setEdited] = useState(ingredients);
 
+  // Calculate confidence statistics
+  const confidenceStats = {
+    high: ingredients.filter(i => i.confidence === 'high').length,
+    medium: ingredients.filter(i => i.confidence === 'medium').length,
+    low: ingredients.filter(i => i.confidence === 'low').length,
+    estimated: ingredients.filter(i => i.source === 'estimated').length
+  };
+
+  const getConfidenceBadge = (ingredient: ParsedIngredient) => {
+    if (ingredient.source === 'estimated') {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-700 border-yellow-500/20">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Estimated
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-sm max-w-xs">
+                This ingredient was not found in the recipe. A standard amount has been added - please verify.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (ingredient.confidence === 'low') {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-700 border-orange-500/20">
+                <HelpCircle className="h-3 w-3 mr-1" />
+                Low confidence
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-sm max-w-xs">
+                {ingredient.aiSuggestion || "Please verify this ingredient's amount and type."}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (ingredient.confidence === 'medium') {
+      return (
+        <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/20">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Medium
+        </Badge>
+      );
+    }
+
+    // High confidence or no confidence info
+    return (
+      <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 border-green-500/20">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        High
+      </Badge>
+    );
+  };
+
   const updateIngredient = (index: number, field: 'name' | 'amount', value: string | number) => {
     const updated = [...edited];
     updated[index] = { ...updated[index], [field]: value };
@@ -26,17 +100,57 @@ export function IngredientConfirmation({
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-background rounded-lg shadow-lg border">
-      <Alert className="mb-6">
+    <div className="max-w-3xl mx-auto p-6 bg-background rounded-lg shadow-lg border">
+      <Alert className="mb-4">
         <AlertDescription>
           <strong>Review extracted ingredients:</strong> I found these from your recipe. 
-          Click "Looks Good" to continue, or edit any values that seem wrong.
+          {confidenceStats.low > 0 || confidenceStats.estimated > 0 ? (
+            <span className="text-orange-600 font-medium">
+              {' '}Please verify {confidenceStats.low + confidenceStats.estimated} ingredient(s) marked with warnings.
+            </span>
+          ) : (
+            <span> All ingredients detected with high confidence!</span>
+          )}
         </AlertDescription>
       </Alert>
 
+      {/* Confidence Summary */}
+      {(confidenceStats.low > 0 || confidenceStats.medium > 0 || confidenceStats.estimated > 0) && (
+        <div className="flex items-center gap-2 mb-4 p-3 bg-muted/50 rounded-md border text-sm">
+          <span className="text-muted-foreground">Confidence:</span>
+          {confidenceStats.high > 0 && (
+            <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
+              {confidenceStats.high} High
+            </Badge>
+          )}
+          {confidenceStats.medium > 0 && (
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
+              {confidenceStats.medium} Medium
+            </Badge>
+          )}
+          {confidenceStats.low > 0 && (
+            <Badge variant="outline" className="bg-orange-500/10 text-orange-700 border-orange-500/20">
+              {confidenceStats.low} Low
+            </Badge>
+          )}
+          {confidenceStats.estimated > 0 && (
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-700 border-yellow-500/20">
+              {confidenceStats.estimated} Estimated
+            </Badge>
+          )}
+        </div>
+      )}
+
       <div className="space-y-3 mb-6">
         {edited.map((ing, idx) => (
-          <div key={idx} className="flex items-center gap-3 p-3 bg-muted rounded">
+          <div 
+            key={idx} 
+            className={`flex items-center gap-3 p-3 rounded transition-colors ${
+              ing.confidence === 'low' || ing.source === 'estimated'
+                ? 'bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900'
+                : 'bg-muted border border-transparent'
+            }`}
+          >
             {editMode ? (
               <>
                 <Input
@@ -51,6 +165,9 @@ export function IngredientConfirmation({
                   onChange={(e) => updateIngredient(idx, 'name', e.target.value)}
                   className="flex-1"
                 />
+                <span className="text-xs text-muted-foreground bg-muted-foreground/10 px-2 py-1 rounded">
+                  {ing.type}
+                </span>
               </>
             ) : (
               <>
@@ -61,6 +178,7 @@ export function IngredientConfirmation({
                 <span className="text-xs text-muted-foreground bg-muted-foreground/10 px-2 py-1 rounded">
                   {ing.type}
                 </span>
+                {getConfidenceBadge(ing)}
               </>
             )}
           </div>

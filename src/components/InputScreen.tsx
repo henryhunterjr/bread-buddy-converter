@@ -105,9 +105,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
   };
 
   const parseWithAI = async (): Promise<ParsedRecipe | null> => {
-    setIsAIParsing(true);
-    setErrors([]);
-
     try {
       const { data, error } = await supabase.functions.invoke('ai-parse-recipe', {
         body: { 
@@ -117,28 +114,54 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       });
 
       if (error) throw error;
-
-      if (!data.success) {
-        throw new Error(data.error || 'AI parsing failed');
-      }
-
-      toast({
-        title: "AI parsing successful",
-        description: "Recipe parsed using AI - please review the results",
-        duration: 3000,
-      });
+      if (!data.success) throw new Error(data.error || 'AI parsing failed');
 
       return data.recipe;
     } catch (error) {
       console.error('AI parse error:', error);
-      toast({
-        title: "AI parsing failed",
-        description: error instanceof Error ? error.message : 'Could not parse recipe with AI',
-        variant: "destructive",
-      });
       return null;
-    } finally {
-      setIsAIParsing(false);
+    }
+  };
+
+  const validateAndCombine = async (
+    regexResult: ParsedRecipe, 
+    aiResult: ParsedRecipe
+  ): Promise<ParsedRecipe> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-validate-recipe', {
+        body: {
+          regexParsed: regexResult,
+          aiParsed: aiResult,
+          recipeText,
+          starterHydration
+        }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error('Validation failed');
+
+      console.log('✓ Validation complete:', {
+        confidence: data.validatedRecipe.confidence,
+        parserUsed: data.validatedRecipe.parserUsed,
+        improvements: data.improvements
+      });
+
+      if (data.improvements?.length > 0) {
+        toast({
+          title: "Recipe validated",
+          description: data.improvements[0],
+          duration: 3000,
+        });
+      }
+
+      return data.validatedRecipe;
+    } catch (error) {
+      console.error('Validation error:', error);
+      // Fallback: prefer AI if regex failed to find flour
+      if (regexResult.totalFlour === 0 && aiResult.totalFlour > 0) {
+        return { ...aiResult, parserUsed: 'ai', confidence: 70 };
+      }
+      return { ...regexResult, parserUsed: 'regex', confidence: 60 };
     }
   };
 
@@ -147,49 +170,68 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
     setAiParseAvailable(false);
     
     try {
-      // Try regex parsing first
-      const parsed = parseRecipe(recipeText, starterHydration);
-      const validationErrors = validateRecipe(parsed);
+      console.log('=== DUAL PARSER MODE ===');
       
-      // Check if flour was found
-      const hasFlour = parsed.totalFlour > 0;
-      
-      if (!hasFlour) {
-        // No flour detected - automatically try AI parsing
+      // ALWAYS run both parsers in parallel
+      const [regexResult, aiResult] = await Promise.all([
+        Promise.resolve(parseRecipe(recipeText, starterHydration)),
+        parseWithAI()
+      ]);
+
+      console.log('Regex result:', {
+        flour: regexResult.totalFlour,
+        hydration: regexResult.hydration,
+        ingredients: regexResult.ingredients.length
+      });
+      console.log('AI result:', {
+        flour: aiResult?.totalFlour,
+        hydration: aiResult?.hydration,
+        ingredients: aiResult?.ingredients.length
+      });
+
+      // If AI parsing failed, fall back to regex only
+      if (!aiResult) {
         toast({
-          title: "No flour detected",
-          description: "Trying AI-powered parsing...",
-          duration: 2000,
+          title: "Using regex parser",
+          description: "AI validation unavailable",
+          variant: "default"
         });
         
-        const aiParsed = await parseWithAI();
-        if (aiParsed) {
-          // Validate AI-parsed result
-          const aiValidationErrors = validateRecipe(aiParsed);
-          if (aiValidationErrors.length > 0) {
-            setErrors(aiValidationErrors);
-            return;
-          }
-          
-          // AI parsing succeeded - pass the pre-parsed data to skip re-parsing
-          setErrors([]);
-          onConvert(recipeText, starterHydration, aiParsed);
-        } else {
-          setErrors(['Could not find flour in the recipe. Please check the format and try again.']);
-          setAiParseAvailable(true);
+        const validationErrors = validateRecipe(regexResult);
+        if (validationErrors.length > 0) {
+          setErrors(validationErrors);
+          return;
         }
+        
+        onConvert(recipeText, starterHydration, {
+          ...regexResult,
+          parserUsed: 'regex',
+          confidence: 70
+        });
         return;
       }
+
+      // Both parsers succeeded - validate and combine
+      toast({
+        title: "Validating recipe...",
+        description: "Comparing regex and AI results",
+        duration: 2000,
+      });
+
+      const validated = await validateAndCombine(regexResult, aiResult);
       
+      const validationErrors = validateRecipe(validated);
       if (validationErrors.length > 0) {
         setErrors(validationErrors);
-        setAiParseAvailable(true); // Allow manual AI retry
+        setAiParseAvailable(true);
         return;
       }
 
       setErrors([]);
-      onConvert(recipeText, starterHydration);
+      onConvert(recipeText, starterHydration, validated);
+      
     } catch (error) {
+      console.error('Parsing error:', error);
       setErrors(['Could not parse recipe. Please check the format.']);
       setAiParseAvailable(true);
     } finally {
@@ -198,12 +240,19 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
   };
 
   const handleManualAIParse = async () => {
+    setIsAIParsing(true);
     const aiParsed = await parseWithAI();
+    setIsAIParsing(false);
+    
     if (aiParsed) {
       const aiValidationErrors = validateRecipe(aiParsed);
       if (aiValidationErrors.length === 0) {
         setErrors([]);
-        onConvert(recipeText, starterHydration, aiParsed);
+        onConvert(recipeText, starterHydration, {
+          ...aiParsed,
+          parserUsed: 'ai',
+          confidence: 80
+        });
       } else {
         setErrors(aiValidationErrors);
       }

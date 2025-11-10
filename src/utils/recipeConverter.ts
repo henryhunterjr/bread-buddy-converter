@@ -31,6 +31,7 @@ import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@
 import { generateBakerWarnings, detectSpecialTechniques } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
+import { generateSmartWarnings } from './smartWarnings';
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
@@ -175,12 +176,14 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   ];
 
   const warnings = generateBakerWarnings(converted);
+  const smartWarnings = generateSmartWarnings(recipe);
+  const allWarnings = [...smartWarnings, ...warnings];
   const substitutions = generateSubstitutions(converted);
   
   // Add special technique warnings if original recipe text provided
   if (originalRecipeText) {
     const techniqueWarnings = detectSpecialTechniques(originalRecipeText);
-    warnings.unshift(...techniqueWarnings);
+    allWarnings.unshift(...techniqueWarnings);
   }
 
   return {
@@ -189,7 +192,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     direction: 'sourdough-to-yeast',
     methodChanges,
     troubleshootingTips,
-    warnings,
+    warnings: allWarnings,
     substitutions
   };
 }
@@ -537,12 +540,14 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   }
 
   const warnings = generateBakerWarnings(converted);
+  const smartWarnings = generateSmartWarnings(recipe);
+  const allWarnings = [...smartWarnings, ...warnings];
   const substitutions = generateSubstitutions(converted);
   
   // Add special technique warnings if original recipe text provided
   if (originalRecipeText) {
     const techniqueWarnings = detectSpecialTechniques(originalRecipeText);
-    warnings.unshift(...techniqueWarnings);
+    allWarnings.unshift(...techniqueWarnings);
   }
 
   return {
@@ -551,7 +556,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     direction: 'yeast-to-sourdough',
     methodChanges,
     troubleshootingTips,
-    warnings,
+    warnings: allWarnings,
     substitutions
   };
 }
