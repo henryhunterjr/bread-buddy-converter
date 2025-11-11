@@ -68,6 +68,15 @@ const Index = () => {
     console.log('Extracted description:', description);
     
     // Show confirmation screen before converting
+    // CRITICAL: These are the ORIGINAL parsed ingredients, NOT converted ingredients
+    // No starter decomposition should happen here - that happens after confirmation
+    console.log('=== INGREDIENTS FOR CONFIRMATION SCREEN ===');
+    console.log('Showing', parsed.ingredients.length, 'original ingredients to user:');
+    parsed.ingredients.forEach((ing, idx) => {
+      console.log(`  ${idx + 1}. ${ing.amount}g ${ing.name} [${ing.type}]`);
+    });
+    console.log('=== (No conversion has happened yet) ===');
+    
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(parsed.ingredients);
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });

@@ -224,8 +224,9 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   
   // STEP 2: Separate ingredients by category
   // Use WORKING PATTERN from convertSourdoughToYeast: filter OUT what we don't want
+  // CRITICAL: Also filter out any existing starter to prevent duplication
   const nonFlourLiquidYeastIngredients = recipe.ingredients.filter(
-    i => i.type !== 'flour' && i.type !== 'liquid' && i.type !== 'yeast'
+    i => i.type !== 'flour' && i.type !== 'liquid' && i.type !== 'yeast' && i.type !== 'starter'
   );
   
   console.log('After filter (should include salt + egg):', nonFlourLiquidYeastIngredients.map(i => 
