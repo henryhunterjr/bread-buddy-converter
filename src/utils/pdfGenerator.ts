@@ -98,6 +98,13 @@ function groupIngredients(percentages: BakersPercentage[], direction: string): I
   }
 }
 
+/**
+ * Mobile detection helper
+ */
+function isMobileDevice(): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 export function generatePDF(
   result: ConvertedRecipe,
   recipeName: string = 'Converted Recipe',
@@ -488,6 +495,50 @@ export function generatePDF(
   const conversionType = result.direction === 'sourdough-to-yeast' ? 'SourdoughToYeast' : 'YeastToSourdough';
   const filename = `${cleanName}_BreadBuddy_${conversionType}.pdf`;
   
-  // Save with UTF-8 encoding
-  doc.save(filename);
+  // Mobile-friendly download strategy
+  if (isMobileDevice()) {
+    // Get PDF as blob
+    const pdfBlob = doc.output('blob');
+    
+    // Strategy 1: Try native share API (best for mobile)
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], filename, { type: 'application/pdf' })] })) {
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+      navigator.share({
+        files: [file],
+        title: cleanRecipeName,
+        text: 'Recipe converted with Bread Buddy'
+      }).catch((error) => {
+        console.log('Share failed:', error);
+        // Fallback to opening in new tab
+        openPDFInNewTab(pdfBlob, filename);
+      });
+    } else {
+      // Strategy 2: Open in new tab with download attribute
+      openPDFInNewTab(pdfBlob, filename);
+    }
+  } else {
+    // Desktop: Use standard download
+    doc.save(filename);
+  }
+}
+
+/**
+ * Open PDF in new tab with download prompt (mobile fallback)
+ */
+function openPDFInNewTab(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.target = '_blank';
+  
+  // Trigger download
+  document.body.appendChild(link);
+  link.click();
+  
+  // Cleanup
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
 }

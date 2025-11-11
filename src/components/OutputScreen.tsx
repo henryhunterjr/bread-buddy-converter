@@ -47,7 +47,17 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
   const handleDownloadPDF = () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
-    generatePDF(result, name, recipeDescription || '');
+    
+    // Show loading state for mobile (PDF generation can take a moment)
+    toast({
+      title: "Generating PDF...",
+      description: "Please wait a moment",
+    });
+    
+    // Small delay to ensure toast shows
+    setTimeout(() => {
+      generatePDF(result, name, recipeDescription || '');
+    }, 100);
   };
 
   const handleSaveRecipe = () => {
