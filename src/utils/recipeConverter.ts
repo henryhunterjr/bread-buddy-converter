@@ -318,7 +318,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   }
   
   // Starter breakdown (100% hydration starter means 50% flour, 50% water)
-  const starterFlourContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Flour from active starter
+  const starterFlourContent = activeStarterWeight * (100 / (100 + starterHydration)); // Flour from active starter
   const starterWaterContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Water from active starter
   
   // Total flour and water in levain
