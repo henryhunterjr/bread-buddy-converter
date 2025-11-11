@@ -203,6 +203,22 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               </div>
             </div>
           )}
+
+          {/* Beta Testing Feedback Reminder */}
+          <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4 dark:bg-blue-950/20 dark:border-blue-800/30 print:hidden">
+            <div className="flex items-start gap-3">
+              <div className="text-lg">📝</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">
+                  Beta Testing Note
+                </h4>
+                <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                  How did this conversion look? Does the hydration make sense? 
+                  Reply to the email I sent you or post in the group with any feedback!
+                </p>
+              </div>
+            </div>
+          </div>
           
         {/* Warnings */}
           {result.warnings.length > 0 && (
