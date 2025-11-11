@@ -33,6 +33,13 @@ function cleanTextForPDF(text: string): string {
   if (!text) return '';
   
   return text
+    // HTML entities to regular characters
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x26;/g, '&')
+    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
     // Smart quotes to straight quotes
     .replace(/['']/g, "'")
     .replace(/[""]/g, '"')
