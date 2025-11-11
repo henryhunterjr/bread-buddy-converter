@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Check, AlertCircle, CheckCircle, HelpCircle } from 'lucide-react';
+import { Pencil, Check, AlertCircle, CheckCircle, HelpCircle, Mail } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -101,6 +101,25 @@ export function IngredientConfirmation({
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-background rounded-lg shadow-lg border">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-xs px-2 py-0.5">
+            BETA
+          </Badge>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          asChild
+          className="flex items-center gap-2"
+        >
+          <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Report Issue</span>
+          </a>
+        </Button>
+      </div>
+      
       <Alert className="mb-4">
         <AlertDescription>
           <strong>Review extracted ingredients:</strong> I found these from your recipe. 

@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { extractTextFromFile } from '@/utils/fileExtractor';
 import { useToast } from '@/hooks/use-toast';
@@ -276,16 +277,41 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <img src={logo} alt="Baking Great Bread" className="h-12 sm:h-14 md:h-16" />
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setShowSavedRecipes(!showSavedRecipes)}
-            className="flex items-center gap-2"
-          >
-            <Archive className="h-4 w-4" />
-            <span className="hidden sm:inline">Saved</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Baking Great Bread" className="h-12 sm:h-14 md:h-16" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-xs px-2 py-0.5 cursor-help">
+                  BETA
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>We're testing! Found a bug? Let us know.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              asChild
+              className="hidden sm:flex items-center gap-2"
+            >
+              <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+                <Mail className="h-4 w-4" />
+                <span className="hidden md:inline">Report Issue</span>
+              </a>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowSavedRecipes(!showSavedRecipes)}
+              className="flex items-center gap-2"
+            >
+              <Archive className="h-4 w-4" />
+              <span className="hidden sm:inline">Saved</span>
+            </Button>
+          </div>
         </div>
       </div>
       

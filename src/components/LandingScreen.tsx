@@ -1,5 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Mail } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import heroBanner from '@/assets/hero-banner.png';
 
@@ -24,9 +27,21 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
         <div className="max-w-4xl w-full space-y-4 md:space-y-6">
           <Card className="w-full p-5 md:p-8 space-y-4 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
             <div className="text-center space-y-3">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
-                Baking Great Bread at Home
-              </h1>
+              <div className="flex items-center justify-center gap-3">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
+                  Baking Great Bread at Home
+                </h1>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-sm px-3 py-1 cursor-help">
+                      BETA
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>We're testing! Found a bug? Let us know.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground font-serif">
                 Sourdough & Yeast Bread Recipe Converter
               </h2>
@@ -82,8 +97,23 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
         </div>
       </div>
       
-      <footer className="text-center py-6 text-xs text-muted-foreground bg-bread-earth/5 border-t border-bread-medium/20">
-        Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
+      <footer className="py-6 bg-bread-earth/5 border-t border-bread-medium/20">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
+          >
+            <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+              <Mail className="h-4 w-4 mr-2" />
+              Report an Issue
+            </a>
+          </Button>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
+        </p>
       </footer>
     </div>
   );

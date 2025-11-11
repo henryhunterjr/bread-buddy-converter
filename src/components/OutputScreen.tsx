@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/pdfGenerator';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -73,14 +74,36 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
       <div className="p-4 sm:p-6 border-b border-border print:border-0">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <img 
-              src={logo} 
-              alt="Baking Great Bread at Home" 
-              className="h-12 sm:h-14 md:h-16 print:h-12" 
-            />
+            <div className="flex items-center gap-3 print:gap-0">
+              <img 
+                src={logo} 
+                alt="Baking Great Bread at Home" 
+                className="h-12 sm:h-14 md:h-16 print:h-12" 
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-xs px-2 py-0.5 cursor-help print:hidden">
+                    BETA
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>We're testing! Found a bug? Let us know.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             
             {/* Action buttons - hidden from PDF and on small mobile */}
             <div className="hidden md:flex gap-2 print:hidden">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                asChild
+              >
+                <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Report Issue
+                </a>
+              </Button>
               <Button variant="outline" size="sm" onClick={onEditExtraction}>
                 Edit Extraction
               </Button>
