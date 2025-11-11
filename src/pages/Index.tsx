@@ -8,6 +8,9 @@ import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe'
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
 import { supabase } from '@/integrations/supabase/client';
 import { extractRecipeInfo } from '@/utils/titleExtractor';
+import { HelpModal } from '@/components/HelpModal';
+import { Button } from '@/components/ui/button';
+import { HelpCircle } from 'lucide-react';
 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output';
 
@@ -20,6 +23,7 @@ const Index = () => {
   const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<any>(null);
   const [recipeName, setRecipeName] = useState<string>('Converted Recipe');
   const [recipeDescription, setRecipeDescription] = useState<string>('');
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -202,6 +206,20 @@ const Index = () => {
 
   return (
     <>
+      {/* Global Help Button - visible on all screens */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setShowHelp(true)}
+        className="fixed top-4 right-4 z-50 bg-background/95 backdrop-blur shadow-lg border-bread-medium/30 hover:bg-bread-light/50 transition-all"
+      >
+        <HelpCircle className="h-4 w-4 mr-2" />
+        Help
+      </Button>
+
+      {/* Help Modal */}
+      <HelpModal open={showHelp} onOpenChange={setShowHelp} />
+
       {screen === 'landing' && (
         <LandingScreen onSelectDirection={handleSelectDirection} />
       )}
