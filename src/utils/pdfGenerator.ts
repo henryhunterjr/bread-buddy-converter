@@ -164,14 +164,14 @@ export function generatePDF(
   // ========== 2. INTRO / DESCRIPTION BLOCK ==========
   if (cleanDescription) {
     doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'normal');
-    doc.setTextColor(44, 44, 44);
+    doc.setFont(FONTS.main, 'italic');
+    doc.setTextColor(102, 102, 102); // #666666 - lighter for subtitle feel
     const descLines = doc.splitTextToSize(cleanDescription, contentWidth);
     descLines.forEach((line: string) => {
       doc.text(line, margin, yPos);
-      yPos += 0.2; // 1.5x line height
+      yPos += 0.2;
     });
-    yPos += 0.3;
+    yPos += 0.4;
   }
   
   // ========== 3. INGREDIENTS SECTION ==========
@@ -193,12 +193,12 @@ export function generatePDF(
       yPos = topMargin;
     }
 
-    // Group subheading (bold, slightly smaller)
+    // Group subheading (bold, larger)
     doc.setFontSize(FONTS.subheadingSize);
     doc.setFont(FONTS.main, 'bold');
     doc.setTextColor(44, 44, 44);
     doc.text(cleanTextForPDF(`For the ${group.section}`), margin, yPos);
-    yPos += 0.28;
+    yPos += 0.32;
 
     // Ingredients in this group
     doc.setFontSize(FONTS.bodySize);
@@ -211,24 +211,23 @@ export function generatePDF(
         yPos = topMargin;
       }
 
-      // Bullet point using circle character
-      doc.setFont(FONTS.main, 'normal');
-      doc.text('•', margin + 0.05, yPos);
+      // Simple bullet point (dash)
+      doc.text('-', margin, yPos);
 
-      // Ingredient name and amount
+      // Ingredient: amount (percentage)
       const ingredientText = cleanTextForPDF(`${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`);
-      const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.35);
+      const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.3);
       ingredientLines.forEach((line: string, idx: number) => {
-        doc.text(line, margin + 0.25, yPos);
+        doc.text(line, margin + 0.2, yPos);
         if (idx < ingredientLines.length - 1) {
-          yPos += 0.2; // 1.5x line height for wrapped lines
+          yPos += 0.18;
         }
       });
-      yPos += 0.22; // Extra spacing between items
+      yPos += 0.2;
     });
 
     // Extra space between groups
-    yPos += 0.15;
+    yPos += 0.2;
   });
 
   // Total Hydration
@@ -267,37 +266,39 @@ export function generatePDF(
       yPos = topMargin;
     }
 
-    // Step number and title (bold)
-    doc.setFont(FONTS.main, 'bold');
+    // Step number with title (bold title followed by colon)
+    doc.setFont(FONTS.main, 'normal');
     doc.setTextColor(44, 44, 44);
-    const stepLabel = cleanTextForPDF(`${index + 1}. ${change.step}`);
-    doc.text(stepLabel, margin, yPos);
-    yPos += 0.25;
+    const stepNumber = `${index + 1}. `;
+    doc.text(stepNumber, margin, yPos);
+    
+    // Step title in bold with colon
+    doc.setFont(FONTS.main, 'bold');
+    const stepTitle = cleanTextForPDF(`${change.step}:`);
+    const stepTitleWidth = doc.getTextWidth(stepNumber);
+    doc.text(stepTitle, margin + stepTitleWidth, yPos);
+    yPos += 0.22;
 
     // Step content (regular weight, full width)
     doc.setFont(FONTS.main, 'normal');
-    const changeLines = doc.splitTextToSize(cleanTextForPDF(change.change), contentWidth);
+    let changeText = cleanTextForPDF(change.change);
+    
+    // If timing exists, integrate it into the text naturally
+    if (change.timing) {
+      changeText += ` (${cleanTextForPDF(change.timing)})`;
+    }
+    
+    const changeLines = doc.splitTextToSize(changeText, contentWidth);
     changeLines.forEach((line: string) => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
         yPos = topMargin;
       }
       doc.text(line, margin, yPos);
-      yPos += 0.2; // 1.5x line spacing
+      yPos += 0.18;
     });
 
-    // Timing if available (italic, lighter)
-    if (change.timing) {
-      yPos += 0.05;
-      doc.setFont(FONTS.main, 'italic');
-      doc.setFontSize(FONTS.timingSize);
-      doc.setTextColor(102, 102, 102); // #666666
-      doc.text(cleanTextForPDF(`Timing: ${change.timing}`), margin, yPos);
-      doc.setFontSize(FONTS.bodySize); // Reset to body size
-      yPos += 0.2;
-    }
-
-    yPos += 0.2; // Space between steps
+    yPos += 0.25; // Space between steps
   });
 
   yPos += 0.2;
@@ -311,64 +312,42 @@ export function generatePDF(
   // ========== 5. BAKER'S NOTES ==========
   if (result.troubleshootingTips.length > 0) {
     // Check if we need a new page
-    if (yPos > pageHeight - 2.5) {
+    if (yPos > pageHeight - 2) {
       doc.addPage();
       yPos = topMargin;
     }
-    
-    // Calculate box height dynamically
-    const estimatedHeight = Math.min(3, result.troubleshootingTips.length * 0.5 + 0.5);
-    const boxStartY = yPos - 0.15;
-    const boxHeight = Math.min(estimatedHeight, pageHeight - yPos - 0.5);
-    
-    // Draw shaded background box
-    doc.setFillColor(249, 249, 249); // #f9f9f9
-    doc.setDrawColor(230, 230, 230); // #e6e6e6
-    doc.setLineWidth(0.01);
-    doc.rect(margin, boxStartY, contentWidth, boxHeight, 'FD');
-    
-    yPos += 0.05;
 
     // Section heading
     doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.main, 'bold');
     doc.setTextColor(44, 44, 44);
-    doc.text("Baker's Notes", margin + 0.2, yPos);
+    doc.text("Tips & Tricks", margin, yPos);
     yPos += 0.3;
 
-    // Tips with bullet points
+    // Tips with bullet points (same style as ingredients)
     doc.setFontSize(FONTS.bodySize);
     doc.setFont(FONTS.main, 'normal');
     doc.setTextColor(44, 44, 44);
 
-    result.troubleshootingTips.slice(0, 4).forEach(tip => {
+    result.troubleshootingTips.slice(0, 6).forEach(tip => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
         yPos = topMargin;
       }
 
-      // Bullet point
-      doc.text('•', margin + 0.2, yPos);
+      // Simple dash bullet
+      doc.text('-', margin, yPos);
 
-      // Issue (bold)
-      doc.setFont(FONTS.main, 'bold');
-      const issueText = cleanTextForPDF(tip.issue);
-      doc.text(issueText, margin + 0.4, yPos);
-      yPos += 0.2;
-
-      // Solution (regular, indented slightly)
-      doc.setFont(FONTS.main, 'normal');
-      const solutionLines = doc.splitTextToSize(cleanTextForPDF(tip.solution), contentWidth - 0.6);
-      solutionLines.forEach((line: string) => {
-        if (yPos > pageHeight - 1) {
-          doc.addPage();
-          yPos = topMargin;
+      // Combine issue and solution in one line
+      const tipText = cleanTextForPDF(`${tip.issue}: ${tip.solution}`);
+      const tipLines = doc.splitTextToSize(tipText, contentWidth - 0.3);
+      tipLines.forEach((line: string, idx: number) => {
+        doc.text(line, margin + 0.2, yPos);
+        if (idx < tipLines.length - 1) {
+          yPos += 0.18;
         }
-        doc.text(line, margin + 0.4, yPos);
-        yPos += 0.2;
       });
-
-      yPos += 0.1; // Space between tips
+      yPos += 0.2;
     });
     
     yPos += 0.3;
@@ -377,62 +356,47 @@ export function generatePDF(
   // ========== 6. SUBSTITUTIONS ==========
   if (result.substitutions.length > 0) {
     // Check if we need a new page
-    if (yPos > pageHeight - 2.5) {
+    if (yPos > pageHeight - 2) {
       doc.addPage();
       yPos = topMargin;
     }
     
-    // Calculate box height
-    const estimatedHeight = Math.min(2.5, result.substitutions.length * 0.45 + 0.5);
-    const boxStartY = yPos - 0.15;
-    const boxHeight = Math.min(estimatedHeight, pageHeight - yPos - 0.5);
-    
-    // Draw shaded background box
-    doc.setFillColor(249, 249, 249);
+    // Horizontal divider
     doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.01);
-    doc.rect(margin, boxStartY, contentWidth, boxHeight, 'FD');
-    
-    yPos += 0.05;
+    doc.setLineWidth(0.015);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 0.4;
 
     // Section heading
     doc.setFontSize(FONTS.headingSize);
     doc.setFont(FONTS.main, 'bold');
     doc.setTextColor(44, 44, 44);
-    doc.text('Substitutions', margin + 0.2, yPos);
+    doc.text('Substitutions', margin, yPos);
     yPos += 0.3;
 
     doc.setFontSize(FONTS.bodySize);
     doc.setFont(FONTS.main, 'normal');
     doc.setTextColor(44, 44, 44);
 
-    result.substitutions.slice(0, 4).forEach(sub => {
+    result.substitutions.slice(0, 5).forEach(sub => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
         yPos = topMargin;
       }
 
-      // Bullet point
-      doc.text('•', margin + 0.2, yPos);
+      // Simple dash bullet
+      doc.text('-', margin, yPos);
 
-      // Original to Substitute (bold)
-      doc.setFont(FONTS.main, 'bold');
-      doc.text(cleanTextForPDF(`${sub.original} → ${sub.substitute}`), margin + 0.4, yPos);
-      yPos += 0.2;
-
-      // Ratio
-      doc.setFont(FONTS.main, 'normal');
-      doc.text(cleanTextForPDF(`Ratio: ${sub.ratio}`), margin + 0.4, yPos);
-      yPos += 0.18;
-
-      // Notes (truncated for space)
-      const notesLines = doc.splitTextToSize(cleanTextForPDF(sub.notes), contentWidth - 0.6);
-      notesLines.slice(0, 2).forEach((line: string) => {
-        doc.text(line, margin + 0.4, yPos);
-        yPos += 0.18;
+      // Combine all info in one readable line
+      const subText = cleanTextForPDF(`${sub.original} → ${sub.substitute} (Ratio: ${sub.ratio}): ${sub.notes}`);
+      const subLines = doc.splitTextToSize(subText, contentWidth - 0.3);
+      subLines.forEach((line: string, idx: number) => {
+        doc.text(line, margin + 0.2, yPos);
+        if (idx < subLines.length - 1) {
+          yPos += 0.18;
+        }
       });
-
-      yPos += 0.1;
+      yPos += 0.2;
     });
     
     yPos += 0.3;
