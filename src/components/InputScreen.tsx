@@ -201,8 +201,8 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       // If AI parsing failed, fall back to regex only
       if (!aiResult) {
         toast({
-          title: "Using regex parser",
-          description: "AI validation unavailable",
+          title: "Using standard parser",
+          description: "Advanced validation unavailable",
           variant: "default"
         });
         
@@ -223,7 +223,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
       // Both parsers succeeded - validate and combine
       toast({
         title: "Validating recipe...",
-        description: "Comparing regex and AI results",
+        description: "Running validation checks",
         duration: 2000,
       });
 
@@ -533,7 +533,7 @@ Mix flour and water, rest 30 min...
                   disabled={!recipeText.trim() || isAIParsing}
                 >
                   <Sparkles className="mr-2 h-4 w-4" />
-                  {isAIParsing ? 'Parsing with AI...' : 'Try AI Parser'}
+                  {isAIParsing ? 'Running advanced parser...' : 'Try Advanced Parser'}
                 </Button>
               )}
             </div>
