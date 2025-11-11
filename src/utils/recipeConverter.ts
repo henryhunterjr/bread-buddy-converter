@@ -391,15 +391,19 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   
   // Build DOUGH section with remaining flour proportions
   // Validate levain total before adding to dough ingredients
+  // CRITICAL FIX: Sum the ACTUAL flour amounts shown in levain (not the theoretical levainFlour)
+  // This accounts for rounding when multiple flours are broken down proportionally
+  const actualLevainFlourTotal = flourProportions.reduce((sum, f) => sum + f.levainAmount, 0);
+  
   const validatedLevainTotal = computeLevainTotal({
     starter: activeStarterWeight,
-    flour: levainFlour,
+    flour: actualLevainFlourTotal,
     water: levainWater
   });
 
   if (process.env.NODE_ENV !== 'production' && validatedLevainTotal !== levainTotal) {
     console.error(`❌ CRITICAL: Levain total mismatch when creating dough ingredient!`);
-    console.error(`Expected: ${validatedLevainTotal}g (${activeStarterWeight}g + ${levainFlour}g + ${levainWater}g)`);
+    console.error(`Expected: ${validatedLevainTotal}g (${activeStarterWeight}g + ${actualLevainFlourTotal}g + ${levainWater}g)`);
     console.error(`Got: ${levainTotal}g`);
   }
 
