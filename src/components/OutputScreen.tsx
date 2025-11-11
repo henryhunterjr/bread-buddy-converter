@@ -34,9 +34,10 @@ interface OutputScreenProps {
   originalRecipeText: string;
   onStartOver: () => void;
   onEditExtraction: () => void;
+  validationAutoFixes?: string[];
 }
 
-export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction }: OutputScreenProps) {
+export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [] }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -180,6 +181,31 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               </p>
             )}
           </div>
+          
+          {/* Validation Auto-Fixes - Show prominently if any were made */}
+          {validationAutoFixes.length > 0 && (
+            <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4 dark:bg-green-950/30 dark:border-green-700 print:bg-white print:border-black">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">✓</div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-green-900 dark:text-green-200 print:text-black mb-2">
+                    Quality Check Complete
+                  </h3>
+                  <p className="text-sm text-green-800 dark:text-green-300 print:text-black mb-2">
+                    We caught and fixed the following issues:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-green-900 dark:text-green-200 print:text-black">
+                    {validationAutoFixes.map((fix, i) => (
+                      <li key={i}>{fix}</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-green-700 dark:text-green-400 print:text-gray-600 mt-2 italic">
+                    Please review the recipe and adjust amounts if needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
         {/* Warnings */}
           {result.warnings.length > 0 && (

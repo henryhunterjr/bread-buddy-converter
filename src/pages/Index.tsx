@@ -4,6 +4,7 @@ import InputScreen from '@/components/InputScreen';
 import OutputScreen from '@/components/OutputScreen';
 import { parseRecipe } from '@/utils/recipeParser';
 import { convertSourdoughToYeast, convertYeastToSourdough } from '@/utils/recipeConverter';
+import { validateConversion } from '@/utils/recipeValidator';
 import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,7 @@ const Index = () => {
   const [recipeName, setRecipeName] = useState<string>('Converted Recipe');
   const [recipeDescription, setRecipeDescription] = useState<string>('');
   const [showHelp, setShowHelp] = useState(false);
+  const [validationAutoFixes, setValidationAutoFixes] = useState<string[]>([]);
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -175,7 +177,26 @@ const Index = () => {
       ? convertSourdoughToYeast(updatedRecipe, originalRecipeText, starterHydration)
       : convertYeastToSourdough(updatedRecipe, originalRecipeText, starterHydration);
     
-    setResult(converted);
+    // CRITICAL: Run validation AFTER conversion but BEFORE displaying to user
+    console.log('=== RUNNING VALIDATION ===');
+    const validationResult = validateConversion(converted);
+    
+    // Log any auto-fixes made
+    if (validationResult.autoFixes.length > 0) {
+      console.log('✓ Auto-fixes applied:', validationResult.autoFixes);
+    }
+    
+    // Add validation warnings to the recipe warnings
+    const validatedRecipe = {
+      ...validationResult.recipe,
+      warnings: [
+        ...validationResult.validationWarnings,
+        ...validationResult.recipe.warnings
+      ]
+    };
+    
+    setValidationAutoFixes(validationResult.autoFixes);
+    setResult(validatedRecipe);
     setScreen('output');
   };
 
@@ -248,6 +269,7 @@ const Index = () => {
           originalRecipeText={originalRecipeText}
           onStartOver={handleStartOver}
           onEditExtraction={handleEditExtraction}
+          validationAutoFixes={validationAutoFixes}
         />
       )}
     </>
