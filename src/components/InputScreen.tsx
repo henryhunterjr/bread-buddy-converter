@@ -283,17 +283,15 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <a 
-              href="https://www.bakinggreatbread.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Wheat className="h-4 w-4 text-warm-orange" />
-              <span>Powered by BakingGreatBread.com</span>
-            </a>
-          </div>
+          <a 
+            href="https://www.bakinggreatbread.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Wheat className="h-4 w-4 text-warm-orange" />
+            <span>Powered by BakingGreatBread.com</span>
+          </a>
         </div>
       </header>
       
