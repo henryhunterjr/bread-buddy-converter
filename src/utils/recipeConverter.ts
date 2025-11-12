@@ -44,6 +44,19 @@ export function computeLevainTotal(levain: { starter: number; flour: number; wat
   return starter + flour + water;
 }
 
+/**
+ * Remove redundant stage labels from ingredient names
+ * Cleans up text like "bread flour for levain" → "bread flour"
+ */
+function cleanIngredientName(name: string): string {
+  return name
+    .replace(/\s+(for|in|from)\s+(levain|dough|starter)/gi, '')
+    .replace(/\s+\(levain\)/gi, '')
+    .replace(/\s+\(main\s+dough\)/gi, '')
+    .replace(/\s+\(dough\)/gi, '')
+    .trim();
+}
+
 export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
   // Starter hydration ratio calculation
@@ -84,8 +97,8 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   const convertedIngredients: ParsedIngredient[] = [
     ...flourIngredients.map(f => ({
       ...f,
-      // Remove any starter-related notes from flour names
-      name: f.name.replace(/for levain|in levain|levain/gi, '').trim()
+      // Clean ingredient names of any levain-related text
+      name: cleanIngredientName(f.name)
     })),
     {
       name: 'water (80-85°F)',
@@ -131,41 +144,41 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   const methodChanges: MethodChange[] = [
     // Step 0: Tangzhong (if detected)
     ...(hasTangzhong ? [{
-      step: '0. TANGZHONG (WATER ROUX)',
+      step: 'TANGZHONG (WATER ROUX)',
       change: 'Combine 1 part flour with 5 parts liquid (water or milk from recipe). Cook over medium heat, stirring constantly, until thick paste forms (149-150°F). Cool completely before using.',
       timing: '5-10 min cook + 30 min cool'
     }] : []),
     {
-      step: '1. MIX' + (hasAutolyse ? ' & AUTOLYSE' : ' & KNEAD'),
+      step: 'MIX' + (hasAutolyse ? ' & AUTOLYSE' : ' & KNEAD'),
       change: hasAutolyse 
         ? 'Mix flour and water only. Rest 20-60 minutes (autolyse). Then add remaining ingredients and knead 8-10 minutes by hand or 5-6 minutes by mixer until smooth and elastic.'
         : 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
       timing: hasAutolyse ? '20-60 min autolyse + 8-10 min knead' : '8-10 min by hand, 5-6 min mixer'
     },
     {
-      step: '2. FIRST RISE',
+      step: 'FIRST RISE',
       change: 'Place in a lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
       timing: '1-1.5 hours'
     },
     {
-      step: '3. SHAPE',
+      step: 'SHAPE',
       change: 'Punch down gently, shape as desired (loaf, braid, or boule), and place on a greased pan or parchment.',
       timing: '5-10 min'
     },
     {
-      step: '4. FINAL PROOF',
+      step: 'FINAL PROOF',
       change: 'Cover and let rise 45–60 minutes, or until dough springs back slowly when gently pressed.',
       timing: '45-60 min'
     },
     {
-      step: '5. BAKE',
+      step: 'BAKE',
       change: isEnriched
         ? 'Preheat oven to 350°F (175°C). Brush with egg wash or milk for a golden crust. Bake 30–35 minutes until deep golden and internal temperature is 190–195°F.'
         : 'Preheat oven to 450°F (230°C). Score the top and optionally spray with water for steam. Bake 35–40 minutes until deep brown and internal temperature is 205–210°F.',
       timing: isEnriched ? '30-35 min at 350°F' : '35-40 min at 450°F'
     },
     {
-      step: '6. COOL',
+      step: 'COOL',
       change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
       timing: '1 hour minimum'
     }
@@ -382,7 +395,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       type: 'liquid'
     },
     ...flourProportions.map(f => ({
-      name: f.name,
+      name: cleanIngredientName(f.name),
       amount: f.levainAmount,
       unit: 'g' as const,
       type: 'flour' as const
@@ -415,7 +428,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       type: 'starter'
     },
     ...flourProportions.map(f => ({
-      name: f.name,
+      name: cleanIngredientName(f.name),
       amount: f.doughAmount,
       unit: 'g' as const,
       type: 'flour' as const

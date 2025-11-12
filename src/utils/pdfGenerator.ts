@@ -266,10 +266,10 @@ export function generatePDF(
       yPos = topMargin;
     }
 
-    // Step number and title on same line (step already includes the number)
+    // Step number and title on same line
     doc.setFont(FONTS.main, 'bold');
     doc.setTextColor(44, 44, 44);
-    const stepTitle = cleanTextForPDF(`${index + 1}. ${change.step}:`);
+    const stepTitle = cleanTextForPDF(`${index + 1}. ${change.step}`);
     doc.text(stepTitle, margin, yPos);
     yPos += 0.22;
 
