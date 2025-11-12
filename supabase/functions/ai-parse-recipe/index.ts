@@ -11,7 +11,12 @@ serve(async (req) => {
   }
 
   try {
-    const { recipeText, starterHydration = 100 } = await req.json();
+    let { recipeText, starterHydration = 100 } = await req.json();
+    
+    // Pre-process text to fix common concatenation issues
+    recipeText = recipeText.replace(/bread flour\s+yolks/gi, 'bread flour, egg yolks');
+    recipeText = recipeText.replace(/flour\s+(\d+\s*egg)/gi, 'flour, $1');
+    
     console.log('AI parsing recipe with starter hydration:', starterHydration);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
