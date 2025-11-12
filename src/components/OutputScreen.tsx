@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/pdfGenerator';
+import { Navigation } from '@/components/Navigation';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
 import { Save, Info, Mail } from 'lucide-react';
@@ -35,9 +36,10 @@ interface OutputScreenProps {
   onStartOver: () => void;
   onEditExtraction: () => void;
   validationAutoFixes?: string[];
+  onHome: () => void;
 }
 
-export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [] }: OutputScreenProps) {
+export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [], onHome }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -81,6 +83,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Navigation onHome={onHome} />
       {/* Header - optimized for mobile and print */}
       <div className="p-4 sm:p-6 border-b border-border print:border-0">
         <div className="max-w-7xl mx-auto">

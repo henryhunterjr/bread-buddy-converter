@@ -283,16 +283,16 @@ const Index = () => {
           onConvert={handleConvert}
           onBack={handleBack}
           onLoadSaved={handleLoadSaved}
+          onHome={handleStartOver}
         />
       )}
       {screen === 'confirmation' && (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <IngredientConfirmation
-            ingredients={extractedIngredients}
-            onConfirm={handleConfirmIngredients}
-            onReject={handleRejectIngredients}
-          />
-        </div>
+        <IngredientConfirmation
+          ingredients={extractedIngredients}
+          onConfirm={handleConfirmIngredients}
+          onReject={handleRejectIngredients}
+          onHome={handleStartOver}
+        />
       )}
       {screen === 'output' && result && (
         <OutputScreen 
@@ -303,6 +303,7 @@ const Index = () => {
           onStartOver={handleStartOver}
           onEditExtraction={handleEditExtraction}
           validationAutoFixes={validationAutoFixes}
+          onHome={handleStartOver}
         />
       )}
     </>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Navigation } from '@/components/Navigation';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ interface InputScreenProps {
   onConvert: (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => void;
   onBack: () => void;
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
+  onHome: () => void;
 }
 
 const PLACEHOLDER_TEXT = `Paste your recipe here...
@@ -46,7 +48,7 @@ Example:
 
 Method: Mix, rest 30 min, fold, shape, proof, bake`;
 
-export default function InputScreen({ direction, onConvert, onBack, onLoadSaved }: InputScreenProps) {
+export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -275,6 +277,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <Navigation onHome={onHome} />
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-border">
         <div className="max-w-4xl mx-auto flex items-center justify-between">

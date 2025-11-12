@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ParsedIngredient } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
+import { Navigation } from './Navigation';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +17,14 @@ interface IngredientConfirmationProps {
   ingredients: ParsedIngredient[];
   onConfirm: (confirmed: ParsedIngredient[]) => void;
   onReject: () => void;
+  onHome: () => void;
 }
 
 export function IngredientConfirmation({ 
   ingredients, 
   onConfirm, 
-  onReject 
+  onReject,
+  onHome 
 }: IngredientConfirmationProps) {
   const [editMode, setEditMode] = useState(false);
   const [edited, setEdited] = useState(ingredients);
@@ -111,8 +114,11 @@ export function IngredientConfirmation({
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-background rounded-lg shadow-lg border">
-      <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navigation onHome={onHome} />
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-3xl w-full bg-background rounded-lg shadow-lg border p-6">
+          <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-xs px-2 py-0.5">
             BETA
@@ -262,6 +268,8 @@ export function IngredientConfirmation({
             </Button>
           </>
         )}
+      </div>
+        </div>
       </div>
     </div>
   );
