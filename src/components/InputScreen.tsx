@@ -284,17 +284,15 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+            <a 
+              href="https://www.bakinggreatbread.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               <Wheat className="h-4 w-4 text-warm-orange" />
               <span>Powered by BakingGreatBread.com</span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Help
-            </Button>
+            </a>
           </div>
         </div>
       </header>
@@ -328,10 +326,10 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </p>
             </div>
 
-            {/* Textarea Label */}
+            {/* Text Area Label */}
             <div className="space-y-2">
               <label htmlFor="recipe-input" className="text-sm font-medium text-foreground">
-                Textarea
+                Text area
               </label>
               <Textarea
                 id="recipe-input"
@@ -353,7 +351,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Button
                 type="button"
-                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-lg"
+                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-xl hover:scale-105 hover:-translate-y-0.5"
                 disabled={isProcessing}
                 onClick={() => document.getElementById('pdf-upload')?.click()}
               >
@@ -370,7 +368,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               
               <Button
                 type="button"
-                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-lg"
+                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-xl hover:scale-105 hover:-translate-y-0.5"
                 disabled={isProcessing}
                 onClick={() => document.getElementById('image-upload')?.click()}
               >
@@ -452,7 +450,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
             <Button 
               onClick={handleConvert}
               size="lg"
-              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-burnt-orange via-warm-orange to-golden-yellow hover:from-burnt-orange/95 hover:via-warm-orange/95 hover:to-golden-yellow/95 text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01]"
+              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-burnt-orange via-warm-orange to-golden-yellow hover:from-[hsl(20,80%,35%)] hover:via-[hsl(25,90%,42%)] hover:to-[hsl(42,95%,40%)] text-white shadow-lg transition-all hover:shadow-2xl hover:scale-[1.02]"
               disabled={!recipeText.trim() || isProcessing || isAIParsing}
             >
               {isProcessing ? (
@@ -536,6 +534,16 @@ Mix flour and water, rest 30 min...
         </div>
       </main>
       
+      {/* Floating Help Button - Bottom Right */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 bg-card border-2 border-warm-orange z-50"
+        onClick={() => setShowHelp(!showHelp)}
+      >
+        <HelpCircle className="h-5 w-5 text-warm-orange" />
+      </Button>
+
       {/* Footer */}
       <footer className="text-center py-4 text-xs text-muted-foreground border-t border-border">
         Copyright 2025 Henry Hunter Baking Great Bread at Home. All Rights Reserved
