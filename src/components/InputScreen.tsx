@@ -349,21 +349,21 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </p>
             </div>
 
-            {/* Dough Type Selector */}
-            <div className="p-4 bg-accent/30 rounded-lg border border-accent space-y-3">
+            {/* Dough Type Selector - Navy Background */}
+            <div className="p-4 bg-[hsl(220,50%,20%)] rounded-lg border-2 border-[hsl(220,50%,30%)] space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-semibold text-foreground">Dough Type</h3>
-                  <p className="text-sm text-muted-foreground">Helps us pick the right formula</p>
+                  <h3 className="text-base font-bold text-white">Dough Type</h3>
+                  <p className="text-sm text-white/80">Helps us pick the right formula</p>
                 </div>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      <Info className="h-4 w-4 text-white/70 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <p className="text-sm">
-                        Plain = basic bread. Enriched = has butter/eggs/sugar. Whole-grain = 50%+ whole wheat/rye.
+                        Straight = basic bread. Enriched = has butter/eggs/sugar. Whole-grain = 50%+ whole wheat/rye.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -374,13 +374,13 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                 value={doughType} 
                 onValueChange={(value: any) => setDoughType(value)}
               >
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="Plain (default)" />
+                <SelectTrigger className="w-full bg-white text-foreground font-semibold border-white/30 h-12">
+                  <SelectValue placeholder="Straight Dough (default)" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="plain">Plain - Basic bread dough</SelectItem>
-                  <SelectItem value="enriched">Enriched - Has butter, eggs, or sugar</SelectItem>
-                  <SelectItem value="whole-grain">Whole-Grain - 50%+ whole wheat/rye</SelectItem>
+                <SelectContent className="bg-background z-50">
+                  <SelectItem value="plain" className="font-medium">Straight Dough - Basic bread</SelectItem>
+                  <SelectItem value="enriched" className="font-medium">Enriched Dough - Has butter, eggs, or sugar</SelectItem>
+                  <SelectItem value="whole-grain" className="font-medium">Whole-Grain - 50%+ whole wheat/rye</SelectItem>
                 </SelectContent>
               </Select>
             </div>

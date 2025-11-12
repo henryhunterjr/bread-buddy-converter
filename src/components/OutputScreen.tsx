@@ -8,8 +8,9 @@ import { generatePDF } from '@/utils/pdfGenerator';
 import { Navigation } from '@/components/Navigation';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
-import { Save, Info, Mail } from 'lucide-react';
+import { Save, Info, Mail, Droplets } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Slider } from '@/components/ui/slider';
 import {
   Dialog,
   DialogContent,
@@ -44,10 +45,16 @@ interface OutputScreenProps {
 export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [], onHome, onMyRecipes }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [waterAdjustmentOpen, setWaterAdjustmentOpen] = useState(false);
+  const [adjustedWaterAmount, setAdjustedWaterAmount] = useState(result.converted.totalLiquid);
   const { toast } = useToast();
   
   const originalPercentages = calculateBakersPercentages(result.original);
   const convertedPercentages = calculateBakersPercentages(result.converted);
+  
+  // Calculate adjusted hydration
+  const adjustedHydration = (adjustedWaterAmount / result.converted.totalFlour) * 100;
+  const waterDifference = adjustedWaterAmount - result.converted.totalLiquid;
 
   const handleDownloadPDF = () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
@@ -261,27 +268,86 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                         : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
                     }`}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="flex-1">
-                        <span className="font-semibold">
-                          {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
-                        </span>{' '}
-                        <span className="break-words">{warning.message}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <span className="font-semibold">
+                            {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
+                          </span>{' '}
+                          <span className="break-words">{warning.message}</span>
+                        </div>
+                        {isHydrationWarning && !waterAdjustmentOpen && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setWaterAdjustmentOpen(true)}
+                            className="ml-2 shrink-0 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 print:hidden"
+                          >
+                            <Droplets className="h-3 w-3 mr-1" />
+                            Adjust Water
+                          </Button>
+                        )}
+                        {isHydrationWarning && waterAdjustmentOpen && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 flex-shrink-0 cursor-help mt-0.5" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[280px] sm:max-w-xs">
+                                <p className="text-xs sm:text-sm">
+                                  This calculation assumes your starter is 100% hydration (equal parts flour and water) by default. 
+                                  If your starter uses a different hydration level, you can adjust it in the input screen.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
-                      {isHydrationWarning && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 flex-shrink-0 cursor-help mt-0.5" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[280px] sm:max-w-xs">
-                              <p className="text-xs sm:text-sm">
-                                This calculation assumes your starter is 100% hydration (equal parts flour and water) by default. 
-                                If your starter uses a different hydration level, you can adjust it in the input screen.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                      
+                      {/* Water Adjustment Slider */}
+                      {isHydrationWarning && waterAdjustmentOpen && (
+                        <div className="bg-white/80 dark:bg-gray-900/80 p-4 rounded-md border border-gray-300 dark:border-gray-600 print:hidden">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label className="text-sm font-semibold">Adjust Water Amount</Label>
+                            <button 
+                              onClick={() => setWaterAdjustmentOpen(false)}
+                              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                              Close ×
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between text-sm">
+                              <span>Water: <span className="font-bold">{adjustedWaterAmount}g</span></span>
+                              <span>Hydration: <span className="font-bold">{adjustedHydration.toFixed(0)}%</span></span>
+                            </div>
+                            
+                            <Slider
+                              value={[adjustedWaterAmount]}
+                              onValueChange={(values) => setAdjustedWaterAmount(values[0])}
+                              min={Math.floor(result.converted.totalFlour * 0.5)}
+                              max={Math.ceil(result.converted.totalFlour * 1.0)}
+                              step={5}
+                              className="w-full"
+                            />
+                            
+                            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                              <span>50%</span>
+                              <span>100%</span>
+                            </div>
+                            
+                            {waterDifference !== 0 && (
+                              <div className="text-xs bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-200 dark:border-blue-700">
+                                {waterDifference > 0 ? (
+                                  <span>✓ Add <strong>{waterDifference}g</strong> more water</span>
+                                ) : (
+                                  <span>✓ Reduce water by <strong>{Math.abs(waterDifference)}g</strong></span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
