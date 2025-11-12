@@ -3,7 +3,7 @@ import LandingScreen from '@/components/LandingScreen';
 import InputScreen from '@/components/InputScreen';
 import OutputScreen from '@/components/OutputScreen';
 import { parseRecipe } from '@/utils/recipeParser';
-import { convertSourdoughToYeast, convertYeastToSourdough } from '@/utils/recipeConverter';
+import { convertSourdoughToYeast, convertYeastToSourdough, cleanIngredientName } from '@/utils/recipeConverter';
 import { validateConversion } from '@/utils/recipeValidator';
 import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 import { IngredientConfirmation } from '@/components/IngredientConfirmation';
@@ -30,6 +30,33 @@ const Index = () => {
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
     setScreen('input');
+  };
+
+  /**
+   * Consolidate duplicate ingredients by cleaning names and summing amounts
+   * This prevents showing "bread flour (levain)" and "bread flour (dough)" as separate entries
+   */
+  const consolidateIngredients = (ingredients: ParsedIngredient[]): ParsedIngredient[] => {
+    const consolidationMap = new Map<string, ParsedIngredient>();
+
+    for (const ingredient of ingredients) {
+      const cleanedName = cleanIngredientName(ingredient.name);
+      const key = `${cleanedName}|${ingredient.type}`; // Use name + type as key to preserve different types
+
+      if (consolidationMap.has(key)) {
+        // Sum amounts for duplicate ingredients
+        const existing = consolidationMap.get(key)!;
+        existing.amount += ingredient.amount;
+      } else {
+        // Add new ingredient with cleaned name
+        consolidationMap.set(key, {
+          ...ingredient,
+          name: cleanedName
+        });
+      }
+    }
+
+    return Array.from(consolidationMap.values());
   };
 
   const handleConvert = async (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
@@ -74,17 +101,23 @@ const Index = () => {
     console.log('Extracted description:', description);
     
     // Show confirmation screen before converting
-    // CRITICAL: These are the ORIGINAL parsed ingredients, NOT converted ingredients
-    // No starter decomposition should happen here - that happens after confirmation
-    console.log('=== INGREDIENTS FOR CONFIRMATION SCREEN ===');
-    console.log('Showing', parsed.ingredients.length, 'original ingredients to user:');
+    // CRITICAL: Consolidate duplicate ingredients BEFORE showing to user
+    console.log('=== INGREDIENTS BEFORE CONSOLIDATION ===');
+    console.log('Raw ingredients:', parsed.ingredients.length);
     parsed.ingredients.forEach((ing, idx) => {
       console.log(`  ${idx + 1}. ${ing.amount}g ${ing.name} [${ing.type}]`);
     });
-    console.log('=== (No conversion has happened yet) ===');
+    
+    const consolidatedIngredients = consolidateIngredients(parsed.ingredients);
+    
+    console.log('=== INGREDIENTS AFTER CONSOLIDATION ===');
+    console.log('Consolidated ingredients:', consolidatedIngredients.length);
+    consolidatedIngredients.forEach((ing, idx) => {
+      console.log(`  ${idx + 1}. ${ing.amount}g ${ing.name} [${ing.type}]`);
+    });
     
     setOriginalRecipeText(recipeText);
-    setExtractedIngredients(parsed.ingredients);
+    setExtractedIngredients(consolidatedIngredients);
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });
     setRecipeName(title);
     setRecipeDescription(description);

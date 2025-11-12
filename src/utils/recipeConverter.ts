@@ -47,8 +47,9 @@ export function computeLevainTotal(levain: { starter: number; flour: number; wat
 /**
  * Remove redundant stage labels from ingredient names
  * Cleans up text like "bread flour for levain" → "bread flour"
+ * EXPORTED for use in consolidation logic
  */
-function cleanIngredientName(name: string): string {
+export function cleanIngredientName(name: string): string {
   return name
     .replace(/\s+(for|in|from)\s+(levain|dough|starter)/gi, '')
     .replace(/\s+\(levain\)/gi, '')
