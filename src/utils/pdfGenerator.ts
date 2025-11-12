@@ -155,9 +155,9 @@ export function generatePDF(
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 0.4;
 
-  // Horizontal divider
+  // Thick horizontal divider
   doc.setDrawColor(230, 230, 230); // #e6e6e6
-  doc.setLineWidth(0.015);
+  doc.setLineWidth(0.04); // Thick gray bar
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 0.4;
   
@@ -238,9 +238,9 @@ export function generatePDF(
   doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin, yPos);
   yPos += 0.5;
   
-  // Horizontal divider
+  // Thick horizontal divider
   doc.setDrawColor(230, 230, 230);
-  doc.setLineWidth(0.015);
+  doc.setLineWidth(0.04); // Thick gray bar
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 0.4;
   
@@ -266,17 +266,11 @@ export function generatePDF(
       yPos = topMargin;
     }
 
-    // Step number with title (bold title followed by colon)
-    doc.setFont(FONTS.main, 'normal');
-    doc.setTextColor(44, 44, 44);
-    const stepNumber = `${index + 1}. `;
-    doc.text(stepNumber, margin, yPos);
-    
-    // Step title in bold with colon
+    // Step number and title on same line (step already includes the number)
     doc.setFont(FONTS.main, 'bold');
-    const stepTitle = cleanTextForPDF(`${change.step}:`);
-    const stepTitleWidth = doc.getTextWidth(stepNumber);
-    doc.text(stepTitle, margin + stepTitleWidth, yPos);
+    doc.setTextColor(44, 44, 44);
+    const stepTitle = cleanTextForPDF(`${index + 1}. ${change.step}:`);
+    doc.text(stepTitle, margin, yPos);
     yPos += 0.22;
 
     // Step content (regular weight, full width)
@@ -303,9 +297,9 @@ export function generatePDF(
 
   yPos += 0.2;
   
-  // Horizontal divider
+  // Thick horizontal divider
   doc.setDrawColor(230, 230, 230);
-  doc.setLineWidth(0.015);
+  doc.setLineWidth(0.04); // Thick gray bar
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 0.4;
   
@@ -361,9 +355,9 @@ export function generatePDF(
       yPos = topMargin;
     }
     
-    // Horizontal divider
+    // Thick horizontal divider
     doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.015);
+    doc.setLineWidth(0.04); // Thick gray bar
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 0.4;
 
@@ -409,9 +403,9 @@ export function generatePDF(
       yPos = topMargin;
     }
     
-    // Horizontal divider
+    // Thick horizontal divider
     doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.015);
+    doc.setLineWidth(0.04); // Thick gray bar
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 0.3;
     
