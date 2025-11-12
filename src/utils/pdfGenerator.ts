@@ -2,25 +2,31 @@ import jsPDF from 'jspdf';
 import { ConvertedRecipe, BakersPercentage } from '@/types/recipe';
 import { calculateBakersPercentages } from './recipeConverter';
 
-// Professional color palette for blog-style recipe card
+// Beautiful parchment color palette
 const COLORS = {
-  darkText: '#2c2c2c',
-  sectionDivider: '#e6e6e6',
-  lightShade: '#f9f9f9',
-  mediumGray: '#666666',
-  lightGray: '#999999'
+  parchment: '#faf8f3',
+  darkText: '#3d2817',
+  serif: '#8b6f47',
+  wheat: '#d4a574',
+  lightBorder: '#e8dcc8',
+  infoBlue: '#e3f2fd',
+  warningYellow: '#fff9e6',
+  cautionOrange: '#fff3e0',
+  proTipGray: '#f5f5f5',
+  iconGray: '#9e9e9e'
 };
 
-// Typography settings - clean, modern sans-serif
+// Beautiful typography with serif for titles
 const FONTS = {
-  main: 'helvetica',
-  titleSize: 24,
-  subtitleSize: 12,
+  title: 'times',
+  body: 'helvetica',
+  titleSize: 28,
+  subtitleSize: 11,
   headingSize: 16,
-  subheadingSize: 14,
-  bodySize: 12,
-  timingSize: 11,
-  footerSize: 9
+  subheadingSize: 13,
+  bodySize: 11,
+  smallSize: 9,
+  footerSize: 8
 };
 
 /**
@@ -103,6 +109,78 @@ function isMobileDevice(): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// Helper to draw wheat icon decoration
+function drawWheatIcon(doc: jsPDF, x: number, y: number, size: number = 0.15) {
+  doc.setFillColor(212, 165, 116); // wheat color
+  doc.setDrawColor(212, 165, 116);
+  // Simple wheat stalk as three small ovals
+  for (let i = 0; i < 3; i++) {
+    doc.ellipse(x, y - (i * size * 0.6), size * 0.3, size * 0.5, 'F');
+  }
+  // Stem line
+  doc.setLineWidth(0.01);
+  doc.line(x, y, x, y - (2.5 * size * 0.6));
+}
+
+// Helper to draw circular step icon
+function drawStepIcon(doc: jsPDF, x: number, y: number, stepNum: number) {
+  // Circle
+  doc.setFillColor(212, 165, 116);
+  doc.circle(x, y, 0.15, 'F');
+  // Number
+  doc.setFontSize(10);
+  doc.setFont(FONTS.body, 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(stepNum.toString(), x, y + 0.04, { align: 'center' });
+}
+
+// Helper to draw info box
+function drawInfoBox(doc: jsPDF, x: number, y: number, width: number, text: string, type: 'info' | 'warning' | 'caution') {
+  const bgColors: Record<string, [number, number, number]> = {
+    info: [227, 242, 253],
+    warning: [255, 249, 230],
+    caution: [255, 243, 224]
+  };
+  const iconSymbols = {
+    info: 'i',
+    warning: '!',
+    caution: '⚠'
+  };
+  
+  const lines = doc.splitTextToSize(text, width - 0.6);
+  const boxHeight = (lines.length * 0.16) + 0.25;
+  
+  // Background box
+  const [r, g, b] = bgColors[type];
+  doc.setFillColor(r, g, b);
+  doc.roundedRect(x, y, width, boxHeight, 0.05, 0.05, 'F');
+  
+  // Border
+  doc.setDrawColor(232, 220, 200);
+  doc.setLineWidth(0.01);
+  doc.roundedRect(x, y, width, boxHeight, 0.05, 0.05, 'S');
+  
+  // Icon circle
+  doc.setFillColor(158, 158, 158);
+  doc.circle(x + 0.2, y + 0.2, 0.08, 'F');
+  doc.setFontSize(8);
+  doc.setFont(FONTS.body, 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(iconSymbols[type], x + 0.2, y + 0.23, { align: 'center' });
+  
+  // Text
+  doc.setFontSize(FONTS.bodySize);
+  doc.setFont(FONTS.body, 'normal');
+  doc.setTextColor(61, 40, 23);
+  let textY = y + 0.2;
+  lines.forEach((line: string) => {
+    doc.text(line, x + 0.4, textY);
+    textY += 0.16;
+  });
+  
+  return boxHeight;
+}
+
 export function generatePDF(
   result: ConvertedRecipe,
   recipeName: string = 'Converted Recipe',
@@ -124,334 +202,311 @@ export function generatePDF(
   
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 1; // 1 inch margins on sides
-  const topMargin = 0.75;
+  const margin = 0.75;
+  const topMargin = 0.6;
   const contentWidth = pageWidth - (margin * 2);
+  
+  // Cream parchment background for entire page
+  doc.setFillColor(250, 248, 243);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
   
   let yPos = topMargin;
   
-  // ========== 1. HEADER BANNER ==========
-  // Recipe Title (Centered, Large Bold)
+  // ========== 1. DECORATIVE HEADER WITH WHEAT ICONS ==========
+  // Draw wheat decorations on both sides
+  drawWheatIcon(doc, margin + 0.3, yPos + 0.3);
+  drawWheatIcon(doc, pageWidth - margin - 0.3, yPos + 0.3);
+  
+  // Recipe Title (Centered, Elegant Serif)
   doc.setFontSize(FONTS.titleSize);
-  doc.setFont(FONTS.main, 'bold');
-  doc.setTextColor(44, 44, 44); // #2c2c2c
-  const titleLines = doc.splitTextToSize(cleanRecipeName, contentWidth);
-  doc.text(titleLines, pageWidth / 2, yPos, { align: 'center' });
-  yPos += (titleLines.length * 0.35) + 0.2;
+  doc.setFont(FONTS.title, 'bold');
+  doc.setTextColor(61, 40, 23);
+  const titleLines = doc.splitTextToSize(cleanRecipeName, contentWidth - 1);
+  doc.text(titleLines, pageWidth / 2, yPos + 0.35, { align: 'center' });
+  yPos += (titleLines.length * 0.4) + 0.2;
   
-  // Subtitle line
+  // Subtitle line with conversion info
   doc.setFontSize(FONTS.subtitleSize);
-  doc.setFont(FONTS.main, 'normal');
-  doc.setTextColor(153, 153, 153); // #999999
+  doc.setFont(FONTS.body, 'normal');
+  doc.setTextColor(139, 111, 71);
   const conversionLabel = result.direction === 'sourdough-to-yeast'
-    ? 'Sourdough to Yeast'
-    : 'Yeast to Sourdough';
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-  const subtitle = `${conversionLabel} | Hydration ${result.converted.hydration.toFixed(0)}% | ${currentDate}`;
+    ? 'CONVERTED FROM SOURDOUGH'
+    : 'CONVERTED FROM YEAST';
+  const subtitle = `${conversionLabel} • ${result.direction === 'yeast-to-sourdough' ? 'STARTER' : 'YEAST'} • HYDRATION ${result.converted.hydration.toFixed(0)}% • ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}`.toUpperCase();
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
-  yPos += 0.4;
-
-  // Thick horizontal divider
-  doc.setDrawColor(230, 230, 230); // #e6e6e6
-  doc.setLineWidth(0.04); // Thick gray bar
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 0.4;
+  yPos += 0.35;
   
-  // ========== 2. INTRO / DESCRIPTION BLOCK ==========
+  // Description if provided
   if (cleanDescription) {
     doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'italic');
-    doc.setTextColor(102, 102, 102); // #666666 - lighter for subtitle feel
-    const descLines = doc.splitTextToSize(cleanDescription, contentWidth);
+    doc.setFont(FONTS.body, 'italic');
+    doc.setTextColor(61, 40, 23);
+    const descLines = doc.splitTextToSize(cleanDescription, contentWidth - 0.5);
     descLines.forEach((line: string) => {
-      doc.text(line, margin, yPos);
-      yPos += 0.2;
+      doc.text(line, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 0.18;
     });
-    yPos += 0.4;
+    yPos += 0.2;
   }
   
-  // ========== 3. INGREDIENTS SECTION ==========
+  yPos += 0.1;
+  
+  // ========== 2. INGREDIENTS - TWO COLUMN GRID ==========
   const convertedPercentages = calculateBakersPercentages(result.converted);
   const ingredientGroups = groupIngredients(convertedPercentages, result.direction);
 
   // Section heading
   doc.setFontSize(FONTS.headingSize);
-  doc.setFont(FONTS.main, 'bold');
-  doc.setTextColor(44, 44, 44);
+  doc.setFont(FONTS.body, 'bold');
+  doc.setTextColor(61, 40, 23);
   doc.text('Ingredients', margin, yPos);
-  yPos += 0.3;
+  yPos += 0.35;
 
-  // Render ingredients as bullet list with proper grouping
-  ingredientGroups.forEach((group, groupIndex) => {
-    // Check if we need a new page
+  // Two-column ingredient table
+  ingredientGroups.forEach((group) => {
     if (yPos > pageHeight - 2) {
       doc.addPage();
+      doc.setFillColor(250, 248, 243);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
       yPos = topMargin;
     }
 
-    // Group subheading (bold, larger)
+    // Group subheading
     doc.setFontSize(FONTS.subheadingSize);
-    doc.setFont(FONTS.main, 'bold');
-    doc.setTextColor(44, 44, 44);
-    doc.text(cleanTextForPDF(`For the ${group.section}`), margin, yPos);
-    yPos += 0.32;
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(139, 111, 71);
+    doc.text(cleanTextForPDF(group.section), margin, yPos);
+    yPos += 0.3;
 
-    // Ingredients in this group
+    // Table header row
+    doc.setFillColor(232, 220, 200);
+    doc.rect(margin, yPos - 0.15, contentWidth, 0.25, 'F');
+    doc.setFontSize(FONTS.smallSize);
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(61, 40, 23);
+    doc.text('Ingredient', margin + 0.1, yPos);
+    doc.text('Amount', margin + contentWidth - 1.5, yPos);
+    doc.text("Baker's %", margin + contentWidth - 0.6, yPos);
+    yPos += 0.25;
+
+    // Ingredient rows
     doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'normal');
-    doc.setTextColor(44, 44, 44);
-    group.ingredients.forEach(item => {
-      // Check if we need a new page
+    doc.setFont(FONTS.body, 'normal');
+    group.ingredients.forEach((item, idx) => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
+        doc.setFillColor(250, 248, 243);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
         yPos = topMargin;
       }
 
-      // Simple bullet point (dash)
-      doc.text('-', margin, yPos);
+      // Alternating row background
+      if (idx % 2 === 1) {
+        doc.setFillColor(255, 253, 248);
+        doc.rect(margin, yPos - 0.15, contentWidth, 0.22, 'F');
+      }
 
-      // Ingredient: amount (percentage)
-      const ingredientText = cleanTextForPDF(`${item.ingredient}: ${item.amount.toFixed(0)}g (${item.percentage.toFixed(0)}%)`);
-      const ingredientLines = doc.splitTextToSize(ingredientText, contentWidth - 0.3);
-      ingredientLines.forEach((line: string, idx: number) => {
-        doc.text(line, margin + 0.2, yPos);
-        if (idx < ingredientLines.length - 1) {
-          yPos += 0.18;
-        }
-      });
-      yPos += 0.2;
+      doc.setTextColor(61, 40, 23);
+      const ingredientName = cleanTextForPDF(item.ingredient);
+      doc.text(ingredientName, margin + 0.1, yPos);
+      doc.text(`${item.amount.toFixed(0)}g`, margin + contentWidth - 1.5, yPos);
+      doc.text(`${item.percentage.toFixed(0)}%`, margin + contentWidth - 0.6, yPos);
+      yPos += 0.22;
     });
 
-    // Extra space between groups
-    yPos += 0.2;
+    yPos += 0.15;
   });
 
-  // Total Hydration
-  yPos += 0.05;
+  // Total Hydration highlight
+  doc.setFillColor(255, 249, 230);
+  doc.roundedRect(margin, yPos, contentWidth, 0.3, 0.05, 0.05, 'F');
   doc.setFontSize(FONTS.bodySize);
-  doc.setFont(FONTS.main, 'bold');
-  doc.setTextColor(44, 44, 44);
-  doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin, yPos);
-  yPos += 0.5;
+  doc.setFont(FONTS.body, 'bold');
+  doc.setTextColor(61, 40, 23);
+  doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin + 0.15, yPos + 0.18);
+  yPos += 0.45;
   
-  // Thick horizontal divider
-  doc.setDrawColor(230, 230, 230);
-  doc.setLineWidth(0.04); // Thick gray bar
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 0.4;
-  
-  // ========== 4. METHOD SECTION ==========
-  // Check if we need a new page
+  // ========== 3. METHOD WITH NUMBERED STEP ICONS ==========
   if (yPos > pageHeight - 2) {
     doc.addPage();
+    doc.setFillColor(250, 248, 243);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
     yPos = topMargin;
   }
 
   // Section heading
   doc.setFontSize(FONTS.headingSize);
-  doc.setFont(FONTS.main, 'bold');
-  doc.setTextColor(44, 44, 44);
+  doc.setFont(FONTS.body, 'bold');
+  doc.setTextColor(61, 40, 23);
   doc.text('Method', margin, yPos);
-  yPos += 0.3;
+  yPos += 0.4;
 
   doc.setFontSize(FONTS.bodySize);
   result.methodChanges.forEach((change, index) => {
-    // Check if we need a new page
     if (yPos > pageHeight - 1.5) {
       doc.addPage();
+      doc.setFillColor(250, 248, 243);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
       yPos = topMargin;
     }
 
-    // Step number and title on same line
-    doc.setFont(FONTS.main, 'bold');
-    doc.setTextColor(44, 44, 44);
-    const stepTitle = cleanTextForPDF(`${index + 1}. ${change.step}`);
-    doc.text(stepTitle, margin, yPos);
-    yPos += 0.22;
+    // Draw step icon
+    drawStepIcon(doc, margin + 0.15, yPos + 0.1, index + 1);
 
-    // Step content (regular weight, full width)
-    doc.setFont(FONTS.main, 'normal');
+    // Step title
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(61, 40, 23);
+    const stepTitle = cleanTextForPDF(change.step.toUpperCase());
+    doc.text(stepTitle, margin + 0.4, yPos + 0.12);
+    yPos += 0.3;
+
+    // Step content
+    doc.setFont(FONTS.body, 'normal');
     let changeText = cleanTextForPDF(change.change);
-    
-    // If timing exists, integrate it into the text naturally
     if (change.timing) {
-      changeText += ` (${cleanTextForPDF(change.timing)})`;
+      changeText += ` ${cleanTextForPDF(change.timing)}`;
     }
     
-    const changeLines = doc.splitTextToSize(changeText, contentWidth);
+    const changeLines = doc.splitTextToSize(changeText, contentWidth - 0.4);
     changeLines.forEach((line: string) => {
       if (yPos > pageHeight - 1) {
         doc.addPage();
+        doc.setFillColor(250, 248, 243);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
         yPos = topMargin;
       }
-      doc.text(line, margin, yPos);
-      yPos += 0.18;
+      doc.text(line, margin + 0.4, yPos);
+      yPos += 0.17;
     });
 
-    yPos += 0.25; // Space between steps
+    yPos += 0.25;
   });
 
   yPos += 0.2;
   
-  // Thick horizontal divider
-  doc.setDrawColor(230, 230, 230);
-  doc.setLineWidth(0.04); // Thick gray bar
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 0.4;
+  // ========== 4. PRO TIPS BOX (warnings/notes at bottom) ==========
+  // Collect all warnings and notes
+  const allNotes: Array<{ text: string; type: 'info' | 'warning' | 'caution' }> = [];
   
-  // ========== 5. BAKER'S NOTES ==========
-  if (result.troubleshootingTips.length > 0) {
-    // Check if we need a new page
-    if (yPos > pageHeight - 2) {
-      doc.addPage();
-      yPos = topMargin;
-    }
-
-    // Section heading
-    doc.setFontSize(FONTS.headingSize);
-    doc.setFont(FONTS.main, 'bold');
-    doc.setTextColor(44, 44, 44);
-    doc.text("Tips & Tricks", margin, yPos);
-    yPos += 0.3;
-
-    // Tips with bullet points (same style as ingredients)
-    doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'normal');
-    doc.setTextColor(44, 44, 44);
-
-    result.troubleshootingTips.slice(0, 6).forEach(tip => {
-      if (yPos > pageHeight - 1) {
-        doc.addPage();
-        yPos = topMargin;
-      }
-
-      // Simple dash bullet
-      doc.text('-', margin, yPos);
-
-      // Combine issue and solution in one line
-      const tipText = cleanTextForPDF(`${tip.issue}: ${tip.solution}`);
-      const tipLines = doc.splitTextToSize(tipText, contentWidth - 0.3);
-      tipLines.forEach((line: string, idx: number) => {
-        doc.text(line, margin + 0.2, yPos);
-        if (idx < tipLines.length - 1) {
-          yPos += 0.18;
-        }
-      });
-      yPos += 0.2;
-    });
-    
-    yPos += 0.3;
-  }
+  result.warnings.forEach(warning => {
+    const type = warning.type === 'info' ? 'info' : warning.type === 'warning' ? 'warning' : 'caution';
+    allNotes.push({ text: cleanTextForPDF(warning.message), type });
+  });
   
-  // ========== 6. SUBSTITUTIONS ==========
-  if (result.substitutions.length > 0) {
-    // Check if we need a new page
-    if (yPos > pageHeight - 2) {
-      doc.addPage();
-      yPos = topMargin;
-    }
-    
-    // Thick horizontal divider
-    doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.04); // Thick gray bar
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 0.4;
-
-    // Section heading
-    doc.setFontSize(FONTS.headingSize);
-    doc.setFont(FONTS.main, 'bold');
-    doc.setTextColor(44, 44, 44);
-    doc.text('Substitutions', margin, yPos);
-    yPos += 0.3;
-
-    doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'normal');
-    doc.setTextColor(44, 44, 44);
-
-    result.substitutions.slice(0, 5).forEach(sub => {
-      if (yPos > pageHeight - 1) {
-        doc.addPage();
-        yPos = topMargin;
-      }
-
-      // Simple dash bullet
-      doc.text('-', margin, yPos);
-
-      // Combine all info in one readable line
-      const subText = cleanTextForPDF(`${sub.original} → ${sub.substitute} (Ratio: ${sub.ratio}): ${sub.notes}`);
-      const subLines = doc.splitTextToSize(subText, contentWidth - 0.3);
-      subLines.forEach((line: string, idx: number) => {
-        doc.text(line, margin + 0.2, yPos);
-        if (idx < subLines.length - 1) {
-          yPos += 0.18;
-        }
-      });
-      yPos += 0.2;
-    });
-    
-    yPos += 0.3;
-  }
+  // Add tangzhong note
+  allNotes.push({
+    text: 'Tangzhong: Cook 50g flour + 50g water to paste; subtract from recipe water.',
+    type: 'info'
+  });
   
-  // Add flavor tip for sourdough-to-yeast conversions
+  // Add sourdough flavor tip if converting to yeast
   if (result.direction === 'sourdough-to-yeast') {
-    if (yPos > pageHeight - 1.5) {
-      doc.addPage();
-      yPos = topMargin;
-    }
-    
-    // Thick horizontal divider
-    doc.setDrawColor(230, 230, 230);
-    doc.setLineWidth(0.04); // Thick gray bar
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 0.3;
-    
-    doc.setFontSize(FONTS.bodySize);
-    doc.setFont(FONTS.main, 'bold');
-    doc.setTextColor(44, 44, 44);
-    doc.text('Tip for Sourdough Flavor:', margin, yPos);
-    yPos += 0.22;
-    
-    doc.setFont(FONTS.main, 'normal');
-    const tipLines = doc.splitTextToSize(
-      'To mimic sourdough tang, add 15g (1 tbsp) lemon juice or plain yogurt to the liquid ingredients.',
-      contentWidth
-    );
-    tipLines.forEach((line: string) => {
-      doc.text(line, margin, yPos);
-      yPos += 0.2;
+    allNotes.push({
+      text: 'Tip: Mimic sourdough flavor by adding 15g (1 tbsp) lemon juice or plain yogurt to liquid ingredients.',
+      type: 'info'
     });
   }
   
-  // ========== 7. FOOTER ==========
-  const footerY = pageHeight - 0.5;
+  // Draw Pro Tips section
+  if (allNotes.length > 0) {
+    // Ensure enough space or add page
+    const estimatedHeight = allNotes.length * 0.6;
+    if (yPos + estimatedHeight > pageHeight - 1.5) {
+      doc.addPage();
+      doc.setFillColor(250, 248, 243);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      yPos = topMargin;
+    }
+    
+    // Pro Tips heading
+    doc.setFontSize(FONTS.headingSize);
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(61, 40, 23);
+    doc.text("Baker's Notes", margin, yPos);
+    yPos += 0.35;
+    
+    // Draw each note as info box
+    allNotes.forEach(note => {
+      if (yPos > pageHeight - 1.2) {
+        doc.addPage();
+        doc.setFillColor(250, 248, 243);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        yPos = topMargin;
+      }
+      const boxHeight = drawInfoBox(doc, margin, yPos, contentWidth, note.text, note.type);
+      yPos += boxHeight + 0.15;
+    });
+  }
   
-  // Top rule
-  doc.setDrawColor(230, 230, 230);
+  yPos += 0.2;
+  
+  // ========== 5. SUBSTITUTIONS ==========
+  if (result.substitutions.length > 0) {
+    if (yPos > pageHeight - 2) {
+      doc.addPage();
+      doc.setFillColor(250, 248, 243);
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      yPos = topMargin;
+    }
+
+    // Section heading
+    doc.setFontSize(FONTS.headingSize);
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(61, 40, 23);
+    doc.text('Substitutions', margin, yPos);
+    yPos += 0.35;
+
+    // Table format for substitutions
+    doc.setFillColor(232, 220, 200);
+    doc.rect(margin, yPos - 0.15, contentWidth, 0.25, 'F');
+    doc.setFontSize(FONTS.smallSize);
+    doc.setFont(FONTS.body, 'bold');
+    doc.text('Original', margin + 0.1, yPos);
+    doc.text('Substitute', margin + 2, yPos);
+    doc.text('Ratio', margin + 4, yPos);
+    yPos += 0.25;
+
+    doc.setFontSize(FONTS.bodySize);
+    doc.setFont(FONTS.body, 'normal');
+    result.substitutions.slice(0, 5).forEach((sub, idx) => {
+      if (yPos > pageHeight - 1) {
+        doc.addPage();
+        doc.setFillColor(250, 248, 243);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        yPos = topMargin;
+      }
+
+      if (idx % 2 === 1) {
+        doc.setFillColor(255, 253, 248);
+        doc.rect(margin, yPos - 0.15, contentWidth, 0.22, 'F');
+      }
+
+      doc.text(cleanTextForPDF(sub.original), margin + 0.1, yPos);
+      doc.text(cleanTextForPDF(sub.substitute), margin + 2, yPos);
+      doc.text(cleanTextForPDF(sub.ratio), margin + 4, yPos);
+      yPos += 0.22;
+    });
+    
+    yPos += 0.3;
+  }
+  
+  // ========== 6. ELEGANT FOOTER ==========
+  const footerY = pageHeight - 0.45;
+  
+  // Decorative line
+  doc.setDrawColor(232, 220, 200);
   doc.setLineWidth(0.01);
-  doc.line(margin, footerY - 0.15, pageWidth - margin, footerY - 0.15);
+  doc.line(margin, footerY - 0.2, pageWidth - margin, footerY - 0.2);
   
   // Footer text
   doc.setFontSize(FONTS.footerSize);
-  doc.setFont(FONTS.main, 'normal');
-  doc.setTextColor(153, 153, 153); // #999999
+  doc.setFont(FONTS.body, 'italic');
+  doc.setTextColor(139, 111, 71);
   doc.text(
-    'Converted with Bread Buddy - BakingGreatBread.com',
+    'Baked with love using Bread Buddy (BakingGreatBread.com)',
     pageWidth / 2,
     footerY,
     { align: 'center' }
-  );
-
-  // Page number
-  const pageCount = (doc as any).internal.getNumberOfPages();
-  doc.text(
-    `Page ${pageCount}`,
-    pageWidth - margin,
-    footerY,
-    { align: 'right' }
   );
   
   // Generate filename - use cleaned name
