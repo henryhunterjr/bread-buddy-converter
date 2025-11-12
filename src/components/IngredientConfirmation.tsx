@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ParsedIngredient } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,17 @@ export function IngredientConfirmation({
 }: IngredientConfirmationProps) {
   const [editMode, setEditMode] = useState(false);
   const [edited, setEdited] = useState(ingredients);
+
+  // 🧪 DIAGNOSTIC TEST: Check flour consolidation
+  useEffect(() => {
+    console.log('INGREDIENT CHECK:', {
+      totalIngredients: ingredients.length,
+      flourEntries: ingredients.filter(i => 
+        i.name.toLowerCase().includes('flour')
+      ).length,
+      samples: ingredients.map(i => i.name).slice(0, 5)
+    });
+  }, [ingredients]);
 
   // Calculate confidence statistics
   const confidenceStats = {
