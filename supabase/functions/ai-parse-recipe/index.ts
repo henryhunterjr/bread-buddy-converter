@@ -14,8 +14,9 @@ serve(async (req) => {
     let { recipeText, starterHydration = 100 } = await req.json();
     
     // Pre-process text to fix common concatenation issues
-    recipeText = recipeText.replace(/bread flour\s+yolks/gi, 'bread flour, egg yolks');
-    recipeText = recipeText.replace(/flour\s+(\d+\s*egg)/gi, 'flour, $1');
+    recipeText = recipeText.replace(/(\d+g?\s+)?(bread\s+)?flour\s+yolks/gi, '$1$2flour\n3 egg yolks');
+    recipeText = recipeText.replace(/flour\s+and\b/gi, 'flour\n');
+    recipeText = recipeText.replace(/sugar\s+and\b/gi, 'sugar\n');
     
     console.log('AI parsing recipe with starter hydration:', starterHydration);
 
