@@ -27,6 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { MeasurementConverter } from '@/components/MeasurementConverter';
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
@@ -599,6 +600,9 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
         </div>
         </div>
       </div>
+      
+      {/* Floating Measurement Converter */}
+      <MeasurementConverter />
       
       {/* Footer */}
       <footer className="text-center py-3 sm:py-4 text-xs text-muted-foreground border-t border-border print:border-0 print:text-black print:mt-8 px-2">

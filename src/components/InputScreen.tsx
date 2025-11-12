@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { ConvertedRecipe, ParsedRecipe } from '@/types/recipe';
+import { MeasurementConverter } from '@/components/MeasurementConverter';
 import { 
   Select, 
   SelectContent, 
@@ -595,6 +596,9 @@ Mix flour and water, rest 30 min...
       >
         <HelpCircle className="h-5 w-5 text-warm-orange" />
       </Button>
+
+      {/* Floating Measurement Converter */}
+      <MeasurementConverter />
 
       {/* Footer */}
       <footer className="text-center py-4 text-xs text-muted-foreground border-t border-border">
