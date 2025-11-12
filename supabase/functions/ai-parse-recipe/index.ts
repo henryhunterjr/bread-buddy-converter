@@ -170,6 +170,23 @@ IMPORTANT:
 
     const parsedRecipe = JSON.parse(cleanedResponse);
     
+    // Clean up ingredient names
+    const cleanParsedIngredient = (text: string) => {
+      return text
+        .replace(/\s+(and|or|yolks|→|↓|\+)$/gi, '') // Remove trailing words
+        .replace(/^\d+\s+([a-z]+)$/g, '$1s') // "3 egg" → "eggs"
+        .replace(/flour\s+yolks/gi, 'flour') // Fix concatenation
+        .trim();
+    };
+    
+    // Apply cleanup to all ingredient names
+    if (parsedRecipe.ingredients && Array.isArray(parsedRecipe.ingredients)) {
+      parsedRecipe.ingredients = parsedRecipe.ingredients.map((ing: any) => ({
+        ...ing,
+        name: cleanParsedIngredient(ing.name)
+      }));
+    }
+    
     // Validate that we found flour
     if (!parsedRecipe.totalFlour || parsedRecipe.totalFlour === 0) {
       return new Response(
