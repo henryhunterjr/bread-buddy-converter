@@ -13,6 +13,7 @@ import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { ConvertedRecipe, ParsedRecipe } from '@/types/recipe';
 import { MeasurementConverter } from '@/components/MeasurementConverter';
+import { InlineMeasurementConverter } from '@/components/InlineMeasurementConverter';
 import { 
   Select, 
   SelectContent, 
@@ -87,6 +88,11 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     if (validateInput(text)) {
       setRecipeText(text);
     }
+  };
+
+  const handleInlineReplace = (original: string, replacement: string) => {
+    const newText = recipeText.replace(original, replacement);
+    setRecipeText(newText);
   };
   
   // Detect if recipe contains starter/levain
@@ -599,6 +605,9 @@ Mix flour and water, rest 30 min...
 
       {/* Floating Measurement Converter */}
       <MeasurementConverter />
+
+      {/* Inline Smart Converter */}
+      <InlineMeasurementConverter text={recipeText} onReplace={handleInlineReplace} />
 
       {/* Footer */}
       <footer className="text-center py-4 text-xs text-muted-foreground border-t border-border">
