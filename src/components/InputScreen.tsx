@@ -155,13 +155,14 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved 
         improvements: data.improvements
       });
 
-      if (data.improvements?.length > 0) {
-        toast({
-          title: "Recipe validated",
-          description: data.improvements[0],
-          duration: 3000,
-        });
-      }
+      // Don't show internal parser comparison to users - they just see the best result
+      // if (data.improvements?.length > 0) {
+      //   toast({
+      //     title: "Recipe validated",
+      //     description: data.improvements[0],
+      //     duration: 3000,
+      //   });
+      // }
 
       return data.validatedRecipe;
     } catch (error) {
