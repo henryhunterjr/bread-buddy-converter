@@ -65,7 +65,28 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const [showHelp, setShowHelp] = useState(false);
   const [showSavedRecipes, setShowSavedRecipes] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [doughType, setDoughType] = useState<'plain' | 'enriched' | 'whole-grain'>('plain');
   const { toast } = useToast();
+  
+  // Input validation: block negatives and junk text
+  const validateInput = (text: string): boolean => {
+    // Block negative numbers
+    if (/-\d+/.test(text)) {
+      toast({
+        title: "Invalid input",
+        description: "Recipe amounts can't be negative",
+        variant: "destructive"
+      });
+      return false;
+    }
+    return true;
+  };
+  
+  const handleTextChange = (text: string) => {
+    if (validateInput(text)) {
+      setRecipeText(text);
+    }
+  };
   
   // Detect if recipe contains starter/levain
   const hasStarter = /starter|levain|sourdough starter/i.test(recipeText);
@@ -178,23 +199,20 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     setAiParseAvailable(false);
     
     try {
-      console.log('=== DUAL PARSER MODE ===');
+      // Check for essential ingredients upfront
+      const hasFlour = /\d+\s*(g|grams?|oz|ounces?|cups?|lbs?|pounds?).*?(flour|bread|wheat|rye|spelt)/i.test(recipeText);
+      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(recipeText);
+      const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(recipeText);
+      
+      if (!hasFlour || !hasWater || !hasLeavening) {
+        setErrors(['🤔 Need flour, water, and yeast/starter amounts to convert. Add those and try again!']);
+        return;
+      }
       
       const [regexResult, aiResult] = await Promise.all([
         Promise.resolve(parseRecipe(recipeText, starterHydration)),
         parseWithAI()
       ]);
-
-      console.log('Regex result:', {
-        flour: regexResult.totalFlour,
-        hydration: regexResult.hydration,
-        ingredients: regexResult.ingredients.length
-      });
-      console.log('AI result:', {
-        flour: aiResult?.totalFlour,
-        hydration: aiResult?.hydration,
-        ingredients: aiResult?.ingredients.length
-      });
 
       if (!aiResult) {
         toast({
@@ -324,6 +342,42 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </p>
             </div>
 
+            {/* Dough Type Selector */}
+            <div className="p-4 bg-accent/30 rounded-lg border border-accent space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Dough Type</h3>
+                  <p className="text-sm text-muted-foreground">Helps us pick the right formula</p>
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        Plain = basic bread. Enriched = has butter/eggs/sugar. Whole-grain = 50%+ whole wheat/rye.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              <Select 
+                value={doughType} 
+                onValueChange={(value: any) => setDoughType(value)}
+              >
+                <SelectTrigger className="w-full bg-background">
+                  <SelectValue placeholder="Plain (default)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="plain">Plain - Basic bread dough</SelectItem>
+                  <SelectItem value="enriched">Enriched - Has butter, eggs, or sugar</SelectItem>
+                  <SelectItem value="whole-grain">Whole-Grain - 50%+ whole wheat/rye</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Text Area Label */}
             <div className="space-y-2">
               <label htmlFor="recipe-input" className="text-sm font-medium text-foreground">
@@ -333,7 +387,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                 id="recipe-input"
                 placeholder={getPlaceholderText(direction)}
                 value={recipeText}
-                onChange={(e) => setRecipeText(e.target.value)}
+                onChange={(e) => handleTextChange(e.target.value)}
                 className="min-h-[200px] bg-muted/30 border-input text-sm resize-none"
               />
             </div>

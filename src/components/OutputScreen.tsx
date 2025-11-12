@@ -161,9 +161,18 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button onClick={handleDownloadPDF} size="sm">
-            Download PDF
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={handleDownloadPDF} size="sm" className="border-2 border-golden-yellow hover:border-warm-orange transition-colors">
+                  Download PDF
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Save your converted recipe as a PDF</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button onClick={onStartOver} variant="secondary" size="sm">
             Start Over
           </Button>
@@ -304,13 +313,49 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                             </div>
                           </td>
                         </tr>
-                        {convertedPercentages.slice(0, 3).map((item, i) => (
-                          <tr key={`levain-${i}`} className="border-b border-border/30">
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">{item.ingredient}</td>
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
-                          </tr>
-                        ))}
+                        {convertedPercentages.slice(0, 3).map((item, i) => {
+                          // Generate tooltips for levain ingredients
+                          const getTooltipText = (ingredient: string): string | null => {
+                            const lower = ingredient.toLowerCase();
+                            if (lower.includes('starter')) {
+                              return "This is your active, bubbly starter—the heart of sourdough! It replaces commercial yeast.";
+                            }
+                            if (lower.includes('water') && i === 1) {
+                              return "Levain water helps build a strong starter culture that ferments your dough over 4-6 hours.";
+                            }
+                            if (lower.includes('flour') && i === 2) {
+                              return "Levain flour feeds your starter culture, creating flavor and leavening power naturally.";
+                            }
+                            return null;
+                          };
+                          
+                          const tooltipText = getTooltipText(item.ingredient);
+                          
+                          return (
+                            <tr key={`levain-${i}`} className="border-b border-border/30">
+                              <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">
+                                {tooltipText ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help underline decoration-dotted decoration-muted-foreground">
+                                          {item.ingredient}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p className="text-sm">{tooltipText}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  item.ingredient
+                                )}
+                              </td>
+                              <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
+                              <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
+                            </tr>
+                          );
+                        })}
                         
                         {/* Dough Section */}
                         <tr className="border-b border-border/50">
@@ -328,18 +373,65 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                           </tr>
                         ))}
                       </>
-                    ) : (
+                     ) : (
                       /* Single list for sourdough-to-yeast conversions */
                       convertedPercentages.map((item, i) => {
                         const isChanged = !originalPercentages.find(
                           orig => orig.ingredient === item.ingredient && Math.abs(orig.amount - item.amount) < 1
                         );
+                        
+                        // Generate helpful tooltips explaining changes
+                        const getTooltipText = (ingredient: string): string | null => {
+                          const lower = ingredient.toLowerCase();
+                          if (lower.includes('yeast') || lower.includes('instant')) {
+                            return "Replaced starter with yeast for a faster rise—typically 1-2 hours instead of 4-6!";
+                          }
+                          if (lower.includes('water') && result.direction === 'sourdough-to-yeast') {
+                            return "Yeast breads often need slightly less water than sourdough for the perfect texture.";
+                          }
+                          if (lower.includes('starter') || lower.includes('levain')) {
+                            return "Active starter feeds the dough slowly, giving deeper flavor and a chewy crumb.";
+                          }
+                          if (lower.includes('sugar') || lower.includes('honey')) {
+                            return "Sugar feeds the yeast for a faster rise, but can slow down sourdough—that's why we adjust starter amounts!";
+                          }
+                          if (lower.includes('butter') || lower.includes('oil')) {
+                            return "Fat makes dough tender and rich, but can slow fermentation—we account for this in rise times.";
+                          }
+                          if (lower.includes('egg')) {
+                            return "Eggs add richness and structure, plus about 75% of their weight counts as liquid!";
+                          }
+                          if (lower.includes('milk')) {
+                            return "Milk adds softness and flavor. We count it as 100% liquid in our hydration calculations.";
+                          }
+                          return null;
+                        };
+                        
+                        const tooltipText = getTooltipText(item.ingredient);
+                        
                         return (
                           <tr 
                             key={i} 
                             className={`border-b border-border/30 ${isChanged ? 'bg-highlight' : ''}`}
                           >
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">{item.ingredient}</td>
+                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">
+                              {tooltipText ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="cursor-help underline decoration-dotted decoration-muted-foreground">
+                                        {item.ingredient}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p className="text-sm">{tooltipText}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                item.ingredient
+                              )}
+                            </td>
                             <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
                             <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
                           </tr>
