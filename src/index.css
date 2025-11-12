@@ -41,8 +41,8 @@ All colors MUST be HSL.
     /* Warm artisanal colors */
     --warm-orange: 25 70% 55%;
     --warm-orange-hover: 25 75% 60%;
-    --burnt-orange: 20 65% 50%;
-    --golden-yellow: 42 70% 55%;
+    --burnt-orange: 20 70% 45%;
+    --golden-yellow: 42 85% 50%;
     --card-border: 28 50% 75%;
     --breadcrumb-text: 28 15% 35%;
 

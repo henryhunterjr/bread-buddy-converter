@@ -40,7 +40,20 @@ interface InputScreenProps {
   onHome: () => void;
 }
 
-const PLACEHOLDER_TEXT = `Paste your yeasted recipe here...`;
+const getPlaceholderText = (direction: string) => 
+  direction === 'yeast-to-sourdough' 
+    ? 'Paste your yeasted recipe here...' 
+    : 'Paste your sourdough recipe here...';
+
+const getConversionTitle = (direction: string) =>
+  direction === 'yeast-to-sourdough' 
+    ? 'sourdough' 
+    : 'yeasted';
+
+const getButtonText = (direction: string) =>
+  direction === 'yeast-to-sourdough'
+    ? 'Convert to Sourdough'
+    : 'Convert to Yeast';
 
 export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
   const [recipeText, setRecipeText] = useState('');
@@ -265,7 +278,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
             <div className="flex items-center gap-2 text-sm text-breadcrumb-text">
               <button onClick={onHome} className="hover:text-foreground transition-colors">Home</button>
               <span>/</span>
-              <span className="text-foreground font-medium">Convert {directionText}</span>
+              <span className="text-foreground font-medium">
+                Convert {direction === 'yeast-to-sourdough' ? 'Yeast → Sourdough' : 'Sourdough → Yeast'}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -294,7 +309,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               Convert {directionText}
             </h1>
             <p className="text-lg text-muted-foreground">
-              We'll expertly transform your recipe into a perfect {direction === 'yeast-to-sourdough' ? 'sourdough' : 'yeasted'} version.
+              We'll expertly transform your recipe into a perfect {getConversionTitle(direction)} version.
             </p>
           </div>
 
@@ -320,7 +335,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </label>
               <Textarea
                 id="recipe-input"
-                placeholder={PLACEHOLDER_TEXT}
+                placeholder={getPlaceholderText(direction)}
                 value={recipeText}
                 onChange={(e) => setRecipeText(e.target.value)}
                 className="min-h-[200px] bg-muted/30 border-input text-sm resize-none"
@@ -437,7 +452,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
             <Button 
               onClick={handleConvert}
               size="lg"
-              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-burnt-orange to-golden-yellow hover:from-burnt-orange/90 hover:to-golden-yellow/90 text-white shadow-lg transition-all hover:shadow-xl"
+              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-burnt-orange via-warm-orange to-golden-yellow hover:from-burnt-orange/95 hover:via-warm-orange/95 hover:to-golden-yellow/95 text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01]"
               disabled={!recipeText.trim() || isProcessing || isAIParsing}
             >
               {isProcessing ? (
@@ -448,7 +463,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               ) : (
                 <>
                   <Sparkles className="mr-2 h-5 w-5" />
-                  Convert to Sourdough
+                  {getButtonText(direction)}
                   <Wheat className="ml-2 h-5 w-5" />
                 </>
               )}
