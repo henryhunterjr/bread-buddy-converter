@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         serif: ['"Playfair Display"', 'Georgia', 'serif'],
-        sans: ['Lato', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -62,6 +62,12 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         highlight: "hsl(var(--highlight))",
+        "warm-orange": "hsl(var(--warm-orange))",
+        "warm-orange-hover": "hsl(var(--warm-orange-hover))",
+        "burnt-orange": "hsl(var(--burnt-orange))",
+        "golden-yellow": "hsl(var(--golden-yellow))",
+        "card-border": "hsl(var(--card-border))",
+        "breadcrumb-text": "hsl(var(--breadcrumb-text))",
       },
       borderRadius: {
         lg: "var(--radius)",
