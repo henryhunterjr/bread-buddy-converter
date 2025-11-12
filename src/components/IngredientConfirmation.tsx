@@ -27,7 +27,25 @@ export function IngredientConfirmation({
   onHome 
 }: IngredientConfirmationProps) {
   const [editMode, setEditMode] = useState(false);
-  const [edited, setEdited] = useState(ingredients);
+  
+  // Auto-fill defaults for low-confidence or estimated ingredients
+  const autoFilledIngredients = ingredients.map(ing => {
+    if ((ing.confidence === 'low' || ing.source === 'estimated') && (!ing.amount || ing.amount === 0)) {
+      const name = ing.name.toLowerCase();
+      if (name.includes('milk') || name.includes('egg wash') || name.includes('wash')) {
+        return { ...ing, amount: 50 };
+      }
+      if (name.includes('butter') && name.includes('brush')) {
+        return { ...ing, amount: 30 };
+      }
+      if (name.includes('seed') || name.includes('topping') || name.includes('garnish')) {
+        return { ...ing, amount: 20 };
+      }
+    }
+    return ing;
+  });
+  
+  const [edited, setEdited] = useState(autoFilledIngredients);
 
   // 🧪 DIAGNOSTIC TEST: Check flour consolidation
   useEffect(() => {
@@ -49,19 +67,23 @@ export function IngredientConfirmation({
   };
 
   const getConfidenceBadge = (ingredient: ParsedIngredient) => {
-    if (ingredient.source === 'estimated') {
+    const needsValue = (!ingredient.amount || ingredient.amount === 0);
+    
+    if (ingredient.source === 'estimated' || (ingredient.confidence === 'low' && needsValue)) {
       return (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-700 border-yellow-500/20">
+              <Badge variant="outline" className="text-xs bg-red-500/20 text-red-700 border-red-500/50 font-bold">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                Estimated
+                {needsValue ? 'Needs value' : 'Estimated'}
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-sm max-w-xs">
-                This ingredient was not found in the recipe. A standard amount has been added - please verify.
+                {needsValue 
+                  ? "This ingredient needs a value. A default has been added - please verify or set to 0g to skip."
+                  : "This ingredient was not found in the recipe. A standard amount has been added - please verify."}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -130,7 +152,7 @@ export function IngredientConfirmation({
           asChild
           className="flex items-center gap-2"
         >
-          <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+          <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback">
             <Mail className="h-4 w-4" />
             <span className="hidden sm:inline">Report Issue</span>
           </a>
@@ -178,11 +200,15 @@ export function IngredientConfirmation({
       )}
 
       <div className="space-y-3 mb-6">
-        {edited.map((ing, idx) => (
+        {edited.map((ing, idx) => {
+          const needsValue = (!ing.amount || ing.amount === 0) && (ing.confidence === 'low' || ing.source === 'estimated');
+          return (
           <div 
             key={idx} 
             className={`flex items-center gap-3 p-3 rounded transition-colors ${
-              ing.confidence === 'low' || ing.source === 'estimated'
+              needsValue
+                ? 'bg-red-50 dark:bg-red-950/20 border-2 border-red-500 dark:border-red-700'
+                : ing.confidence === 'low' || ing.source === 'estimated'
                 ? 'bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900'
                 : 'bg-muted border border-transparent'
             }`}
@@ -218,7 +244,8 @@ export function IngredientConfirmation({
               </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="flex gap-3">

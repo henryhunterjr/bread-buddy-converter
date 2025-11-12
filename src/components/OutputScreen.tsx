@@ -38,9 +38,10 @@ interface OutputScreenProps {
   onEditExtraction: () => void;
   validationAutoFixes?: string[];
   onHome: () => void;
+  onMyRecipes?: () => void;
 }
 
-export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [], onHome }: OutputScreenProps) {
+export default function OutputScreen({ result, recipeName: initialRecipeName, recipeDescription, originalRecipeText, onStartOver, onEditExtraction, validationAutoFixes = [], onHome, onMyRecipes }: OutputScreenProps) {
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -75,8 +76,8 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
     saveRecipe(recipeName, originalRecipeText, result);
     toast({
-      title: "Recipe saved",
-      description: `"${recipeName}" has been saved to your browser`,
+      title: "✅ Saved!",
+      description: `Find it under "My Recipes" in the menu.`,
     });
     setSaveDialogOpen(false);
     setRecipeName('');
@@ -84,7 +85,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Navigation onHome={onHome} />
+      <Navigation onHome={onHome} onMyRecipes={onMyRecipes} />
       {/* Header - optimized for mobile and print */}
       <div className="p-4 sm:p-6 border-b border-border print:border-0">
         <div className="max-w-7xl mx-auto">
@@ -114,7 +115,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                 size="sm"
                 asChild
               >
-                <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+                <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback">
                   <Mail className="h-4 w-4 mr-2" />
                   Report Issue
                 </a>
@@ -126,12 +127,12 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
                 <Save className="mr-2 h-4 w-4" />
-                Save Recipe
+                Save to My Recipes
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Save Recipe</DialogTitle>
+                <DialogTitle>Save to My Recipes</DialogTitle>
                 <DialogDescription>
                   Give this recipe a name so you can easily find it later
                 </DialogDescription>
@@ -333,14 +334,14 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                           const tooltipText = getTooltipText(item.ingredient);
                           
                           return (
-                            <tr key={`levain-${i}`} className="border-b border-border/30">
+                           <tr key={`levain-${i}`} className="border-b border-border/30">
                               <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">
                                 {tooltipText ? (
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <span className="cursor-help underline decoration-dotted decoration-muted-foreground">
-                                          {item.ingredient}
+                                          {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
                                         </span>
                                       </TooltipTrigger>
                                       <TooltipContent className="max-w-xs">
@@ -349,7 +350,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                                     </Tooltip>
                                   </TooltipProvider>
                                 ) : (
-                                  item.ingredient
+                                  item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)
                                 )}
                               </td>
                               <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
@@ -368,7 +369,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                         </tr>
                         {convertedPercentages.slice(3).map((item, i) => (
                           <tr key={`dough-${i}`} className="border-b border-border/30">
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">{item.ingredient}</td>
+                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">{item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}</td>
                             <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
                             <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
                           </tr>
@@ -421,7 +422,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="cursor-help underline decoration-dotted decoration-muted-foreground">
-                                        {item.ingredient}
+                                        {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
@@ -430,7 +431,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                                   </Tooltip>
                                 </TooltipProvider>
                               ) : (
-                                item.ingredient
+                                item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)
                               )}
                             </td>
                             <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>

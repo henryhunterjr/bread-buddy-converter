@@ -12,8 +12,11 @@ import { extractRecipeInfo } from '@/utils/titleExtractor';
 import { HelpModal } from '@/components/HelpModal';
 import { Button } from '@/components/ui/button';
 import { HelpCircle } from 'lucide-react';
+import { SavedRecipes } from '@/components/SavedRecipes';
+import { SavedRecipe } from '@/utils/recipeStorage';
+import { Navigation } from '@/components/Navigation';
 
-type Screen = 'landing' | 'input' | 'confirmation' | 'output';
+type Screen = 'landing' | 'input' | 'confirmation' | 'output' | 'saved';
 
 const Index = () => {
   const [screen, setScreen] = useState<Screen>('landing');
@@ -257,6 +260,18 @@ const Index = () => {
   const handleBack = () => {
     setScreen('landing');
   };
+  
+  const handleViewSavedRecipes = () => {
+    setScreen('saved');
+  };
+  
+  const handleLoadRecipe = (recipe: SavedRecipe) => {
+    setOriginalRecipeText(recipe.originalText);
+    setResult(recipe.convertedRecipe);
+    setDirection(recipe.convertedRecipe.direction);
+    setRecipeName(recipe.name);
+    setScreen('output');
+  };
 
   return (
     <>
@@ -294,6 +309,16 @@ const Index = () => {
           onHome={handleStartOver}
         />
       )}
+      {screen === 'saved' && (
+        <div className="min-h-screen bg-background flex flex-col">
+          <Navigation onHome={handleStartOver} />
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="max-w-3xl w-full">
+              <SavedRecipes onLoadRecipe={handleLoadRecipe} />
+            </div>
+          </div>
+        </div>
+      )}
       {screen === 'output' && result && (
         <OutputScreen 
           result={result}
@@ -304,6 +329,7 @@ const Index = () => {
           onEditExtraction={handleEditExtraction}
           validationAutoFixes={validationAutoFixes}
           onHome={handleStartOver}
+          onMyRecipes={handleViewSavedRecipes}
         />
       )}
     </>

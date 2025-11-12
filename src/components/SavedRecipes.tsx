@@ -50,14 +50,14 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
   if (savedRecipes.length === 0) {
     return (
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Saved Recipes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No saved recipes yet. Convert a recipe and click "Save Recipe" to store it here.
-          </p>
-        </CardContent>
+      <CardHeader>
+        <CardTitle>My Recipes</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground text-center py-8">
+          No saved recipes yet. Convert a recipe and click "Save to My Recipes" to store it here.
+        </p>
+      </CardContent>
       </Card>
     );
   }
@@ -65,7 +65,7 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Saved Recipes ({savedRecipes.length})</CardTitle>
+        <CardTitle>My Recipes ({savedRecipes.length})</CardTitle>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">

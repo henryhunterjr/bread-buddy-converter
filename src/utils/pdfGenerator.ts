@@ -225,14 +225,14 @@ export function generatePDF(
   doc.text(titleLines, pageWidth / 2, yPos + 0.35, { align: 'center' });
   yPos += (titleLines.length * 0.4) + 0.2;
   
-  // Subtitle line with conversion info
+  // Subtitle line with conversion info and branding
   doc.setFontSize(FONTS.subtitleSize);
   doc.setFont(FONTS.body, 'normal');
   doc.setTextColor(139, 111, 71);
   const conversionLabel = result.direction === 'sourdough-to-yeast'
-    ? 'CONVERTED FROM SOURDOUGH'
-    : 'CONVERTED FROM YEAST';
-  const subtitle = `${conversionLabel} • ${result.direction === 'yeast-to-sourdough' ? 'STARTER' : 'YEAST'} • HYDRATION ${result.converted.hydration.toFixed(0)}% • ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' })}`.toUpperCase();
+    ? 'SOURDOUGH → YEAST'
+    : 'YEAST → SOURDOUGH';
+  const subtitle = `CONVERTED BY BAKING GREAT BREAD AT HOME • ${conversionLabel} • HYDRATION ${result.converted.hydration.toFixed(0)}% • ${new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}`.toUpperCase();
   doc.text(subtitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 0.35;
   
@@ -308,7 +308,9 @@ export function generatePDF(
 
       doc.setTextColor(61, 40, 23);
       const ingredientName = cleanTextForPDF(item.ingredient);
-      doc.text(ingredientName, margin + 0.1, yPos);
+      // Capitalize first letter
+      const capitalizedName = ingredientName.charAt(0).toUpperCase() + ingredientName.slice(1);
+      doc.text(capitalizedName, margin + 0.1, yPos);
       doc.text(`${item.amount.toFixed(0)}g`, margin + contentWidth - 1.5, yPos);
       doc.text(`${item.percentage.toFixed(0)}%`, margin + contentWidth - 0.6, yPos);
       yPos += 0.22;
@@ -503,7 +505,7 @@ export function generatePDF(
   doc.setFont(FONTS.body, 'italic');
   doc.setTextColor(139, 111, 71);
   doc.text(
-    'Baked with love using Bread Buddy (BakingGreatBread.com)',
+    'Baked with ❤️ using Baking Great Bread at Home Sourdough ↔ Yeast Converter',
     pageWidth / 2,
     footerY,
     { align: 'center' }
@@ -512,7 +514,7 @@ export function generatePDF(
   // Generate filename - use cleaned name
   const cleanName = cleanRecipeName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
   const conversionType = result.direction === 'sourdough-to-yeast' ? 'SourdoughToYeast' : 'YeastToSourdough';
-  const filename = `${cleanName}_BreadBuddy_${conversionType}.pdf`;
+  const filename = `${cleanName}_BGB_${conversionType}.pdf`;
   
   // Mobile-friendly download strategy
   if (isMobileDevice()) {

@@ -105,7 +105,7 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
             asChild
             className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
           >
-            <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Beta%20Feedback">
+            <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback">
               <Mail className="h-4 w-4 mr-2" />
               Report an Issue
             </a>
