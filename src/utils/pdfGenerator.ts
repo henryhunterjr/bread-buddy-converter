@@ -76,8 +76,16 @@ function groupIngredients(percentages: BakersPercentage[], direction: string): I
     const levainIngredients = percentages.slice(0, 3); // First 3 are levain (starter, water, flour)
     const doughIngredients = percentages.slice(3);
     
+    // Add levain subtotal as a special entry
+    const levainTotal = levainIngredients.reduce((sum, item) => sum + item.amount, 0);
+    const levainSubtotal: BakersPercentage = {
+      ingredient: '── Levain Subtotal',
+      amount: levainTotal,
+      percentage: 0 // We'll hide the percentage column for this row
+    };
+    
     return [
-      { section: 'Levain / Starter', ingredients: levainIngredients },
+      { section: 'Levain / Starter', ingredients: [...levainIngredients, levainSubtotal] },
       { section: 'Dough', ingredients: doughIngredients }
     ];
   } else {
@@ -248,7 +256,44 @@ export function generatePDF(
   
   yPos += 0.1;
   
-  // ========== 2. INGREDIENTS - TWO COLUMN GRID ==========
+  // ========== 2. RECIPE SUMMARY (YEAST TO SOURDOUGH ONLY) ==========
+  if (result.direction === 'yeast-to-sourdough') {
+    const convertedPercentages = calculateBakersPercentages(result.converted);
+    const levainFlour = convertedPercentages[2]?.amount || 0;
+    const doughFlour = convertedPercentages.slice(3).filter(p => 
+      p.ingredient.toLowerCase().includes('flour')
+    ).reduce((sum, p) => sum + p.amount, 0);
+    const levainWater = convertedPercentages[1]?.amount || 0;
+    const doughWater = convertedPercentages.slice(3).filter(p => 
+      p.ingredient.toLowerCase().includes('water')
+    ).reduce((sum, p) => sum + p.amount, 0);
+    const totalDoughWeight = convertedPercentages.reduce((sum, p) => sum + p.amount, 0);
+
+    // Section heading
+    doc.setFontSize(FONTS.headingSize);
+    doc.setFont(FONTS.body, 'bold');
+    doc.setTextColor(61, 40, 23);
+    doc.text('Recipe Summary', margin, yPos);
+    yPos += 0.35;
+
+    // Summary box with light background
+    doc.setFillColor(245, 242, 235);
+    doc.roundedRect(margin, yPos - 0.1, contentWidth, 0.65, 0.05, 0.05, 'F');
+    
+    doc.setFontSize(FONTS.bodySize);
+    doc.setFont(FONTS.body, 'normal');
+    doc.setTextColor(61, 40, 23);
+    
+    doc.text(`Total Flour: ${result.converted.totalFlour}g`, margin + 0.15, yPos + 0.05);
+    doc.text(`(${levainFlour.toFixed(0)}g in levain, ${doughFlour.toFixed(0)}g in final dough)`, margin + 0.3, yPos + 0.2, { maxWidth: contentWidth - 0.6 });
+    
+    doc.text(`Total Water: ${result.converted.totalLiquid}g`, margin + 0.15, yPos + 0.35);
+    doc.text(`(${levainWater.toFixed(0)}g in levain, ${doughWater.toFixed(0)}g in final dough)`, margin + 0.3, yPos + 0.5, { maxWidth: contentWidth - 0.6 });
+    
+    yPos += 0.8;
+  }
+  
+  // ========== 3. INGREDIENTS - TWO COLUMN GRID ==========
   const convertedPercentages = calculateBakersPercentages(result.converted);
   const ingredientGroups = groupIngredients(convertedPercentages, result.direction);
 
@@ -305,11 +350,32 @@ export function generatePDF(
 
       doc.setTextColor(61, 40, 23);
       const ingredientName = cleanTextForPDF(item.ingredient);
-      // Force capitalize first letter of ingredient name
-      const capitalizedName = ingredientName.charAt(0).toUpperCase() + ingredientName.slice(1).toLowerCase();
-      doc.text(capitalizedName, margin + 0.1, yPos);
-      doc.text(`${item.amount.toFixed(0)}g`, margin + contentWidth - 1.5, yPos);
-      doc.text(`${item.percentage.toFixed(0)}%`, margin + contentWidth - 0.6, yPos);
+      
+      // Check if this is the levain subtotal or levain reference
+      const isLevainSubtotal = ingredientName.includes('── Levain Subtotal');
+      const isLevainReference = ingredientName.toLowerCase().includes('all of the levain');
+      
+      // Handle special formatting for levain subtotal
+      if (isLevainSubtotal) {
+        doc.setFont(FONTS.body, 'bold');
+        doc.setFillColor(232, 220, 200);
+        doc.rect(margin, yPos - 0.15, contentWidth, 0.22, 'F');
+        doc.text('Levain Subtotal', margin + 0.1, yPos);
+        doc.text(`${item.amount.toFixed(0)}g`, margin + contentWidth - 1.5, yPos);
+        // Skip percentage display for subtotal
+      } else if (isLevainReference) {
+        // Format "all of the levain" as "Levain (from above): XXXg"
+        const displayName = `Levain (from above): ${item.amount.toFixed(0)}g`;
+        doc.text(displayName, margin + 0.1, yPos);
+        doc.text(`${item.percentage.toFixed(0)}%`, margin + contentWidth - 0.6, yPos);
+        // Skip amount column since it's in the name
+      } else {
+        // Normal ingredient display
+        const capitalizedName = ingredientName.charAt(0).toUpperCase() + ingredientName.slice(1).toLowerCase();
+        doc.text(capitalizedName, margin + 0.1, yPos);
+        doc.text(`${item.amount.toFixed(0)}g`, margin + contentWidth - 1.5, yPos);
+        doc.text(`${item.percentage.toFixed(0)}%`, margin + contentWidth - 0.6, yPos);
+      }
       yPos += 0.22;
     });
 
@@ -325,7 +391,24 @@ export function generatePDF(
   doc.text(`Total Hydration: ${result.converted.hydration.toFixed(0)}%`, margin + 0.15, yPos + 0.18);
   yPos += 0.45;
   
-  // ========== 3. METHOD WITH NUMBERED STEP ICONS ==========
+  // Explanation Note (yeast-to-sourdough only)
+  if (result.direction === 'yeast-to-sourdough') {
+    doc.setFillColor(245, 242, 235);
+    doc.roundedRect(margin, yPos, contentWidth, 0.4, 0.05, 0.05, 'F');
+    doc.setFontSize(FONTS.smallSize);
+    doc.setFont(FONTS.body, 'italic');
+    doc.setTextColor(100, 100, 100);
+    const noteText = 'Note: The levain flour and water are included in both the levain section and the total calculations. This is standard practice in baker\'s formulas.';
+    const noteLines = doc.splitTextToSize(noteText, contentWidth - 0.3);
+    let noteY = yPos + 0.15;
+    noteLines.forEach((line: string) => {
+      doc.text(line, margin + 0.15, noteY);
+      noteY += 0.12;
+    });
+    yPos += 0.5;
+  }
+  
+  // ========== 4. METHOD WITH NUMBERED STEP ICONS ==========
   if (yPos > pageHeight - 2) {
     doc.addPage();
     doc.setFillColor(250, 248, 243);
