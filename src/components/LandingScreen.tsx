@@ -19,6 +19,10 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           src={heroBanner} 
           alt="Baking workspace with rustic bread and baking tools" 
           className="absolute inset-0 w-full h-full object-cover"
+          width="1920"
+          height="220"
+          loading="eager"
+          fetchPriority="high"
         />
       </div>
       

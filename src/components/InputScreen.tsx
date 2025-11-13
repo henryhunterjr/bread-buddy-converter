@@ -299,7 +299,14 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       <header className="w-full border-b border-border bg-card/95 backdrop-blur">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src={bgbLogo} alt="Baking Great Bread" className="h-12 w-12 rounded-full object-cover" />
+            <img 
+              src={bgbLogo} 
+              alt="Baking Great Bread" 
+              className="h-12 w-12 rounded-full object-cover"
+              width="48"
+              height="48"
+              loading="lazy"
+            />
             <div className="flex items-center gap-2 text-sm text-breadcrumb-text">
               <button onClick={onHome} className="hover:text-foreground transition-colors">Home</button>
               <span>/</span>

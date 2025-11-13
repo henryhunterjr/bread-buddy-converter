@@ -119,7 +119,10 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               <img 
                 src={logo} 
                 alt="Baking Great Bread at Home" 
-                className="h-12 sm:h-14 md:h-16 print:h-12" 
+                className="h-12 sm:h-14 md:h-16 print:h-12"
+                width="64"
+                height="64"
+                loading="lazy"
               />
               <Tooltip>
                 <TooltipTrigger asChild>
