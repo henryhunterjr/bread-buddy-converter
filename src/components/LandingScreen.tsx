@@ -22,7 +22,6 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           width="1920"
           height="220"
           loading="eager"
-          fetchPriority="high"
         />
       </div>
       
