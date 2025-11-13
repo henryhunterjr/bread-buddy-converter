@@ -108,13 +108,48 @@ export function generateSubstitutions(recipe: ParsedRecipe): IngredientSubstitut
     }
     
     // Egg substitutions (for enriched doughs)
-    if (lowerName.includes('egg')) {
+    if (lowerName.includes('egg') && !lowerName.includes('wash')) {
       substitutions.push({
-        original: 'Eggs',
-        substitute: 'Flax eggs (for vegan option)',
-        ratio: '1 egg = 1 tbsp ground flax + 3 tbsp water',
+        original: 'Eggs (whole)',
+        substitute: 'Flax eggs (vegan)',
+        ratio: '1 egg : 1 tbsp ground flaxseed + 3 tbsp water',
         hydrationAdjustment: 0,
-        notes: 'Mix ground flaxseed with water, let sit 5 minutes until gel-like. Adds nutty flavor. Texture will be slightly denser.'
+        notes: 'Mix ground flaxseed with water, let sit 5 minutes until gel-like. Works best in dense breads. Provides binding but not leavening.'
+      });
+      
+      substitutions.push({
+        original: 'Eggs (whole)',
+        substitute: 'Aquafaba (chickpea liquid)',
+        ratio: '1 egg : 3 tbsp aquafaba',
+        hydrationAdjustment: 0,
+        notes: 'Use liquid from canned chickpeas. Best for enriched doughs. Provides structure and some lift.'
+      });
+    }
+    
+    // Milk substitutions (for enriched doughs)
+    if (lowerName.includes('milk') && !lowerName.includes('powder')) {
+      substitutions.push({
+        original: 'Whole milk',
+        substitute: 'Water',
+        ratio: '1:1',
+        hydrationAdjustment: 0,
+        notes: 'Direct 1:1 replacement. Bread will be slightly less rich and tender. Add 1 tbsp butter per cup of milk for richer flavor.'
+      });
+      
+      substitutions.push({
+        original: 'Whole milk',
+        substitute: 'Plant-based milk (soy, oat, almond)',
+        ratio: '1:1',
+        hydrationAdjustment: 0,
+        notes: 'Use unsweetened varieties. Soy milk is closest to dairy milk in protein. Oat adds sweetness. Almond is thinner.'
+      });
+      
+      substitutions.push({
+        original: 'Whole milk',
+        substitute: 'Buttermilk',
+        ratio: '1:1 (add 1/4 tsp baking soda per cup)',
+        hydrationAdjustment: 0,
+        notes: 'Adds tanginess and tenderness. Add 1/4 tsp baking soda per cup to neutralize acidity.'
       });
     }
   });
