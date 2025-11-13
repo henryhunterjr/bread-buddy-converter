@@ -11,20 +11,33 @@ export interface SavedRecipe {
 const STORAGE_KEY = 'bgb_saved_recipes';
 
 export function saveRecipe(name: string, originalText: string, convertedRecipe: ConvertedRecipe): SavedRecipe {
-  const savedRecipes = getSavedRecipes();
-  
-  const newRecipe: SavedRecipe = {
-    id: Date.now().toString(),
-    name: name.trim() || `Recipe ${savedRecipes.length + 1}`,
-    originalText,
-    convertedRecipe,
-    savedAt: Date.now()
-  };
-  
-  savedRecipes.push(newRecipe);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
-  
-  return newRecipe;
+  try {
+    const savedRecipes = getSavedRecipes();
+    
+    const newRecipe: SavedRecipe = {
+      id: Date.now().toString(),
+      name: name.trim() || `Recipe ${savedRecipes.length + 1}`,
+      originalText,
+      convertedRecipe,
+      savedAt: Date.now()
+    };
+    
+    savedRecipes.push(newRecipe);
+    
+    // Check if localStorage is available and has space
+    const recipeData = JSON.stringify(savedRecipes);
+    if (recipeData.length > 5000000) { // ~5MB limit
+      throw new Error('Storage quota exceeded. Please delete some older recipes.');
+    }
+    
+    localStorage.setItem(STORAGE_KEY, recipeData);
+    return newRecipe;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'QuotaExceededError') {
+      throw new Error('Storage quota exceeded. Please delete some older recipes to make space.');
+    }
+    throw new Error(`Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export function getSavedRecipes(): SavedRecipe[] {
@@ -39,9 +52,14 @@ export function getSavedRecipes(): SavedRecipe[] {
 }
 
 export function deleteRecipe(id: string): void {
-  const savedRecipes = getSavedRecipes();
-  const filtered = savedRecipes.filter(r => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  try {
+    const savedRecipes = getSavedRecipes();
+    const filtered = savedRecipes.filter(r => r.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error('Error deleting recipe:', error);
+    throw new Error(`Failed to delete recipe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export function getRecipeById(id: string): SavedRecipe | null {
@@ -50,5 +68,10 @@ export function getRecipeById(id: string): SavedRecipe | null {
 }
 
 export function clearAllRecipes(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error('Error clearing recipes:', error);
+    throw new Error(`Failed to clear recipes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }

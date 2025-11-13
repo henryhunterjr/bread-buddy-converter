@@ -240,47 +240,61 @@ function validateBakersPercentages(
 }
 
 /**
- * CHECK 6: Essential Ingredients Validation
- * Ensures recipe has core bread-making ingredients
+ * CHECK 6: Essential Ingredients Check
+ * Ensures recipe has minimum required ingredients and handles edge cases
  */
 function validateEssentialIngredients(
   conversion: ConvertedRecipe,
   warnings: RecipeWarning[]
 ): ConvertedRecipe {
-  const ingredients = conversion.converted.ingredients;
+  const hasFlour = conversion.converted.totalFlour > 0;
+  const hasLiquid = conversion.converted.totalLiquid > 0;
+  const hasLeavening = conversion.converted.yeastAmount > 0 || conversion.converted.starterAmount > 0;
   
-  // Must have: flour, liquid, leavening
-  const hasFlour = ingredients.some(i => i.type === 'flour');
-  const hasLiquid = ingredients.some(i => i.type === 'liquid');
-  const hasLeavening = ingredients.some(i => i.type === 'yeast' || i.type === 'starter');
-  const hasSalt = ingredients.some(i => i.type === 'salt');
-  
-  if (!hasFlour) {
+  // Critical errors for non-bread recipes
+  if (!hasFlour || conversion.converted.totalFlour < 50) {
     warnings.push({
-      type: 'warning',
-      message: 'No flour detected in recipe. This may not be a bread recipe.'
+      type: 'caution',
+      message: 'Very little or no flour detected in recipe. This may not be a bread recipe, or ingredients were not recognized properly. Please verify your recipe text.'
     });
   }
   
-  if (!hasLiquid) {
+  if (!hasLiquid || conversion.converted.totalLiquid < 20) {
     warnings.push({
-      type: 'warning',
-      message: 'No liquid detected in recipe. Bread requires water, milk, or other liquid.'
+      type: 'caution',
+      message: 'Very little or no liquid detected. Bread requires hydration (typically 60-80% of flour weight). Please verify your recipe includes water, milk, or other liquids.'
     });
   }
   
   if (!hasLeavening) {
     warnings.push({
       type: 'warning',
-      message: 'No leavening agent detected. Recipe needs yeast or sourdough starter.'
+      message: 'No leavening agent (yeast or starter) detected. This may be an unleavened flatbread or focaccia. If this should be a leavened bread, please verify the recipe text.'
     });
   }
   
-  if (!hasSalt) {
+  // Edge case: Extremely high flour ratio
+  if (hasFlour && conversion.converted.totalFlour > 2000) {
     warnings.push({
       type: 'info',
-      message: 'No salt detected. Salt enhances flavor and controls fermentation.'
+      message: `This recipe uses ${conversion.converted.totalFlour}g of flour, which is quite large (typically makes 3-4 loaves). Verify this is intentional.`
     });
+  }
+  
+  // Edge case: Unusual hydration
+  if (hasFlour && hasLiquid) {
+    const hydration = (conversion.converted.totalLiquid / conversion.converted.totalFlour) * 100;
+    if (hydration < 50) {
+      warnings.push({
+        type: 'caution',
+        message: `Hydration is very low (${hydration.toFixed(1)}%). This will produce an extremely stiff dough. Typical bread is 60-80% hydration. Please verify.`
+      });
+    } else if (hydration > 100) {
+      warnings.push({
+        type: 'caution',
+        message: `Hydration is very high (${hydration.toFixed(1)}%). This will be more like a batter than dough. Typical bread is 60-80% hydration. Please verify.`
+      });
+    }
   }
   
   return conversion;
