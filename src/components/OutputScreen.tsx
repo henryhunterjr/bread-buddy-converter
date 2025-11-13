@@ -211,6 +211,39 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             </div>
           </div>
 
+          {/* Recipe Summary Section */}
+          {result.direction === 'yeast-to-sourdough' && (
+            <Card className="p-3 sm:p-4 md:p-6 bg-muted/30 print:shadow-none print:border-2">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 text-foreground print:text-black">Recipe Summary</h2>
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Flour:</span>
+                  <span className="font-semibold text-foreground">
+                    {result.converted.totalFlour}g 
+                    <span className="text-muted-foreground ml-2">
+                      ({convertedPercentages[2]?.amount.toFixed(0)}g in levain, {convertedPercentages.slice(3).filter(p => p.ingredient.toLowerCase().includes('flour')).reduce((sum, p) => sum + p.amount, 0).toFixed(0)}g in final dough)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Water:</span>
+                  <span className="font-semibold text-foreground">
+                    {result.converted.totalLiquid}g 
+                    <span className="text-muted-foreground ml-2">
+                      ({convertedPercentages[1]?.amount.toFixed(0)}g in levain, {convertedPercentages.slice(3).filter(p => p.ingredient.toLowerCase().includes('water')).reduce((sum, p) => sum + p.amount, 0).toFixed(0)}g in final dough)
+                    </span>
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Dough Weight:</span>
+                  <span className="font-semibold text-foreground">
+                    ~{convertedPercentages.reduce((sum, p) => sum + p.amount, 0).toFixed(0)}g
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Ingredients Table - PDF Style */}
           <Card className="p-3 sm:p-4 md:p-6 print:shadow-none print:border-2">
             <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 text-foreground print:text-black">Ingredients</h2>
@@ -280,6 +313,16 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                           );
                         })}
                         
+                        {/* Levain Subtotal */}
+                        <tr className="border-t border-border/50 bg-muted/20">
+                          <td colSpan={2} className="py-2 px-1 sm:px-2 text-xs sm:text-sm font-semibold text-foreground">
+                            Levain Subtotal
+                          </td>
+                          <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm font-semibold text-right text-foreground whitespace-nowrap">
+                            {convertedPercentages.slice(0, 3).reduce((sum, item) => sum + item.amount, 0).toFixed(0)}g
+                          </td>
+                        </tr>
+                        
                         {/* Dough Section */}
                         <tr className="border-b border-border/50">
                           <td colSpan={3} className="py-2 sm:py-3 px-1 sm:px-2">
@@ -288,13 +331,30 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                             </div>
                           </td>
                         </tr>
-                        {convertedPercentages.slice(3).map((item, i) => (
-                          <tr key={`dough-${i}`} className="border-b border-border/30">
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">{item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}</td>
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
-                            <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
-                          </tr>
-                        ))}
+                        {convertedPercentages.slice(3).map((item, i) => {
+                          // Check if this is the "all of the levain" ingredient
+                          const isLevainReference = item.ingredient.toLowerCase().includes('all of the levain');
+                          const displayName = isLevainReference 
+                            ? `Levain (from above): ${item.amount.toFixed(0)}g` 
+                            : item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1);
+                          
+                          return (
+                            <tr key={`dough-${i}`} className="border-b border-border/30">
+                              <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-foreground break-words">
+                                {isLevainReference ? displayName : displayName}
+                              </td>
+                              {!isLevainReference && (
+                                <>
+                                  <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.amount.toFixed(0)}g</td>
+                                  <td className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
+                                </>
+                              )}
+                              {isLevainReference && (
+                                <td colSpan={2} className="py-2 px-1 sm:px-2 text-xs sm:text-sm text-right text-muted-foreground whitespace-nowrap">{item.percentage.toFixed(0)}%</td>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </>
                      ) : (
                       /* Single list for sourdough-to-yeast conversions */
@@ -375,6 +435,18 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                 </table>
               </div>
             </div>
+            
+            {/* Explanation Note - Always show for yeast-to-sourdough */}
+            {result.direction === 'yeast-to-sourdough' && (
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/30">
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>
+                    <strong>Note:</strong> The levain flour and water are included in both the levain section and the total calculations. This is standard practice in baker's formulas.
+                  </p>
+                </div>
+              </div>
+            )}
             
             {/* Highlighting Legend */}
             {result.direction === 'sourdough-to-yeast' && (
