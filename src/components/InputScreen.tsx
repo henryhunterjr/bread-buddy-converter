@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
 import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat } from 'lucide-react';
 import bgbLogo from '@/assets/bgb-logo.jpg';
-import { extractTextFromFile } from '@/utils/fileExtractor';
+import { extractTextFromFile } from '@/utils/lazyFileExtractor';
 import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';

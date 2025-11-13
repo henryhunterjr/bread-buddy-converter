@@ -49,4 +49,25 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ['pdfjs-dist'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-slider'],
+          'pdf-vendor': ['jspdf', 'jspdf-autotable'],
+          'ocr-vendor': ['tesseract.js'],
+          'pdfjs-vendor': ['pdfjs-dist'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: mode === 'production',
+        pure_funcs: mode === 'production' ? ['console.log'] : [],
+      },
+    },
+  },
 }));

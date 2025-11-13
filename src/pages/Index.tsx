@@ -1,20 +1,22 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import LandingScreen from '@/components/LandingScreen';
-import InputScreen from '@/components/InputScreen';
-import OutputScreen from '@/components/OutputScreen';
 import { parseRecipe } from '@/utils/recipeParser';
 import { convertSourdoughToYeast, convertYeastToSourdough, cleanIngredientName } from '@/utils/recipeConverter';
 import { validateConversion } from '@/utils/recipeValidator';
 import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
-import { IngredientConfirmation } from '@/components/IngredientConfirmation';
 import { supabase } from '@/integrations/supabase/client';
 import { extractRecipeInfo } from '@/utils/titleExtractor';
 import { HelpModal } from '@/components/HelpModal';
 import { Button } from '@/components/ui/button';
-import { HelpCircle } from 'lucide-react';
-import { SavedRecipes } from '@/components/SavedRecipes';
+import { HelpCircle, Loader2 } from 'lucide-react';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { Navigation } from '@/components/Navigation';
+
+// Lazy load heavy components for better initial load performance
+const InputScreen = lazy(() => import('@/components/InputScreen'));
+const OutputScreen = lazy(() => import('@/components/OutputScreen'));
+const IngredientConfirmation = lazy(() => import('@/components/IngredientConfirmation').then(module => ({ default: module.IngredientConfirmation })));
+const SavedRecipes = lazy(() => import('@/components/SavedRecipes').then(module => ({ default: module.SavedRecipes })));
 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output' | 'saved';
 
@@ -297,46 +299,56 @@ const Index = () => {
       {screen === 'landing' && (
         <LandingScreen onSelectDirection={handleSelectDirection} />
       )}
-      {screen === 'input' && (
-        <InputScreen 
-          direction={direction} 
-          onConvert={handleConvert}
-          onBack={handleBack}
-          onLoadSaved={handleLoadSaved}
-          onHome={handleStartOver}
-        />
-      )}
-      {screen === 'confirmation' && (
-        <IngredientConfirmation
-          ingredients={extractedIngredients}
-          onConfirm={handleConfirmIngredients}
-          onReject={handleRejectIngredients}
-          onHome={handleStartOver}
-        />
-      )}
-      {screen === 'saved' && (
-        <div className="min-h-screen bg-background flex flex-col">
-          <Navigation onHome={handleStartOver} />
-          <div className="flex-1 flex items-center justify-center p-6">
-            <div className="max-w-3xl w-full">
-              <SavedRecipes onLoadRecipe={handleLoadRecipe} />
-            </div>
+      
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
-      )}
-      {screen === 'output' && result && (
-        <OutputScreen 
-          result={result}
-          recipeName={recipeName}
-          recipeDescription={recipeDescription}
-          originalRecipeText={originalRecipeText}
-          onStartOver={handleStartOver}
-          onEditExtraction={handleEditExtraction}
-          validationAutoFixes={validationAutoFixes}
-          onHome={handleStartOver}
-          onMyRecipes={handleViewSavedRecipes}
-        />
-      )}
+      }>
+        {screen === 'input' && (
+          <InputScreen 
+            direction={direction} 
+            onConvert={handleConvert}
+            onBack={handleBack}
+            onLoadSaved={handleLoadSaved}
+            onHome={handleStartOver}
+          />
+        )}
+        {screen === 'confirmation' && (
+          <IngredientConfirmation
+            ingredients={extractedIngredients}
+            onConfirm={handleConfirmIngredients}
+            onReject={handleRejectIngredients}
+            onHome={handleStartOver}
+          />
+        )}
+        {screen === 'saved' && (
+          <div className="min-h-screen bg-background flex flex-col">
+            <Navigation onHome={handleStartOver} />
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="max-w-3xl w-full">
+                <SavedRecipes onLoadRecipe={handleLoadRecipe} />
+              </div>
+            </div>
+          </div>
+        )}
+        {screen === 'output' && result && (
+          <OutputScreen 
+            result={result}
+            recipeName={recipeName}
+            recipeDescription={recipeDescription}
+            originalRecipeText={originalRecipeText}
+            onStartOver={handleStartOver}
+            onEditExtraction={handleEditExtraction}
+            validationAutoFixes={validationAutoFixes}
+            onHome={handleStartOver}
+            onMyRecipes={handleViewSavedRecipes}
+          />
+        )}
+      </Suspense>
     </>
   );
 };
