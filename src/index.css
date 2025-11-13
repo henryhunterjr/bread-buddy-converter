@@ -111,6 +111,15 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    /* Performance optimizations */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Optimize font loading */
+  @font-face {
+    font-display: swap;
   }
 }
 

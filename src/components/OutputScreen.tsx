@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ConvertedRecipe } from '@/types/recipe';
 import { calculateBakersPercentages } from '@/utils/recipeConverter';
-import { generatePDF } from '@/utils/pdfGenerator';
+import { generatePDF } from '@/utils/lazyPdfGenerator';
 import { Navigation } from '@/components/Navigation';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
