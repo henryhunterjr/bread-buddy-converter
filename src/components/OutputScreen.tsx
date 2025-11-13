@@ -8,7 +8,7 @@ import { generatePDF } from '@/utils/pdfGenerator';
 import { Navigation } from '@/components/Navigation';
 import { saveRecipe } from '@/utils/recipeStorage';
 import logo from '@/assets/logo.png';
-import { Save, Info, Mail, Droplets } from 'lucide-react';
+import { Save, Info, Mail, Droplets, Download, Printer, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -55,6 +55,24 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
   // Calculate adjusted hydration
   const adjustedHydration = (adjustedWaterAmount / result.converted.totalFlour) * 100;
   const waterDifference = adjustedWaterAmount - result.converted.totalLiquid;
+  
+  // Calculate recommended water range (+2% to +5% hydration)
+  const currentHydration = result.converted.hydration;
+  const recommendedMinWater = Math.ceil((result.converted.totalFlour * (currentHydration + 2)) / 100);
+  const recommendedMaxWater = Math.ceil((result.converted.totalFlour * (currentHydration + 5)) / 100);
+  const recommendedMinHydration = currentHydration + 2;
+  const recommendedMaxHydration = currentHydration + 5;
+  
+  // Determine slider color based on hydration level
+  const getSliderColor = () => {
+    if (adjustedHydration >= 65 && adjustedHydration <= 75) return 'bg-green-500';
+    if (adjustedHydration >= 60 && adjustedHydration <= 80) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const handleDownloadPDF = () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
@@ -115,7 +133,7 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               </Tooltip>
             </div>
             
-            {/* Action buttons - hidden from PDF and on small mobile */}
+            {/* Report Issue button - top right */}
             <div className="hidden md:flex gap-2 print:hidden">
               <Button 
                 variant="ghost" 
@@ -127,64 +145,6 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
                   Report Issue
                 </a>
               </Button>
-              <Button variant="outline" size="sm" onClick={onEditExtraction}>
-                Edit Extraction
-              </Button>
-          <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Save className="mr-2 h-4 w-4" />
-                Save to My Recipes
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Save to My Recipes</DialogTitle>
-                <DialogDescription>
-                  Give this recipe a name so you can easily find it later
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name-top">Recipe Name</Label>
-                  <Input
-                    id="name-top"
-                    placeholder="e.g. Cranberry Walnut Sourdough"
-                    value={recipeName}
-                    onChange={(e) => setRecipeName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveRecipe();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveRecipe}>
-                  Save
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button onClick={handleDownloadPDF} size="sm" className="border-2 border-golden-yellow hover:border-warm-orange transition-colors">
-                  Download PDF
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Save your converted recipe as a PDF</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <Button onClick={onStartOver} variant="secondary" size="sm">
-            Start Over
-          </Button>
             </div>
           </div>
         </div>
@@ -250,111 +210,6 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
               </div>
             </div>
           </div>
-          
-        {/* Warnings */}
-          {result.warnings.length > 0 && (
-            <div className="space-y-2 px-1 sm:px-2">
-              {result.warnings.map((warning, i) => {
-                const isHydrationWarning = /hydration/i.test(warning.message);
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`p-3 sm:p-4 rounded-lg border text-xs sm:text-sm print:border-2 print:p-3 ${
-                      warning.type === 'caution' 
-                        ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200 print:bg-white print:border-black print:text-black' 
-                        : warning.type === 'warning'
-                        ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200 print:bg-white print:border-black print:text-black'
-                        : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1">
-                          <span className="font-semibold">
-                            {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
-                          </span>{' '}
-                          <span className="break-words">{warning.message}</span>
-                        </div>
-                        {isHydrationWarning && !waterAdjustmentOpen && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setWaterAdjustmentOpen(true)}
-                            className="ml-2 shrink-0 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 print:hidden"
-                          >
-                            <Droplets className="h-3 w-3 mr-1" />
-                            Adjust Water
-                          </Button>
-                        )}
-                        {isHydrationWarning && waterAdjustmentOpen && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info className="h-4 w-4 flex-shrink-0 cursor-help mt-0.5" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-[280px] sm:max-w-xs">
-                                <p className="text-xs sm:text-sm">
-                                  This calculation assumes your starter is 100% hydration (equal parts flour and water) by default. 
-                                  If your starter uses a different hydration level, you can adjust it in the input screen.
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </div>
-                      
-                      {/* Water Adjustment Slider */}
-                      {isHydrationWarning && waterAdjustmentOpen && (
-                        <div className="bg-white/80 dark:bg-gray-900/80 p-4 rounded-md border border-gray-300 dark:border-gray-600 print:hidden">
-                          <div className="flex items-center justify-between mb-3">
-                            <Label className="text-sm font-semibold">Adjust Water Amount</Label>
-                            <button 
-                              onClick={() => setWaterAdjustmentOpen(false)}
-                              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                            >
-                              Close ×
-                            </button>
-                          </div>
-                          
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span>Water: <span className="font-bold">{adjustedWaterAmount}g</span></span>
-                              <span>Hydration: <span className="font-bold">{adjustedHydration.toFixed(0)}%</span></span>
-                            </div>
-                            
-                            <Slider
-                              value={[adjustedWaterAmount]}
-                              onValueChange={(values) => setAdjustedWaterAmount(values[0])}
-                              min={Math.floor(result.converted.totalFlour * 0.5)}
-                              max={Math.ceil(result.converted.totalFlour * 1.0)}
-                              step={5}
-                              className="w-full"
-                            />
-                            
-                            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-                              <span>50%</span>
-                              <span>100%</span>
-                            </div>
-                            
-                            {waterDifference !== 0 && (
-                              <div className="text-xs bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-200 dark:border-blue-700">
-                                {waterDifference > 0 ? (
-                                  <span>✓ Add <strong>{waterDifference}g</strong> more water</span>
-                                ) : (
-                                  <span>✓ Reduce water by <strong>{Math.abs(waterDifference)}g</strong></span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
           {/* Ingredients Table - PDF Style */}
           <Card className="p-3 sm:p-4 md:p-6 print:shadow-none print:border-2">
@@ -570,22 +425,208 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             </div>
           </Card>
 
-          {/* Troubleshooting Tips */}
-          <Card className="p-3 sm:p-4 md:p-6 bg-muted/30 print:shadow-none print:border-2 print:bg-white">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 text-foreground print:text-black">Baker's Notes</h2>
-            <div className="space-y-3 sm:space-y-4">
-              {result.troubleshootingTips.map((tip, i) => (
-                <div key={i} className="border-l-4 border-primary/30 pl-3 sm:pl-4">
-                  <div className="font-bold text-foreground text-xs sm:text-sm">{tip.issue}</div>
-                  <div className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">{tip.solution}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-border/30 text-xs text-muted-foreground italic flex items-center gap-2">
-              <span>💡</span>
-              <span>Watch the dough, not the clock. Fermentation times vary with temperature and flour type.</span>
+          {/* Action Buttons - Consolidated after recipe content */}
+          <Card className="p-4 sm:p-6 bg-gradient-to-r from-warm-orange/10 to-golden-yellow/10 print:hidden">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
+              <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="default" className="w-full sm:w-auto">
+                    <Save className="mr-2 h-4 w-4" />
+                    Save to My Recipes
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Save to My Recipes</DialogTitle>
+                    <DialogDescription>
+                      Give this recipe a name so you can easily find it later
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name-action">Recipe Name</Label>
+                      <Input
+                        id="name-action"
+                        placeholder="e.g. Cranberry Walnut Sourdough"
+                        value={recipeName}
+                        onChange={(e) => setRecipeName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveRecipe();
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveRecipe}>
+                      Save
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              <Button onClick={handleDownloadPDF} variant="default" className="w-full sm:w-auto">
+                <Download className="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
+              
+              <Button onClick={handlePrint} variant="outline" className="w-full sm:w-auto">
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
+              
+              <Button onClick={onStartOver} variant="secondary" className="w-full sm:w-auto">
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Start Over
+              </Button>
             </div>
           </Card>
+
+          {/* Baker's Notes and Warnings - Moved to bottom */}
+          <div className="border-t-2 border-border/50 pt-6 mt-2">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-center text-foreground print:text-black">Baker's Notes & Tips</h2>
+            
+            {/* Warnings Section */}
+            {result.warnings.length > 0 && (
+              <Card className="p-4 sm:p-6 mb-4 print:shadow-none print:border-2">
+                <h3 className="text-base sm:text-lg font-bold mb-3 text-foreground print:text-black">Important Notes</h3>
+                <div className="space-y-3">
+                  {result.warnings.map((warning, i) => {
+                    const isHydrationWarning = /hydration/i.test(warning.message);
+                    
+                    return (
+                      <div 
+                        key={i} 
+                        className={`p-3 sm:p-4 rounded-lg border text-xs sm:text-sm print:border-2 print:p-3 ${
+                          warning.type === 'caution' 
+                            ? 'bg-red-50 border-red-300 text-red-900 dark:bg-red-950/30 dark:border-red-800 dark:text-red-200 print:bg-white print:border-black print:text-black' 
+                            : warning.type === 'warning'
+                            ? 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-200 print:bg-white print:border-black print:text-black'
+                            : 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-200 print:bg-white print:border-black print:text-black'
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1">
+                              <span className="font-semibold">
+                                {warning.type === 'caution' ? '⚠️ Caution' : warning.type === 'warning' ? '⚡ Note' : 'ℹ️ Info'}:
+                              </span>{' '}
+                              <span className="break-words">{warning.message}</span>
+                            </div>
+                            {isHydrationWarning && !waterAdjustmentOpen && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setWaterAdjustmentOpen(true)}
+                                className="ml-2 shrink-0 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 print:hidden"
+                              >
+                                <Droplets className="h-3 w-3 mr-1" />
+                                Adjust Water
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {/* Enhanced Water Adjustment Slider with Recommendations */}
+                          {isHydrationWarning && waterAdjustmentOpen && (
+                            <div className="bg-white/80 dark:bg-gray-900/80 p-4 rounded-md border border-gray-300 dark:border-gray-600 print:hidden">
+                              <div className="flex items-center justify-between mb-3">
+                                <Label className="text-sm font-semibold">Adjust Water Amount</Label>
+                                <button 
+                                  onClick={() => setWaterAdjustmentOpen(false)}
+                                  className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                  Close ×
+                                </button>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                {/* Recommended Range Display */}
+                                <div className="bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700 p-2 rounded text-xs">
+                                  <div className="font-semibold text-green-900 dark:text-green-200 mb-1">💡 Recommended Range:</div>
+                                  <div className="text-green-800 dark:text-green-300">
+                                    Add <strong>{recommendedMinWater - result.converted.totalLiquid}g to {recommendedMaxWater - result.converted.totalLiquid}g</strong> more water
+                                  </div>
+                                  <div className="text-green-700 dark:text-green-400 mt-1">
+                                    Target: {recommendedMinWater}g - {recommendedMaxWater}g ({recommendedMinHydration.toFixed(0)}% - {recommendedMaxHydration.toFixed(0)}% hydration)
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm">
+                                  <span>Water: <span className="font-bold">{adjustedWaterAmount}g</span></span>
+                                  <span>Hydration: <span className={`font-bold ${getSliderColor() === 'bg-green-500' ? 'text-green-600' : getSliderColor() === 'bg-yellow-500' ? 'text-yellow-600' : 'text-red-600'}`}>{adjustedHydration.toFixed(0)}%</span></span>
+                                </div>
+                                
+                                <div className="relative">
+                                  <Slider
+                                    value={[adjustedWaterAmount]}
+                                    onValueChange={(values) => setAdjustedWaterAmount(values[0])}
+                                    min={Math.floor(result.converted.totalFlour * 0.5)}
+                                    max={Math.ceil(result.converted.totalFlour * 1.0)}
+                                    step={5}
+                                    className="w-full"
+                                  />
+                                  {/* Visual safe zone indicator */}
+                                  <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded relative overflow-hidden">
+                                    <div 
+                                      className="absolute h-full bg-green-400/50 dark:bg-green-600/50"
+                                      style={{
+                                        left: `${((recommendedMinWater - Math.floor(result.converted.totalFlour * 0.5)) / (Math.ceil(result.converted.totalFlour * 1.0) - Math.floor(result.converted.totalFlour * 0.5))) * 100}%`,
+                                        width: `${((recommendedMaxWater - recommendedMinWater) / (Math.ceil(result.converted.totalFlour * 1.0) - Math.floor(result.converted.totalFlour * 0.5))) * 100}%`
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                    <span>50%</span>
+                                    <span className="text-green-600 dark:text-green-400">← Safe Zone →</span>
+                                    <span>100%</span>
+                                  </div>
+                                </div>
+                                
+                                {waterDifference !== 0 && (
+                                  <div className={`text-xs p-2 rounded border ${
+                                    adjustedHydration >= recommendedMinHydration && adjustedHydration <= recommendedMaxHydration
+                                      ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700'
+                                      : 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700'
+                                  }`}>
+                                    {waterDifference > 0 ? (
+                                      <span>✓ Add <strong>{waterDifference}g</strong> more water</span>
+                                    ) : (
+                                      <span>✓ Reduce water by <strong>{Math.abs(waterDifference)}g</strong></span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+            
+            {/* Troubleshooting Tips */}
+            <Card className="p-3 sm:p-4 md:p-6 bg-muted/30 print:shadow-none print:border-2 print:bg-white">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 text-foreground print:text-black">Troubleshooting</h3>
+              <div className="space-y-3 sm:space-y-4">
+                {result.troubleshootingTips.map((tip, i) => (
+                  <div key={i} className="border-l-4 border-primary/30 pl-3 sm:pl-4">
+                    <div className="font-bold text-foreground text-xs sm:text-sm">{tip.issue}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">{tip.solution}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-border/30 text-xs text-muted-foreground italic flex items-center gap-2">
+                <span>💡</span>
+                <span>Watch the dough, not the clock. Fermentation times vary with temperature and flour type.</span>
+              </div>
+            </Card>
+          </div>
 
           {/* Ingredient Substitutions */}
           {result.substitutions.length > 0 && (
@@ -613,58 +654,6 @@ export default function OutputScreen({ result, recipeName: initialRecipeName, re
             </Card>
           )}
 
-        {/* Actions - Bottom (always visible, hidden from PDF) */}
-        <div className="flex gap-2 sm:gap-4 justify-center flex-wrap print:hidden px-2">
-          <Button onClick={onEditExtraction} variant="outline" size="sm" className="sm:text-base">
-            Edit Extraction
-          </Button>
-          <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="sm:text-base">
-                <Save className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                Save Recipe
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[95vw] sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Save Recipe</DialogTitle>
-                <DialogDescription>
-                  Give this recipe a name so you can easily find it later
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name-bottom">Recipe Name</Label>
-                  <Input
-                    id="name-bottom"
-                    placeholder="e.g. Cranberry Walnut Sourdough"
-                    value={recipeName}
-                    onChange={(e) => setRecipeName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveRecipe();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveRecipe}>
-                  Save
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Button onClick={handleDownloadPDF} size="sm" className="sm:text-base">
-            Download PDF
-          </Button>
-          <Button onClick={onStartOver} variant="secondary" size="sm" className="sm:text-base">
-            Start Over
-          </Button>
-        </div>
         </div>
       </div>
       

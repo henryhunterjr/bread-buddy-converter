@@ -112,9 +112,9 @@ export function MeasurementConverter() {
         <Button
           size="icon"
           variant="outline"
-          className="fixed bottom-24 right-4 h-14 w-14 rounded-full shadow-lg bg-warm-orange hover:bg-warm-orange-hover text-white border-2 border-golden-yellow z-50 print:hidden"
+          className="fixed bottom-20 right-4 h-12 w-12 rounded-full shadow-lg bg-warm-orange hover:bg-warm-orange-hover text-white border-2 border-golden-yellow z-40 print:hidden"
         >
-          <Calculator className="h-6 w-6" />
+          <Calculator className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

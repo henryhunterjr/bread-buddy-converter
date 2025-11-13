@@ -205,7 +205,7 @@ export function IngredientConfirmation({
           return (
           <div 
             key={idx} 
-            className={`flex items-center gap-3 p-3 rounded transition-colors ${
+            className={`flex items-start gap-3 p-3 rounded transition-colors ${
               needsValue
                 ? 'bg-red-50 dark:bg-red-950/20 border-2 border-red-500 dark:border-red-700'
                 : ing.confidence === 'low' || ing.source === 'estimated'
@@ -233,14 +233,16 @@ export function IngredientConfirmation({
               </>
             ) : (
               <>
-                <span className="font-mono font-semibold w-24 text-right">
+                <span className="font-mono font-semibold w-20 text-left shrink-0">
                   {ing.amount}g
                 </span>
-                <span className="flex-1">{ing.name}</span>
-                <span className="text-xs text-muted-foreground bg-muted-foreground/10 px-2 py-1 rounded">
-                  {ing.type}
-                </span>
-                {getConfidenceBadge(ing)}
+                <span className="flex-1 text-left">{ing.name}</span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className="text-xs text-muted-foreground bg-muted-foreground/10 px-2 py-1 rounded whitespace-nowrap">
+                    {ing.type}
+                  </span>
+                  {getConfidenceBadge(ing)}
+                </div>
               </>
             )}
           </div>
@@ -248,13 +250,13 @@ export function IngredientConfirmation({
         })}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         {editMode ? (
           <>
             <Button 
               onClick={() => setEditMode(false)}
               variant="outline"
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Cancel Edit
             </Button>
@@ -263,7 +265,7 @@ export function IngredientConfirmation({
                 setEditMode(false);
                 onConfirm(edited);
               }}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               <Check className="mr-2 h-4 w-4" />
               Save & Convert
@@ -274,21 +276,21 @@ export function IngredientConfirmation({
             <Button 
               onClick={onReject}
               variant="outline"
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Start Over
             </Button>
             <Button 
               onClick={() => setEditMode(true)}
               variant="outline"
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               <Pencil className="mr-2 h-4 w-4" />
               Edit Values
             </Button>
             <Button 
               onClick={() => onConfirm(edited)}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               <Check className="mr-2 h-4 w-4" />
               Looks Good

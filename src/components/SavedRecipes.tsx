@@ -3,7 +3,8 @@ import { SavedRecipe, getSavedRecipes, deleteRecipe } from '@/utils/recipeStorag
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Clock, ChevronRight } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Trash2, Clock, ChevronRight, Info } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,14 +51,23 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
   if (savedRecipes.length === 0) {
     return (
       <Card className="w-full">
-      <CardHeader>
-        <CardTitle>My Recipes</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground text-center py-8">
-          No saved recipes yet. Convert a recipe and click "Save to My Recipes" to store it here.
-        </p>
-      </CardContent>
+        <CardHeader>
+          <CardTitle>My Recipes</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Storage Info Alert */}
+          <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+              <strong>Local Storage:</strong> Recipes are saved locally on this device in your browser. 
+              They will not sync across devices and will be deleted if you clear your browser data.
+            </AlertDescription>
+          </Alert>
+          
+          <p className="text-muted-foreground text-center py-8">
+            No saved recipes yet. Convert a recipe and click "Save to My Recipes" to store it here.
+          </p>
+        </CardContent>
       </Card>
     );
   }
@@ -67,7 +77,16 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
       <CardHeader>
         <CardTitle>My Recipes ({savedRecipes.length})</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Storage Info Alert */}
+        <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+            <strong>Local Storage:</strong> Recipes are saved locally on this device in your browser. 
+            They will not sync across devices and will be deleted if you clear your browser data.
+          </AlertDescription>
+        </Alert>
+        
         <ScrollArea className="h-[400px] pr-4">
           <div className="space-y-2">
             {savedRecipes.map((recipe) => (

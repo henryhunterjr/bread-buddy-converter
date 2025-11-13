@@ -125,9 +125,15 @@ const Index = () => {
     setRecipeName(title);
     setRecipeDescription(description);
     setScreen('confirmation');
+    
+    // Scroll to top when confirmation screen loads
+    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
   };
 
   const handleConfirmIngredients = async (confirmedIngredients: ParsedIngredient[]) => {
+    // Scroll to top when moving to output screen
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     // Detect if user made corrections
     const userCorrections = confirmedIngredients
       .map((confirmed, idx) => {
@@ -275,15 +281,14 @@ const Index = () => {
 
   return (
     <>
-      {/* Global Help Button - visible on all screens */}
+      {/* Global Help Button - fixed bottom-right, always accessible */}
       <Button
         variant="outline"
-        size="sm"
+        size="icon"
         onClick={() => setShowHelp(true)}
-        className="fixed top-4 right-4 z-50 bg-background/95 backdrop-blur shadow-lg border-bread-medium/30 hover:bg-bread-light/50 transition-all"
+        className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full bg-background/95 backdrop-blur shadow-lg border-bread-medium/30 hover:bg-bread-light/50 transition-all print:hidden"
       >
-        <HelpCircle className="h-4 w-4 mr-2" />
-        Help
+        <HelpCircle className="h-5 w-5" />
       </Button>
 
       {/* Help Modal */}
