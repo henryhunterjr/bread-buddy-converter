@@ -34,6 +34,190 @@ import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 import { generateSmartWarnings } from './smartWarnings';
 
 /**
+ * Detects if recipe is a multi-day sourdough requiring complex conversion
+ */
+function detectMultiDaySourdough(recipeText: string): boolean {
+  const text = recipeText.toLowerCase();
+  
+  // Check for multi-day patterns
+  const multiDayPatterns = [
+    /day\s*1.*day\s*2/s,
+    /day\s*2.*day\s*3/s,
+    /primo\s+impasto.*secondo\s+impasto/s,
+    /first\s+dough.*second\s+dough/s,
+    /lievito\s+madre/i,
+    /mother\s+yeast/i
+  ];
+  
+  const hasMultiDay = multiDayPatterns.some(pattern => pattern.test(text));
+  
+  // Check for multiple long fermentation periods
+  const longFermPattern = /\d+[-–]\d+\s*hours/gi;
+  const matches = text.match(longFermPattern);
+  const multipleLongFerments = matches && matches.length >= 3;
+  
+  // Check for starter feeding instructions
+  const starterFeeding = /feed.*starter|refresh.*starter|starter.*feeding/i.test(text);
+  
+  return hasMultiDay || (multipleLongFerments && starterFeeding);
+}
+
+/**
+ * Converts sourdough-specific language to yeast equivalents
+ */
+function convertSourdoughLanguage(text: string): string {
+  let result = text;
+  
+  // Handle fermentation time conversion with callback
+  result = result.replace(/ferment\s+(\d+)[-–](\d+)\s*hours/gi, (match, low, high) => {
+    const avgHours = (parseInt(low) + parseInt(high)) / 2;
+    const yeastHours = Math.round(avgHours / 4); // Yeast is ~4x faster
+    return `rise ${yeastHours}-${yeastHours + 1} hours`;
+  });
+  
+  // Simple string replacements
+  const replacements: [RegExp, string][] = [
+    [/lievito\s+madre/gi, 'instant yeast'],
+    [/sourdough\s+starter/gi, 'yeast'],
+    [/mother\s+yeast/gi, 'instant yeast'],
+    [/refreshed\s+starter/gi, 'proofed yeast'],
+    [/active\s+starter/gi, 'activated yeast'],
+    [/enriched\s+sourdough/gi, 'enriched yeasted dough'],
+    [/primo\s+impasto/gi, 'first mix'],
+    [/secondo\s+impasto/gi, 'final dough'],
+    [/26[-–]28°C/g, '24-27°C'],
+    [/77[-–]82°F/g, '75-80°F']
+  ];
+  
+  for (const [pattern, replacement] of replacements) {
+    result = result.replace(pattern, replacement);
+  }
+  
+  return result;
+}
+
+/**
+ * Restructures multi-day timeline to yeast-appropriate schedule
+ */
+function generateYeastTimeline(
+  classification: { type: 'lean' | 'enriched' | 'sweet' },
+  isComplex: boolean
+): MethodChange[] {
+  const { type } = classification;
+  
+  if (type === 'sweet' || isComplex) {
+    // Complex enriched doughs (like panettone)
+    return [
+      {
+        step: 'TIMELINE OVERVIEW',
+        change: '🔄 **CONVERTED TO YEASTED VERSION** — Original recipe used sourdough starter over 2-3 days. This version uses commercial yeast and completes in 18-24 hours (overnight bulk + same-day finish).',
+        timing: '18-24 hours total'
+      },
+      {
+        step: '1. EVENING: MIX DOUGH',
+        change: 'Dissolve instant yeast in warm water (105-110°F). Let stand 5 minutes until foamy. Mix with flour and other dry ingredients until combined. Add eggs at room temperature. Mix until shaggy, then knead 8-10 minutes until smooth. Add softened butter gradually in the last 2-3 minutes of kneading.',
+        timing: '15-20 min'
+      },
+      {
+        step: '2. OVERNIGHT BULK FERMENTATION',
+        change: 'Cover dough and place in refrigerator (38-40°F). Let ferment overnight (10-14 hours). The cold fermentation develops flavor while controlling yeast activity. Dough should rise 50-75%.',
+        timing: '10-14 hours cold'
+      },
+      {
+        step: '3. MORNING: REMOVE FROM FRIDGE',
+        change: 'Remove dough from refrigerator. Let stand at room temperature 1-2 hours to warm up and continue rising. Dough should be soft and expanded.',
+        timing: '1-2 hours'
+      },
+      {
+        step: '4. ADD ENRICHMENTS & SHAPE',
+        change: 'If using dried fruit, nuts, or chocolate, fold them in gently. Shape dough into desired form (panettone mold, loaf pan, etc.). Work quickly to prevent butter from melting.',
+        timing: '10-15 min'
+      },
+      {
+        step: '5. FINAL PROOF',
+        change: 'Cover shaped dough loosely. Proof at room temperature (75-78°F) until nearly doubled and very puffy, 2-3 hours. Dough should spring back slowly when pressed. Don\'t rush this step—enriched doughs need time.',
+        timing: '2-3 hours'
+      },
+      {
+        step: '6. BAKE',
+        change: 'Preheat oven to 350-375°F (175-190°C). Brush with egg wash if desired. Bake 35-50 minutes (depending on size) until deep golden brown and internal temperature reaches 190-195°F. Tent with foil if browning too quickly.',
+        timing: '35-50 min at 350-375°F'
+      },
+      {
+        step: '7. COOL COMPLETELY',
+        change: 'Cool in pan 10 minutes, then turn out onto wire rack. Cool completely (2-3 hours) before slicing. Enriched breads continue to set as they cool.',
+        timing: '2-3 hours'
+      }
+    ];
+  }
+  
+  if (type === 'enriched') {
+    // Standard enriched doughs
+    return [
+      {
+        step: 'TIMELINE OVERVIEW',
+        change: '🔄 **CONVERTED TO YEASTED VERSION** — Original sourdough timeline simplified. This version completes in 4-6 hours same-day.',
+        timing: '4-6 hours total'
+      },
+      {
+        step: '1. MIX DOUGH',
+        change: 'Dissolve instant yeast in warm liquids (105-110°F). Let stand 5 minutes. Add flour and mix until shaggy. Rest 20-30 minutes (autolyse). Add salt, then knead 8-10 minutes. Add softened butter in final 2 minutes.',
+        timing: '30-40 min'
+      },
+      {
+        step: '2. FIRST RISE',
+        change: 'Cover and let rise in warm spot (75-78°F) until doubled, about 1.5-2 hours. Enriched doughs rise slower than lean doughs due to sugar and fat.',
+        timing: '1.5-2 hours'
+      },
+      {
+        step: '3. SHAPE',
+        change: 'Turn dough onto lightly floured surface. Shape into desired form. Place in greased pan.',
+        timing: '10 min'
+      },
+      {
+        step: '4. FINAL PROOF',
+        change: 'Cover and proof until puffy and nearly doubled, 1-1.5 hours. Should spring back slowly when pressed.',
+        timing: '1-1.5 hours'
+      },
+      {
+        step: '5. BAKE',
+        change: 'Preheat oven to 375°F. Brush with egg wash if desired. Bake 25-35 minutes until golden and internal temp reaches 190°F.',
+        timing: '25-35 min at 375°F'
+      }
+    ];
+  }
+  
+  // Lean doughs
+  return [
+    {
+      step: 'TIMELINE OVERVIEW',
+      change: '🔄 **CONVERTED TO YEASTED VERSION** — Original sourdough timeline simplified. This version completes in 3-4 hours same-day.',
+      timing: '3-4 hours total'
+    },
+    {
+      step: '1. MIX DOUGH',
+      change: 'Dissolve instant yeast in warm water (105-110°F). Let stand 5 minutes until foamy. Add flour and salt, mix until shaggy. Knead 10 minutes until smooth and elastic.',
+      timing: '15-20 min'
+    },
+    {
+      step: '2. FIRST RISE',
+      change: 'Cover and let rise in warm spot (75-78°F) until doubled, about 1-1.5 hours.',
+      timing: '1-1.5 hours'
+    },
+    {
+      step: '3. SHAPE & FINAL PROOF',
+      change: 'Shape dough and place in pan or on baking sheet. Cover and proof 45-60 minutes until puffy.',
+      timing: '45-60 min'
+    },
+    {
+      step: '4. BAKE',
+      change: 'Preheat oven to 450°F. Score if desired. Bake with steam 25-35 minutes until golden and hollow-sounding.',
+      timing: '25-35 min at 450°F'
+    }
+  ];
+}
+
+/**
  * Computes the total levain weight from its components
  * This ensures consistency across the application and prevents display mismatches
  */
@@ -59,6 +243,9 @@ export function cleanIngredientName(name: string): string {
 }
 
 export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
+  // DETECT if this is a complex multi-day sourdough
+  const isMultiDay = originalRecipeText ? detectMultiDaySourdough(originalRecipeText) : false;
+  
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
   // Starter hydration ratio calculation
   const starterFlourRatio = 100 / (100 + starterHydration);
@@ -114,73 +301,116 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     hydration: trueHydration
   };
 
-  // Detect special techniques and dough type for method tailoring
-  const specialTechniques = originalRecipeText ? detectSpecialTechniques(originalRecipeText) : [];
-  const hasTangzhong = specialTechniques.some(t => t.message.includes('Tangzhong'));
-  const hasAutolyse = specialTechniques.some(t => t.message.includes('Autolyse'));
-  
-  const hasEggs = convertedIngredients.some(i => 
-    i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
-  );
-  const butterAmount = nonStarterIngredients
-    .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter'))
-    .reduce((sum, i) => sum + i.amount, 0);
+  // Calculate ingredient amounts for classification
   const sugarAmount = nonStarterIngredients
     .filter(i => i.type === 'sweetener' || i.name.toLowerCase().includes('sugar'))
     .reduce((sum, i) => sum + i.amount, 0);
-  const isEnriched = hasEggs || butterAmount > 0 || sugarAmount > 0;
+  const fatAmount = nonStarterIngredients
+    .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const milkAmount = nonStarterIngredients
+    .filter(i => i.name.toLowerCase().includes('milk'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  const saltAmount = nonStarterIngredients
+    .filter(i => i.type === 'salt')
+    .reduce((sum, i) => sum + i.amount, 0);
 
-  const methodChanges: MethodChange[] = [
-    // Step 0: Tangzhong (if detected)
-    ...(hasTangzhong ? [{
-      step: 'TANGZHONG (WATER ROUX)',
-      change: 'Combine 1 part flour with 5 parts liquid (water or milk from recipe). Cook over medium heat, stirring constantly, until thick paste forms (149-150°F). Cool completely before using.',
-      timing: '5-10 min cook + 30 min cool'
-    }] : []),
-    {
-      step: 'MIX' + (hasAutolyse ? ' & AUTOLYSE' : ' & KNEAD'),
-      change: hasAutolyse 
-        ? 'Mix flour and water only. Rest 20-60 minutes (autolyse). Then add remaining ingredients and knead 8-10 minutes by hand or 5-6 minutes by mixer until smooth and elastic.'
-        : 'Combine all ingredients in a bowl. Knead by hand for 8–10 minutes or with a stand mixer (dough hook) for 5–6 minutes until smooth and elastic. Dough should pass the windowpane test.',
-      timing: hasAutolyse ? '20-60 min autolyse + 8-10 min knead' : '8-10 min by hand, 5-6 min mixer'
-    },
-    {
-      step: 'FIRST RISE',
-      change: 'Place in a lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
-      timing: '1-1.5 hours'
-    },
-    {
-      step: 'SHAPE',
-      change: 'Punch down gently, shape as desired (loaf, braid, or boule), and place on a greased pan or parchment.',
-      timing: '5-10 min'
-    },
-    {
-      step: 'FINAL PROOF',
-      change: 'Cover and let rise 45–60 minutes, or until dough springs back slowly when gently pressed.',
-      timing: '45-60 min'
-    },
-    {
-      step: 'BAKE',
-      change: isEnriched
-        ? 'Preheat oven to 350°F (175°C). Brush with egg wash or milk for a golden crust. Bake 30–35 minutes until deep golden and internal temperature is 190–195°F.'
-        : 'Preheat oven to 450°F (230°C). Score the top and optionally spray with water for steam. Bake 35–40 minutes until deep brown and internal temperature is 205–210°F.',
-      timing: isEnriched ? '30-35 min at 350°F' : '35-40 min at 450°F'
-    },
-    {
-      step: 'COOL',
-      change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
-      timing: '1 hour minimum'
-    }
-  ];
+  // STEP 5: Generate method instructions based on dough type
+  const classification = classifyDough(sugarAmount, fatAmount, milkAmount, trueFlour);
+  
+  let methodChanges: MethodChange[];
+  
+  if (isMultiDay) {
+    // Use restructured timeline for multi-day sourdough conversions
+    methodChanges = generateYeastTimeline(classification, true);
+  } else {
+    // Standard conversion: detect special techniques
+    const specialTechniques = originalRecipeText ? detectSpecialTechniques(originalRecipeText) : [];
+    const hasTangzhong = specialTechniques.some(t => t.message.includes('Tangzhong'));
+    const hasAutolyse = specialTechniques.some(t => t.message.includes('Autolyse'));
+    
+    const hasEggs = convertedIngredients.some(i => 
+      i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
+    );
+    const butterAmount = nonStarterIngredients
+      .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter'))
+      .reduce((sum, i) => sum + i.amount, 0);
+    const isEnriched = hasEggs || butterAmount > 0 || sugarAmount > 0;
 
+    methodChanges = [
+      // Step 0: Tangzhong (if detected)
+      ...(hasTangzhong ? [{
+        step: 'TANGZHONG (WATER ROUX)',
+        change: 'Combine 1 part flour with 5 parts liquid (water or milk from recipe). Cook over medium heat, stirring constantly, until thick paste forms (149-150°F). Cool completely before using.',
+        timing: '5-10 min cook + 30 min cool'
+      }] : []),
+      {
+        step: 'PREPARE YEAST',
+        change: `Dissolve ${instantYeastAmount}g instant yeast (or ${activeDryYeastAmount}g active dry yeast) in 1/4 cup warm water (105-110°F) for 5-10 minutes until foamy. This ensures yeast viability.`,
+        timing: '5-10 minutes'
+      },
+      {
+        step: 'MIX' + (hasAutolyse ? ' & AUTOLYSE' : ' & KNEAD'),
+        change: hasAutolyse 
+          ? `Mix ${trueFlour}g flour and ${trueWater}g water only. Rest 20-60 minutes (autolyse). Then add proofed yeast, ${saltAmount}g salt, and other ingredients. Knead 8-10 minutes by hand or 5-6 minutes by mixer until smooth and elastic.`
+          : `Combine proofed yeast with ${trueWater}g water (or other liquids), ${trueFlour}g flour, ${saltAmount}g salt${sugarAmount > 0 ? `, ${sugarAmount}g sugar` : ''}${butterAmount > 0 ? `, ${butterAmount}g butter (add softened butter last 2 min)` : ''}. Knead by hand for 8–10 minutes or with stand mixer for 5–6 minutes until smooth and elastic. Dough should pass windowpane test.`,
+        timing: hasAutolyse ? '20-60 min autolyse + 8-10 min knead' : '8-10 min by hand, 5-6 min mixer'
+      },
+      {
+        step: 'FIRST RISE',
+        change: isEnriched 
+          ? 'Place in lightly oiled bowl, cover, and let rise 1.5-2 hours at 75–78°F until doubled. Enriched doughs rise slower due to sugar and fat.'
+          : 'Place in lightly oiled bowl, cover, and let rise 1–1.5 hours at 75–78°F until doubled in size.',
+        timing: isEnriched ? '1.5-2 hours' : '1-1.5 hours'
+      },
+      {
+        step: 'SHAPE',
+        change: 'Punch down gently, shape as desired (loaf, braid, or boule), and place on greased pan or parchment.',
+        timing: '5-10 min'
+      },
+      {
+        step: 'FINAL PROOF',
+        change: isEnriched
+          ? 'Cover and let rise 1-1.5 hours until puffy and nearly doubled. Should spring back slowly when pressed.'
+          : 'Cover and let rise 45–60 minutes until dough springs back slowly when gently pressed.',
+        timing: isEnriched ? '1-1.5 hours' : '45-60 min'
+      },
+      {
+        step: 'BAKE',
+        change: isEnriched
+          ? 'Preheat oven to 350-375°F (175-190°C). Brush with egg wash if desired. Bake 25-40 minutes until deep golden and internal temperature is 190–195°F. Tent with foil if browning too quickly.'
+          : 'Preheat oven to 450°F (230°C). Score the top and spray with water for steam. Bake 25-35 minutes until deep brown and internal temperature is 200-205°F.',
+        timing: isEnriched ? '25-40 min at 350-375°F' : '25-35 min at 450°F'
+      },
+      {
+        step: 'COOL',
+        change: 'Remove from pan and cool on wire rack at least 1 hour before slicing.',
+        timing: '1 hour minimum'
+      }
+    ];
+  }
+
+  // Generate troubleshooting tips - YEAST SPECIFIC
   const troubleshootingTips = [
     {
-      issue: 'Dense Crumb',
-      solution: 'Dough was likely under-proofed or yeast too old. Ensure yeast is fresh and active, and proof until dough springs back slowly when pressed.'
+      issue: 'Dough not rising',
+      solution: 'Check yeast expiration date. Ensure water temperature was 105-110°F (not too hot—above 120°F kills yeast). Give dough more time in a warmer spot.'
+    },
+    {
+      issue: 'Dense texture',
+      solution: 'Ensure adequate kneading (dough should pass windowpane test). Allow full rise times—don\'t rush fermentation. Check oven temperature with thermometer.'
+    },
+    {
+      issue: 'Too much rise/overflow',
+      solution: 'Reduce yeast slightly or shorten rise time. Yeasted doughs can over-proof quickly in warm environments.'
+    },
+    {
+      issue: 'Yeast not foaming during proofing',
+      solution: 'Water may be too hot (killed yeast) or too cold (yeast inactive). Yeast may be expired. Try fresh yeast and correct water temperature (105-110°F).'
     },
     {
       issue: 'Crust Too Hard',
-      solution: 'Loaf may be overbaked or hydration too low. Check internal temperature (target 190-195°F) and consider increasing water by 2-3%.'
+      solution: 'Loaf may be overbaked or hydration too low. Check internal temperature (target 190-195°F for enriched, 200-205°F for lean) and consider increasing water by 2-3%.'
     },
     {
       issue: 'Flat Loaf',
@@ -188,15 +418,15 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     }
   ];
 
-  const warnings = generateBakerWarnings(converted);
-  const smartWarnings = generateSmartWarnings(recipe);
-  const allWarnings = [...smartWarnings, ...warnings];
+  const warnings = generateSmartWarnings(converted);
   const substitutions = generateSubstitutions(converted);
   
-  // Add special technique warnings if original recipe text provided
-  if (originalRecipeText) {
-    const techniqueWarnings = detectSpecialTechniques(originalRecipeText);
-    allWarnings.unshift(...techniqueWarnings);
+  // Add multi-day conversion notice if applicable
+  if (isMultiDay) {
+    warnings.unshift({
+      type: 'info',
+      message: '🔄 This recipe was originally a multi-day sourdough process. The conversion restructures the timeline for commercial yeast, completing in 18-24 hours with overnight bulk fermentation instead of 2-3 days with sourdough starter.'
+    });
   }
 
   return {
@@ -205,7 +435,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     direction: 'sourdough-to-yeast',
     methodChanges,
     troubleshootingTips,
-    warnings: allWarnings,
+    warnings,
     substitutions
   };
 }
