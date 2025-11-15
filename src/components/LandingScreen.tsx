@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Mail } from 'lucide-react';
 import logo from '@/assets/logo.png';
-import heroBanner from '@/assets/hero-banner.jpeg';
+import heroBanner from '@/assets/hero-banner.png';
 
 interface LandingScreenProps {
   onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
@@ -14,19 +14,18 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Hero Banner Section */}
-      <div className="relative w-full h-[200px] sm:h-[240px] md:h-[280px] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/10" />
-        <img 
-          src={heroBanner} 
-          alt="Baking workspace with rustic bread and baking tools" 
-          className="absolute inset-0 w-full h-full object-cover object-center"
-          loading="eager"
-          style={{ 
-            maxWidth: '100%',
-            imageRendering: 'crisp-edges'
-          }}
-        />
-      </div>
+      <div 
+        className="relative w-full h-[150px] sm:h-[200px] md:h-[260px]"
+        style={{
+          backgroundImage: `url(${heroBanner})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          imageRendering: 'crisp-edges'
+        }}
+        role="img"
+        aria-label="Baking workspace with rustic bread and baking tools"
+      />
       
       {/* Main Content */}
       <div className="flex-1 flex items-start justify-center p-4 md:p-6 pt-4 md:pt-6">
