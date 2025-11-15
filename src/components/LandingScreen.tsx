@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Mail } from 'lucide-react';
 import logo from '@/assets/logo.png';
-import heroBanner from '@/assets/hero-banner.png';
+import heroBanner from '@/assets/hero-banner.jpeg';
 
 interface LandingScreenProps {
   onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
