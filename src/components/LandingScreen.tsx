@@ -14,14 +14,17 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Hero Banner Section */}
-      <div className="relative w-full h-[180px] md:h-[220px] overflow-hidden">
+      <div className="relative w-full h-[200px] sm:h-[240px] md:h-[280px] overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/10" />
         <img 
           src={heroBanner} 
           alt="Baking workspace with rustic bread and baking tools" 
-          className="absolute inset-0 w-full h-full object-cover"
-          width="1920"
-          height="220"
+          className="absolute inset-0 w-full h-full object-cover object-center"
           loading="eager"
+          style={{ 
+            maxWidth: '100%',
+            imageRendering: 'crisp-edges'
+          }}
         />
       </div>
       
