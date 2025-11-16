@@ -269,13 +269,36 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   const instantYeastAmount = Math.round(trueFlour * 0.011); // 1.1%
   const activeDryYeastAmount = Math.round(instantYeastAmount * 1.25);
   
+  // BUG FIX #1: Add starter flour back into flour display
+  // If recipe has multiple flours, add proportionally to the largest flour
+  // If single flour, add all starter flour to it
+  const adjustedFlourIngredients = flourIngredients.map((f, idx, arr) => {
+    if (arr.length === 1) {
+      // Single flour: add all starter flour
+      console.log(`[BUG FIX #1] Single flour detected: ${f.amount}g + ${starterFlour}g from starter = ${f.amount + starterFlour}g`);
+      return {
+        ...f,
+        amount: f.amount + starterFlour,
+        name: cleanIngredientName(f.name)
+      };
+    } else if (idx === 0) {
+      // Multiple flours: add to first (typically largest) flour
+      console.log(`[BUG FIX #1] Multiple flours detected: Adding ${starterFlour}g from starter to primary flour`);
+      return {
+        ...f,
+        amount: f.amount + starterFlour,
+        name: cleanIngredientName(f.name)
+      };
+    }
+    return {
+      ...f,
+      name: cleanIngredientName(f.name)
+    };
+  });
+  
   // Build final ingredient list - PRESERVE multi-flour ratios
   const convertedIngredients: ParsedIngredient[] = [
-    ...flourIngredients.map(f => ({
-      ...f,
-      // Clean ingredient names of any levain-related text
-      name: cleanIngredientName(f.name)
-    })),
+    ...adjustedFlourIngredients,
     {
       name: 'water (80-85°F)',
       amount: trueWater,
@@ -732,7 +755,9 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
       flour: doughFlour,
       water: doughWater,
       salt: recipe.saltAmount
-    }
+    },
+    // BUG FIX #3: Pass ingredients for dynamic instruction generation
+    [...levainIngredients, ...doughIngredients, ...nonFlourLiquidYeastIngredients]
   );
 
   const troubleshootingTips = [

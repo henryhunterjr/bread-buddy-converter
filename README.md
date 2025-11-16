@@ -48,6 +48,23 @@ Thoroughly tested with:
 - Conversions are estimates based on standard baker's percentages
 - Some recipe formats may require manual cleanup
 - Assumes 100% hydration sourdough starter
+
+## Changelog
+
+### Version 1.1 (November 2024)
+- **FIX**: Flour display inconsistency in sourdough→yeast conversion (ISSUE-003) - Flour amount in ingredients list now correctly includes flour from starter
+- **FIX**: Text input validation false error messages (ISSUE-002/005) - Validation now only triggers onBlur instead of during typing
+- **FIX**: Dynamic instruction generation based on actual ingredients (ISSUE-001) - Method instructions now mention only ingredients present in the recipe
+- **AUDIT**: Independent QA completed (4.4/5.0 score)
+
+### Version 1.0 (October 2024)
+- Initial public launch
+- Full yeast ↔ sourdough conversion
+- PDF export functionality
+- OCR image parsing
+- Ingredient confidence scoring
+- Biga/poolish detection
+- Multi-liquid hydration tracking
 - Not suitable for unleavened breads or flatbreads
 
 ## Contributing
