@@ -79,8 +79,13 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       return errors;
     }
     
-    // Check for negative numbers
-    if (/-\d+/.test(text)) {
+    // Check for negative amounts (more precise regex)
+    // Matches: start of line or whitespace, then minus sign, optional space, then digits
+    // Examples: "-500", "- 500", "\n-100" 
+    // Won't match: "5-7g" (range), "all-purpose" (no digits), "2024-11-15" (preceded by digit)
+    const negativePattern = /(?:^|\s)-\s*\d+/;
+    if (negativePattern.test(text)) {
+      console.log('[InputScreen] Negative number detected in recipe text');
       errors.push("Recipe amounts can't be negative");
     }
     
@@ -97,7 +102,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   
   const handleTextBlur = () => {
     // Validate only when user leaves the field
+    console.log('[InputScreen] Text blur triggered, validating:', recipeText.substring(0, 100));
     const validationErrors = validateInputOnBlur(recipeText);
+    console.log('[InputScreen] Validation errors:', validationErrors);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
       toast({
