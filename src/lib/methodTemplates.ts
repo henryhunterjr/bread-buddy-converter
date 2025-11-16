@@ -33,13 +33,39 @@ export function classifyDough(
 export function getMethodTemplate(
   classification: DoughClassification,
   levainDetails: { starter: number; water: number; flour: number; total: number },
-  doughDetails: { flour: number; water: number; salt: number }
+  doughDetails: { flour: number; water: number; salt: number },
+  ingredients?: Array<{ name: string; type: string; amount: number }>
 ): MethodChange[] {
   const { type } = classification;
   const { starter, water, flour, total } = levainDetails;
   const { flour: doughFlour, water: doughWater, salt } = doughDetails;
 
+  // BUG FIX #3: Detect actual ingredients for dynamic instructions
+  const hasEggs = ingredients?.some(i => i.name.toLowerCase().includes('egg'));
+  const hasButter = ingredients?.some(i => i.name.toLowerCase().includes('butter'));
+  const hasOil = ingredients?.some(i => i.name.toLowerCase().includes('oil'));
+  const hasMilk = ingredients?.some(i => i.name.toLowerCase().includes('milk'));
+  const hasSugar = ingredients?.some(i => i.name.toLowerCase().includes('sugar') || i.type === 'sweetener');
+  
+  console.log('[BUG FIX #3] Detected ingredients:', { hasEggs, hasButter, hasOil, hasMilk, hasSugar });
+
   if (type === 'enriched' || type === 'sweet') {
+    // Build dynamic ingredient list for mix instruction
+    let mixIngredients = ['water'];
+    if (hasMilk) mixIngredients.push('milk');
+    const liquidsList = mixIngredients.join(' + ');
+    
+    let enrichmentInstructions = '';
+    if (hasButter) {
+      enrichmentInstructions = 'Add softened butter gradually during first fold, not in initial mix.';
+    } else if (hasOil) {
+      enrichmentInstructions = 'Add oil gradually during mixing or after autolyse.';
+    }
+    
+    if (hasEggs) {
+      enrichmentInstructions += ' Add eggs at room temperature after autolyse.';
+    }
+    
     return [
       {
         step: '1. BUILD LEVAIN (Night Before)',
@@ -48,7 +74,7 @@ export function getMethodTemplate(
       },
       {
         step: '2. MIX DOUGH (Morning)',
-        change: `In a large bowl, dissolve levain into liquids (water + milk). Add ${doughFlour}g flour and mix until shaggy. Rest 30-45 minutes (autolyse). Add softened butter gradually during first fold, not in initial mix. Add eggs at room temperature after autolyse.`,
+        change: `In a large bowl, dissolve levain into liquids (${liquidsList}). Add ${doughFlour}g flour and mix until shaggy. Rest 30-45 minutes (autolyse).${enrichmentInstructions ? ' ' + enrichmentInstructions : ''}`,
         timing: '30-45 min autolyse'
       },
       {

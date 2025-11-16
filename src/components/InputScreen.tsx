@@ -70,23 +70,41 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const [doughType, setDoughType] = useState<'plain' | 'enriched' | 'whole-grain'>('plain');
   const { toast } = useToast();
   
-  // Input validation: block negatives and junk text
-  const validateInput = (text: string): boolean => {
-    // Block negative numbers
-    if (/-\d+/.test(text)) {
-      toast({
-        title: "Invalid input",
-        description: "Recipe amounts can't be negative",
-        variant: "destructive"
-      });
-      return false;
+  // BUG FIX #2: Validate only on blur, not on every keystroke
+  const validateInputOnBlur = (text: string): string[] => {
+    const errors: string[] = [];
+    
+    // Only validate if field has content
+    if (!text || text.trim().length === 0) {
+      return errors;
     }
-    return true;
+    
+    // Check for negative numbers
+    if (/-\d+/.test(text)) {
+      errors.push("Recipe amounts can't be negative");
+    }
+    
+    return errors;
   };
   
   const handleTextChange = (text: string) => {
-    if (validateInput(text)) {
-      setRecipeText(text);
+    setRecipeText(text);
+    // Clear errors when user is typing
+    if (errors.length > 0) {
+      setErrors([]);
+    }
+  };
+  
+  const handleTextBlur = () => {
+    // Validate only when user leaves the field
+    const validationErrors = validateInputOnBlur(recipeText);
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      toast({
+        title: "Invalid input",
+        description: validationErrors[0],
+        variant: "destructive"
+      });
     }
   };
 
@@ -402,6 +420,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                 placeholder={getPlaceholderText(direction)}
                 value={recipeText}
                 onChange={(e) => handleTextChange(e.target.value)}
+                onBlur={handleTextBlur}
                 className="min-h-[200px] bg-muted/30 border-input text-sm resize-none"
               />
             </div>
