@@ -45,6 +45,15 @@ All colors MUST be HSL.
     --golden-yellow: 42 90% 45%;
     --card-border: 28 50% 75%;
     --breadcrumb-text: 28 15% 35%;
+    
+    /* Bread-themed palette */
+    --bread-light: 32 60% 96%;
+    --bread-medium: 32 40% 85%;
+    --bread-gold: 42 85% 65%;
+    --bread-wheat: 38 75% 70%;
+    --bread-earth: 28 50% 35%;
+    --bread-terracotta: 20 60% 50%;
+    --bread-cream: 32 70% 95%;
 
     --radius: 0.5rem;
 
