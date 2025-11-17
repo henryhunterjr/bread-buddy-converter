@@ -33,6 +33,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface InputScreenProps {
   direction: 'sourdough-to-yeast' | 'yeast-to-sourdough';
@@ -58,6 +59,7 @@ const getButtonText = (direction: string) =>
     : 'Convert to Yeast';
 
 export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
+  const { trackEvent } = useAnalytics();
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -154,6 +156,12 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     setErrors([]);
     setUploadedFileName(file.name);
     
+    // Track file upload
+    trackEvent('file_uploaded', {
+      file_type: file.type,
+      file_size: file.size
+    });
+    
     try {
       const extractedText = await extractTextFromFile(file);
       setRecipeText(extractedText);
@@ -189,6 +197,10 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       return data.recipe;
     } catch (error) {
       console.error('AI parse error:', error);
+      // Track AI parsing failure
+      trackEvent('ai_parsing_failed', {
+        error_message: error instanceof Error ? error.message : 'Unknown error'
+      });
       return null;
     }
   };

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { HelpCircle, Loader2 } from 'lucide-react';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { Navigation } from '@/components/Navigation';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 // Lazy load heavy components for better initial load performance
 const InputScreen = lazy(() => import('@/components/InputScreen'));
@@ -21,6 +22,7 @@ const SavedRecipes = lazy(() => import('@/components/SavedRecipes').then(module 
 type Screen = 'landing' | 'input' | 'confirmation' | 'output' | 'saved';
 
 const Index = () => {
+  const { trackEvent } = useAnalytics();
   const [screen, setScreen] = useState<Screen>('landing');
   const [direction, setDirection] = useState<'sourdough-to-yeast' | 'yeast-to-sourdough'>('sourdough-to-yeast');
   const [result, setResult] = useState<ConvertedRecipe | null>(null);
@@ -35,6 +37,7 @@ const Index = () => {
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
     setScreen('input');
+    trackEvent('conversion_started', { conversion_direction: selectedDirection });
   };
 
   /**
@@ -67,6 +70,12 @@ const Index = () => {
   const handleConvert = async (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
     // Use AI-parsed data if provided, otherwise parse with regex
     const parsed = aiParsedData || parseRecipe(recipeText, starterHydration);
+    
+    // Track parsing method used
+    trackEvent(aiParsedData ? 'ai_parsing_success' : 'regex_parsing_used', {
+      conversion_direction: direction,
+      parser_used: aiParsedData ? 'ai' : 'regex'
+    });
     
     console.log('handleConvert - using', aiParsedData ? 'AI-parsed data' : 'regex-parsed data');
     console.log('Parsed recipe:', {
@@ -242,6 +251,14 @@ const Index = () => {
     setValidationAutoFixes(validationResult.autoFixes);
     setResult(validatedRecipe);
     setScreen('output');
+    
+    // Track conversion completed
+    trackEvent('conversion_completed', {
+      conversion_direction: direction,
+      ingredient_count: confirmedIngredients.length,
+      had_corrections: userCorrections.length > 0,
+      had_auto_fixes: validationResult.autoFixes.length > 0
+    });
   };
 
   const handleRejectIngredients = () => {
