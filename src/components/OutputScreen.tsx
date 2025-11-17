@@ -107,7 +107,7 @@ export default function OutputScreen({
   );
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--background))] flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Print Styles */}
       <style>{`
         @media print {

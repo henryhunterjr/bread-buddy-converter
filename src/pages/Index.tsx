@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { HelpCircle, Loader2 } from 'lucide-react';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { Navigation } from '@/components/Navigation';
+import { LoadingState } from '@/components/LoadingState';
 
 // Lazy load heavy components for better initial load performance
 const InputScreen = lazy(() => import('@/components/InputScreen'));
@@ -31,6 +32,8 @@ const Index = () => {
   const [recipeDescription, setRecipeDescription] = useState<string>('');
   const [showHelp, setShowHelp] = useState(false);
   const [validationAutoFixes, setValidationAutoFixes] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -65,6 +68,9 @@ const Index = () => {
   };
 
   const handleConvert = async (recipeText: string, starterHydration: number, aiParsedData?: ParsedRecipe) => {
+    setIsProcessing(true);
+    setProcessingMessage('Parsing your recipe...');
+    
     // Use AI-parsed data if provided, otherwise parse with regex
     const parsed = aiParsedData || parseRecipe(recipeText, starterHydration);
     
@@ -77,6 +83,7 @@ const Index = () => {
     });
     
     // Extract recipe name and description using AI
+    setProcessingMessage('Extracting recipe details...');
     let title = 'Converted Bread Recipe';
     let description = '';
     
