@@ -68,6 +68,13 @@ export default {
         "golden-yellow": "hsl(var(--golden-yellow))",
         "card-border": "hsl(var(--card-border))",
         "breadcrumb-text": "hsl(var(--breadcrumb-text))",
+        "bread-light": "hsl(var(--bread-light))",
+        "bread-medium": "hsl(var(--bread-medium))",
+        "bread-gold": "hsl(var(--bread-gold))",
+        "bread-wheat": "hsl(var(--bread-wheat))",
+        "bread-earth": "hsl(var(--bread-earth))",
+        "bread-terracotta": "hsl(var(--bread-terracotta))",
+        "bread-cream": "hsl(var(--bread-cream))",
       },
       borderRadius: {
         lg: "var(--radius)",
