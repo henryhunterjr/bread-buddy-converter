@@ -513,15 +513,18 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   const starterPercentage = 0.20;
   const starterFlourNeeded = Math.round(totalFlour * starterPercentage); // 100g for 500g flour
 
-  // LEVAIN BUILD FORMULA at ORIGINAL hydration (not always 100%!):
-  // For X% inoculation (default 20%):
-  // - Starter seed: 4% of total flour (e.g., 40g for 1000g flour)
-  // - Levain flour: X% of total flour (e.g., 96g = 20% of 480g)
-  // - Levain water: X% of total flour × ORIGINAL hydration (e.g., 96g × 0.78 = 75g for 78% recipe)
-  // Result: Levain matches ORIGINAL recipe hydration, not forced to 100%
-  const activeStarterWeight = Math.round(starterFlourNeeded * 0.2); // 4% of total flour
-  const levainFlour = starterFlourNeeded; // 20% of total flour
-  const levainWater = Math.round(starterFlourNeeded * originalHydration); // KEY FIX: Use ORIGINAL hydration!
+  // LEVAIN BUILD FORMULA - ALWAYS 100% HYDRATION:
+  // For 20% inoculation:
+  // - Target total levain flour: 20% of total flour (e.g., 112g for 562g flour)
+  // - Starter seed: 40% of target levain flour (e.g., 45g for 112g)
+  // - Flour to ADD: Target minus flour from starter (e.g., 112g - 22.5g = 89.5g)
+  // - Water to ADD: Equal to flour to add for 100% hydration (e.g., 89.5g)
+  // Result: Levain always at 100% hydration, matching typical home baker starter maintenance
+  const activeStarterWeight = Math.round(starterFlourNeeded * 0.4); // 40% of target = 8% of total flour
+  const starterFlourInLevain = activeStarterWeight * (starterHydration / (100 + starterHydration));
+  const starterWaterInLevain = activeStarterWeight * (starterHydration / (100 + starterHydration));
+  const levainFlour = Math.round(starterFlourNeeded - starterFlourInLevain); // Flour to ADD
+  const levainWater = levainFlour; // 100% hydration: water to add = flour to add
 
   // Calculate levain total using helper function to ensure consistency
   const levainTotal = computeLevainTotal({
@@ -538,13 +541,9 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     }
   }
   
-  // Starter breakdown (100% hydration starter means 50% flour, 50% water)
-  const starterFlourContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Flour from active starter
-  const starterWaterContent = activeStarterWeight * (starterHydration / (100 + starterHydration)); // Water from active starter
-  
-  // Total flour and water in levain
-  const totalLevainFlour = levainFlour + starterFlourContent; // 100g + 10g = 110g
-  const totalLevainWater = levainWater + starterWaterContent; // 100g + 10g = 110g
+  // Total flour and water in levain (using values calculated above)
+  const totalLevainFlour = levainFlour + starterFlourInLevain;
+  const totalLevainWater = levainWater + starterWaterInLevain;
   
   // STEP 4: Calculate remaining dough ingredients
   const doughFlour = Math.round(totalFlour - totalLevainFlour);
@@ -726,7 +725,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   
   console.log('Converted recipe hydration (final):', finalHydration.toFixed(1) + '%');
   console.log('Starter flour contribution:', totalLevainFlour + 'g (' + ((totalLevainFlour / totalFlour) * 100).toFixed(1) + '% of total flour)');
-  console.log('Active starter used:', activeStarterWeight + 'g (provides ' + starterFlourContent + 'g flour)');
+  console.log('Active starter used:', activeStarterWeight + 'g (provides ' + starterFlourInLevain + 'g flour)');
   console.log('Levain build ratio: ' + activeStarterWeight + 'g starter : ' + levainWater + 'g water : ' + levainFlour + 'g flour = ' + levainTotal + 'g total');
   
   // Calculate actual starter percentage for validation
