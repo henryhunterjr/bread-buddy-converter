@@ -104,22 +104,13 @@ Return a JSON object with this structure:
       "type": "flour"
     }
   ],
-  "method": "extracted and refined method text with sensory cues",
-  "totalFlour": 500,
-  "totalLiquid": 400,
-  "starterAmount": 0,
-  "yeastAmount": 7,
-  "saltAmount": 10,
-  "hydration": 80
+  "method": "extracted and refined method text with sensory cues"
 }
 
 IMPORTANT: 
-- If starter is ${starterHydration}% hydration and weighs X grams, then:
-  - Flour from starter = X / (1 + ${starterHydration}/100)
-  - Water from starter = X * (${starterHydration}/100) / (1 + ${starterHydration}/100)
-- Total flour = sum of all flour ingredients + flour from starter
-- Total liquid = sum of all liquid ingredients + water from starter
-- Hydration = (totalLiquid / totalFlour) * 100`;
+- Classify ingredient types accurately: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other
+- All amounts must be in grams
+- Do NOT calculate totals or hydration - just parse and classify ingredients`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -192,6 +183,44 @@ IMPORTANT:
         name: cleanParsedIngredient(ing.name)
       }));
     }
+    
+    // Calculate totals from parsed ingredients
+    let totalFlour = 0;
+    let totalLiquid = 0;
+    let starterAmount = 0;
+    let yeastAmount = 0;
+    let saltAmount = 0;
+    
+    parsedRecipe.ingredients.forEach((ing: any) => {
+      const amount = ing.amount || 0;
+      
+      if (ing.type === 'flour') {
+        totalFlour += amount;
+      } else if (ing.type === 'liquid') {
+        totalLiquid += amount;
+      } else if (ing.type === 'starter') {
+        starterAmount += amount;
+        // Calculate flour and water from starter
+        const flourFromStarter = amount / (1 + starterHydration / 100);
+        const waterFromStarter = (amount * (starterHydration / 100)) / (1 + starterHydration / 100);
+        totalFlour += flourFromStarter;
+        totalLiquid += waterFromStarter;
+      } else if (ing.type === 'yeast') {
+        yeastAmount += amount;
+      } else if (ing.type === 'salt') {
+        saltAmount += amount;
+      }
+    });
+    
+    const hydration = totalFlour > 0 ? (totalLiquid / totalFlour) * 100 : 0;
+    
+    // Add calculated fields to parsed recipe
+    parsedRecipe.totalFlour = Math.round(totalFlour * 10) / 10;
+    parsedRecipe.totalLiquid = Math.round(totalLiquid * 10) / 10;
+    parsedRecipe.starterAmount = Math.round(starterAmount * 10) / 10;
+    parsedRecipe.yeastAmount = Math.round(yeastAmount * 10) / 10;
+    parsedRecipe.saltAmount = Math.round(saltAmount * 10) / 10;
+    parsedRecipe.hydration = Math.round(hydration * 10) / 10;
     
     // Validate that we found flour
     if (!parsedRecipe.totalFlour || parsedRecipe.totalFlour === 0) {
