@@ -34,6 +34,8 @@ const Index = () => {
   const [validationAutoFixes, setValidationAutoFixes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('');
 
   const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
     setDirection(selectedDirection);
@@ -133,6 +135,7 @@ const Index = () => {
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });
     setRecipeName(title);
     setRecipeDescription(description);
+    setIsProcessing(false);
     setScreen('confirmation');
     
     // Scroll to top when confirmation screen loads
@@ -140,6 +143,9 @@ const Index = () => {
   };
 
   const handleConfirmIngredients = async (confirmedIngredients: ParsedIngredient[]) => {
+    setIsProcessing(true);
+    setProcessingMessage('Converting your recipe...');
+    
     // Scroll to top when moving to output screen
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
@@ -248,6 +254,7 @@ const Index = () => {
     
     setValidationAutoFixes(validationResult.autoFixes);
     setResult(validatedRecipe);
+    setIsProcessing(false);
     setScreen('output');
   };
 
@@ -289,25 +296,33 @@ const Index = () => {
   };
 
   return (
-    <>
-      {/* Global Help Button - fixed bottom-right, always accessible */}
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => setShowHelp(true)}
-        className="fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full bg-background/95 backdrop-blur shadow-lg border-bread-medium/30 hover:bg-bread-light/50 transition-all print:hidden"
-      >
-        <HelpCircle className="h-5 w-5" />
-      </Button>
-
+    <div className="min-h-screen bg-gradient-to-b from-background to-bread-light">
       {/* Help Modal */}
       <HelpModal open={showHelp} onOpenChange={setShowHelp} />
-
-      {screen === 'landing' && (
-        <LandingScreen onSelectDirection={handleSelectDirection} />
+      
+      {/* Help Button - Fixed Position */}
+      {screen !== 'landing' && !isProcessing && (
+        <Button
+          onClick={() => setShowHelp(true)}
+          variant="outline"
+          size="icon"
+          className="fixed bottom-4 left-4 z-50 rounded-full shadow-lg hover:shadow-xl transition-shadow bg-background border-2 min-h-[48px] min-w-[48px]"
+          aria-label="Help"
+        >
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       )}
       
-      <Suspense fallback={
+      {/* Loading State */}
+      {isProcessing && (
+        <LoadingState 
+          title="Processing Recipe" 
+          description={processingMessage}
+        />
+      )}
+      
+      {!isProcessing && (
+        <Suspense fallback={<LoadingState title="Loading..." description="Please wait" />}>
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -355,8 +370,9 @@ const Index = () => {
             onMyRecipes={handleViewSavedRecipes}
           />
         )}
-      </Suspense>
-    </>
+        </Suspense>
+      )}
+    </div>
   );
 };
 

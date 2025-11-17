@@ -144,21 +144,35 @@ export default function OutputScreen({
         }
       `}</style>
 
-      <Navigation onHome={onHome} onMyRecipes={onMyRecipes} />
+      {/* Navigation */}
+      <div className="no-print">
+        <Navigation onHome={onHome} onMyRecipes={onMyRecipes} />
+      </div>
       
-      {/* Hero Image */}
-      <div className="w-full h-[300px] overflow-hidden relative no-print hero-image">
-        <img 
-          src={heroBanner} 
-          alt="Artisan bread" 
-          className="w-full h-full object-cover"
+      {/* Hero Image Section */}
+      <div className="relative w-full h-[200px] sm:h-[280px] md:h-[340px] lg:h-[400px] no-print">
+        <div
+          style={{
+            backgroundImage: `url(${heroBanner})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+          className="absolute inset-0"
+          role="img"
+          aria-label="Finished artisan bread"
         />
-        {/* Small logo overlay in corner */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md">
+        <div className="absolute inset-0 bg-gradient-to-b from-bread-earth/40 via-bread-earth/30 to-bread-earth/50" />
+        <div className="relative h-full flex items-center justify-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-bread-cream drop-shadow-lg">
+            Your Converted Recipe
+          </h1>
+        </div>
+        <div className="absolute top-4 right-4">
           <img 
             src={logo} 
-            alt="BGB Logo" 
-            className="h-8 w-8"
+            alt="Baking Great Bread Logo" 
+            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full shadow-lg opacity-90"
           />
         </div>
       </div>
@@ -179,34 +193,27 @@ export default function OutputScreen({
       </div>
       
       {/* Main Content */}
-      <div className="flex-1 p-4 sm:p-8 overflow-auto">
-        <div className="max-w-5xl mx-auto space-y-8">
-          
-          {/* Recipe Header Section */}
-          <div className="text-center space-y-3 py-6 print-page-break">
-            {/* Recipe Title - Large Serif */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-[hsl(var(--foreground))] leading-tight">
+      <div className="container mx-auto px-4 py-12 space-y-12 max-w-5xl">
+        {/* Recipe Header */}
+        <Card className="p-8 bg-card border-bread-medium/20 shadow-lg print-page-break">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground">
               {initialRecipeName}
-            </h1>
-            
-            {/* Metadata Line */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-sm text-[hsl(var(--muted-foreground))]">
-              <span>Converted from {result.direction === 'sourdough-to-yeast' ? 'Sourdough → Yeast' : 'Yeast → Sourdough'}</span>
-              <span className="hidden sm:inline">•</span>
-              <span>Hydration: {result.converted.hydration.toFixed(0)}%</span>
-              <span className="hidden sm:inline">•</span>
-              <span>Yield: {(result.converted.totalFlour + result.converted.totalLiquid + result.converted.saltAmount).toFixed(0)}g</span>
-              <span className="hidden sm:inline">•</span>
-              <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-sm sm:text-base text-muted-foreground">
+              <span>Converted from {result.direction === 'sourdough-to-yeast' ? 'sourdough' : 'yeast'} → {result.direction === 'sourdough-to-yeast' ? 'yeast' : 'sourdough'}</span>
+              <span>•</span>
+              <span>Hydration: {result.converted.hydration.toFixed(1)}%</span>
+              <span>•</span>
+              <span>Date: {new Date().toLocaleDateString()}</span>
             </div>
-            
-            {/* Recipe Description */}
             {recipeDescription && (
-              <p className="text-base sm:text-lg max-w-3xl mx-auto text-[hsl(var(--muted-foreground))] italic leading-relaxed pt-2">
+              <p className="text-base sm:text-lg italic text-muted-foreground max-w-2xl mx-auto">
                 {recipeDescription}
               </p>
             )}
           </div>
+        </Card>
 
           {/* Validation Auto-Fixes */}
           {validationAutoFixes.length > 0 && (
@@ -227,11 +234,9 @@ export default function OutputScreen({
             </Card>
           )}
           
-          {/* Ingredients Section */}
-          <div className="print-page-break">
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold mb-6 text-[hsl(var(--foreground))] border-b-2 border-[hsl(var(--primary))] pb-2">
-              Ingredients
-            </h2>
+        {/* Ingredients Section */}
+        <Card className="p-8 bg-card border-bread-medium/20 shadow-lg print-page-break">
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-foreground mb-6">Ingredients</h2>
             
             <div className="space-y-6">
               {/* Dough Table */}
@@ -271,8 +276,9 @@ export default function OutputScreen({
                       </tr>
                     </tbody>
                   </table>
-                </div>
-              </div>
+            </div>
+          </div>
+        </Card>
 
               {/* Finishing Table - if applicable */}
               {finishingIngredients.length > 0 && (
@@ -320,11 +326,9 @@ export default function OutputScreen({
             )}
           </div>
 
-          {/* Method Section */}
-          <div className="print-page-break">
-            <h2 className="text-2xl sm:text-3xl font-serif font-bold mb-6 text-[hsl(var(--foreground))] border-b-2 border-[hsl(var(--primary))] pb-2">
-              Method
-            </h2>
+        {/* Method Section */}
+        <Card className="p-8 bg-card border-bread-medium/20 shadow-lg print-page-break">
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-foreground mb-6">Method</h2>
             <div className="space-y-6">
               {result.methodChanges.map((change, i) => (
                 <div key={i} className="flex gap-4 print-page-break">
