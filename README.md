@@ -48,6 +48,9 @@ Thoroughly tested with:
 - Conversions are estimates based on standard baker's percentages
 - Some recipe formats may require manual cleanup
 - Assumes 100% hydration sourdough starter
+- **Recipe Formatting:** Works best with straightforward ingredient lists. Complex recipes with separate topping/filling sections or unusual formatting may require manual review.
+- **OCR Accuracy:** Image uploads work best with clear, printed recipes. Handwritten or complex multi-section recipes may need verification.
+- **Validation:** Unusually high hydration (>150%) triggers a warning for user verification.
 
 ## Changelog
 

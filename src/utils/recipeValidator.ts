@@ -167,6 +167,15 @@ function validateHydration(
     });
   }
   
+  // Check for unusually high hydration (>150%)
+  if (calculatedHydration > 150) {
+    console.log('[Validator] High hydration detected:', calculatedHydration.toFixed(1) + '%');
+    warnings.push({
+      type: 'caution',
+      message: `This hydration percentage seems unusually high (${calculatedHydration.toFixed(1)}%). Please verify your ingredient amounts before proceeding.`
+    });
+  }
+  
   return conversion;
 }
 
