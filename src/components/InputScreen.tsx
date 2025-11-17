@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat } from 'lucide-react';
-import bgbLogo from '@/assets/bgb-logo.jpg';
+import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat, ChefHat } from 'lucide-react';
+import { HeroHeader } from '@/components/HeroHeader';
 import { extractTextFromFile } from '@/utils/lazyFileExtractor';
 import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
@@ -314,88 +314,84 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     }
   };
 
-  const directionText = direction === 'sourdough-to-yeast' 
-    ? 'Sourdough → Yeast' 
-    : 'Yeast → Sourdough';
+  const handleNavigation = (route: 'home' | 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
+    if (route === 'home') {
+      onHome();
+    } else {
+      onBack();
+    }
+  };
+
+  const pageTitle = direction === 'sourdough-to-yeast' 
+    ? 'Convert Your Sourdough Recipe'
+    : 'Convert Your Yeast Recipe';
+  
+  const pageSubtitle = direction === 'sourdough-to-yeast'
+    ? "We'll turn your sourdough recipe into a perfectly leavened yeast loaf"
+    : "We'll transform your yeast recipe into an artisan sourdough bread";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Premium Header with Breadcrumb */}
-      <header className="w-full border-b border-border bg-card/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img 
-              src={bgbLogo} 
-              alt="Baking Great Bread" 
-              className="h-12 w-12 rounded-full object-cover"
-              width="48"
-              height="48"
-              loading="lazy"
-            />
-            <div className="flex items-center gap-2 text-sm text-breadcrumb-text">
-              <button onClick={onHome} className="hover:text-foreground transition-colors">Home</button>
-              <span>/</span>
-              <span className="text-foreground font-medium">
-                Convert {direction === 'yeast-to-sourdough' ? 'Yeast → Sourdough' : 'Sourdough → Yeast'}
-              </span>
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
+      {/* Hero Header */}
+      <HeroHeader 
+        pageTitle={pageTitle}
+        pageSubtitle={pageSubtitle}
+        showNav={true}
+        onNavigate={handleNavigation}
+      />
+      
+      {/* Progress Indicator */}
+      <div className="w-full bg-bread-cream/50 border-b border-bread-medium/30 py-4">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-bread-earth">Step 1 of 3</span>
+            <span className="text-xs text-muted-foreground">Enter Recipe</span>
           </div>
-          <a 
-            href="https://www.bakinggreatbread.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Wheat className="h-4 w-4 text-warm-orange" />
-            <span>Powered by BakingGreatBread.com</span>
-          </a>
+          <div className="w-full h-2 bg-bread-medium/30 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-burnt-orange to-warm-orange rounded-full transition-all duration-500"
+              style={{ width: '33%' }}
+            />
+          </div>
         </div>
-      </header>
+      </div>
       
       {/* Main Content */}
       <main className="flex-1 py-8 sm:py-12 px-4">
-        <div className="max-w-4xl mx-auto space-y-6">
-          
-          {/* Page Title */}
-          <div className="text-center space-y-2 mb-8">
-            <h1 className="font-serif text-4xl sm:text-5xl font-bold text-foreground">
-              Convert {directionText}
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              We'll expertly transform your recipe into a perfect {getConversionTitle(direction)} version.
-            </p>
-          </div>
+        <div className="max-w-[800px] mx-auto space-y-6">
 
-          {/* Main Input Card - Premium Design */}
-          <Card className="border-2 border-card-border shadow-2xl p-6 sm:p-8 space-y-6">
+          {/* Main Input Card - Warm Beige Design */}
+          <Card className="bg-bread-light/90 backdrop-blur border-bread-medium/40 shadow-xl rounded-lg p-8 space-y-8">
             {/* Card Header */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-5 w-5 text-warm-orange" />
-                <h2 className="font-serif text-2xl font-semibold text-foreground">
-                  Paste or Upload a Recipe
+            <div className="space-y-2 text-center">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <ChefHat className="h-6 w-6 text-burnt-orange" />
+                <h2 className="font-serif text-3xl font-bold text-bread-earth">
+                  Enter Your Recipe
                 </h2>
               </div>
-              <p className="text-muted-foreground">
-                Simply paste, type, or upload – we'll handle the rest.
+              <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+                Paste your recipe text, or upload a PDF or image. We'll extract the ingredients and convert it for you.
               </p>
             </div>
 
-            {/* Dough Type Selector - Navy Background */}
-            <div className="p-4 bg-[hsl(220,50%,20%)] rounded-lg border-2 border-[hsl(220,50%,30%)] space-y-3">
+            {/* Dough Type Selector */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-white">Dough Type</h3>
-                  <p className="text-sm text-white/80">Helps us pick the right formula</p>
-                </div>
+                <label className="text-base font-semibold text-bread-earth flex items-center gap-2">
+                  <Wheat className="h-5 w-5 text-burnt-orange" />
+                  Dough Type
+                </label>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-white/70 cursor-help" />
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
+                    <TooltipContent className="max-w-xs bg-background z-50">
                       <p className="text-sm">
-                        Straight = basic bread. Enriched = has butter/eggs/sugar. Whole-grain = 50%+ whole wheat/rye.
+                        <strong>Straight:</strong> Basic bread.<br/>
+                        <strong>Enriched:</strong> Has butter/eggs/sugar.<br/>
+                        <strong>Whole-grain:</strong> 50%+ whole wheat/rye.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -406,83 +402,113 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                 value={doughType} 
                 onValueChange={(value: any) => setDoughType(value)}
               >
-                <SelectTrigger className="w-full bg-white text-foreground font-semibold border-white/30 h-12">
-                  <SelectValue placeholder="Straight Dough (default)" />
+                <SelectTrigger className="w-full bg-background text-foreground font-medium border-bread-medium h-14 text-base rounded-lg shadow-sm hover:border-burnt-orange transition-colors">
+                  <SelectValue placeholder="Select dough type" />
                 </SelectTrigger>
-                <SelectContent className="bg-background z-50">
-                  <SelectItem value="plain" className="font-medium">Straight Dough - Basic bread</SelectItem>
-                  <SelectItem value="enriched" className="font-medium">Enriched Dough - Has butter, eggs, or sugar</SelectItem>
-                  <SelectItem value="whole-grain" className="font-medium">Whole-Grain - 50%+ whole wheat/rye</SelectItem>
+                <SelectContent className="bg-background z-50 border-bread-medium">
+                  <SelectItem value="plain" className="font-medium text-base">
+                    <div className="flex items-center gap-2">
+                      🍞 Straight Dough - Basic bread
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="enriched" className="font-medium text-base">
+                    <div className="flex items-center gap-2">
+                      🥐 Enriched Dough - Butter, eggs, or sugar
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="whole-grain" className="font-medium text-base">
+                    <div className="flex items-center gap-2">
+                      🌾 Whole-Grain - 50%+ whole wheat/rye
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Text Area Label */}
-            <div className="space-y-2">
-              <label htmlFor="recipe-input" className="text-sm font-medium text-foreground">
-                Text area
+            {/* Text Area */}
+            <div className="space-y-3">
+              <label htmlFor="recipe-input" className="text-base font-semibold text-bread-earth flex items-center gap-2">
+                <FileText className="h-5 w-5 text-burnt-orange" />
+                Recipe Text
               </label>
               <Textarea
                 id="recipe-input"
-                placeholder={getPlaceholderText(direction)}
+                placeholder={`${getPlaceholderText(direction)}\n\nExample:\n500g bread flour\n325g water\n10g salt\n7g instant yeast\n5g sugar`}
                 value={recipeText}
                 onChange={(e) => handleTextChange(e.target.value)}
                 onBlur={handleTextBlur}
-                className="min-h-[200px] bg-muted/30 border-input text-sm resize-none"
+                className="min-h-[300px] bg-background border-bread-medium text-base resize-none rounded-lg shadow-sm hover:border-burnt-orange transition-colors focus-visible:ring-burnt-orange"
               />
             </div>
 
             {uploadedFileName && (
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                <span className="text-muted-foreground truncate">Uploaded: {uploadedFileName}</span>
+              <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <span className="text-green-800 font-medium truncate">Uploaded: {uploadedFileName}</span>
               </div>
             )}
 
-            {/* Upload Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button
-                type="button"
-                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-xl hover:scale-105 hover:-translate-y-0.5"
-                disabled={isProcessing}
-                onClick={() => document.getElementById('pdf-upload')?.click()}
-              >
-                <FileText className="mr-2 h-5 w-5" />
-                Upload PDF
-              </Button>
-              <input
-                id="pdf-upload"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
+            {/* Upload Section */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold text-bread-earth flex items-center gap-2">
+                <Upload className="h-5 w-5 text-burnt-orange" />
+                Or Upload a File
+              </label>
               
-              <Button
-                type="button"
-                className="bg-warm-orange hover:bg-warm-orange-hover text-white h-12 text-base font-medium shadow-md transition-all hover:shadow-xl hover:scale-105 hover:-translate-y-0.5"
-                disabled={isProcessing}
-                onClick={() => document.getElementById('image-upload')?.click()}
-              >
-                <Image className="mr-2 h-5 w-5" />
-                Upload Image
-              </Button>
-              <input
-                id="image-upload"
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-
-            {/* File Info */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>Max 20MB • Accepts: PDF, JPG, WEBP</span>
-              <button className="flex items-center gap-1 text-burnt-orange hover:underline">
-                <HelpCircle className="h-3 w-3" />
-                See example
-              </button>
+              {/* Visual Drag-and-Drop Zone */}
+              <div className="border-2 border-dashed border-bread-medium rounded-lg p-8 bg-background/50 hover:bg-background hover:border-burnt-orange transition-all">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="p-4 rounded-full bg-burnt-orange/10">
+                    <Upload className="h-8 w-8 text-burnt-orange" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-base font-medium text-bread-earth">
+                      Drop your file here, or click to browse
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Supports PDF, JPG, PNG, WEBP • Max 20MB
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-md">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 text-base font-medium border-bread-medium hover:bg-bread-light hover:border-burnt-orange"
+                      disabled={isProcessing}
+                      onClick={() => document.getElementById('pdf-upload')?.click()}
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      Choose PDF
+                    </Button>
+                    <input
+                      id="pdf-upload"
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-12 text-base font-medium border-bread-medium hover:bg-bread-light hover:border-burnt-orange"
+                      disabled={isProcessing}
+                      onClick={() => document.getElementById('image-upload')?.click()}
+                    >
+                      <Image className="mr-2 h-5 w-5" />
+                      Choose Image
+                    </Button>
+                    <input
+                      id="image-upload"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Errors */}
@@ -501,10 +527,10 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
 
             {/* Starter Hydration (Conditional) */}
             {hasStarter && (
-              <div className="p-4 bg-accent/50 rounded-lg border border-accent space-y-3">
+              <div className="p-6 bg-background rounded-lg border border-bread-medium space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-semibold text-foreground">Starter Hydration</h3>
+                    <h3 className="text-base font-semibold text-bread-earth">Starter Hydration</h3>
                     <p className="text-sm text-muted-foreground">Most starters are 100% hydration</p>
                   </div>
                   <TooltipProvider>
@@ -512,7 +538,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                       <TooltipTrigger asChild>
                         <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
+                      <TooltipContent className="max-w-xs bg-background z-50">
                         <p className="text-sm">
                           We assume 100% hydration by default. If your starter uses a different ratio, select it here.
                         </p>
@@ -525,10 +551,10 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                   value={starterHydration.toString()} 
                   onValueChange={(value) => setStarterHydration(Number(value))}
                 >
-                  <SelectTrigger className="w-full bg-background">
+                  <SelectTrigger className="w-full bg-background h-12 border-bread-medium">
                     <SelectValue placeholder="100% (default)" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-background z-50 border-bread-medium">
                     <SelectItem value="50">50% (stiff starter)</SelectItem>
                     <SelectItem value="75">75%</SelectItem>
                     <SelectItem value="100">100% (equal parts - default)</SelectItem>
@@ -538,26 +564,27 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               </div>
             )}
 
-            {/* Convert Button - Premium Gradient */}
-            <Button 
-              onClick={handleConvert}
-              size="lg"
-              className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-burnt-orange via-warm-orange to-golden-yellow hover:from-[hsl(20,80%,35%)] hover:via-[hsl(25,90%,42%)] hover:to-[hsl(42,95%,40%)] text-white shadow-lg transition-all hover:shadow-2xl hover:scale-[1.02]"
-              disabled={!recipeText.trim() || isProcessing || isAIParsing}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Converting...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  {getButtonText(direction)}
-                  <Wheat className="ml-2 h-5 w-5" />
-                </>
-              )}
-            </Button>
+            {/* Convert Button - Primary CTA */}
+            <div className="pt-4">
+              <Button 
+                onClick={handleConvert}
+                size="lg"
+                className="w-full sm:w-4/5 mx-auto block min-h-[48px] h-14 text-lg font-bold bg-burnt-orange hover:bg-burnt-orange/90 text-white shadow-lg rounded-lg transition-all hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+                disabled={!recipeText.trim() || isProcessing || isAIParsing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Converting Recipe...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Next: Review Ingredients
+                  </>
+                )}
+              </Button>
+            </div>
             
             {aiParseAvailable && (
               <Button 
