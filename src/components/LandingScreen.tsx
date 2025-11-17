@@ -2,7 +2,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail } from 'lucide-react';
+import { Mail, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo.png';
 import heroBanner from '@/assets/hero-banner.png';
 
@@ -11,6 +12,8 @@ interface LandingScreenProps {
 }
 
 export default function LandingScreen({ onSelectDirection }: LandingScreenProps) {
+  const navigate = useNavigate();
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Hero Banner Section */}
@@ -104,6 +107,15 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
       
       <footer className="py-6 bg-bread-earth/5 border-t border-bread-medium/20">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/analytics')}
+            className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            View Analytics
+          </Button>
           <Button
             variant="outline"
             size="sm"
