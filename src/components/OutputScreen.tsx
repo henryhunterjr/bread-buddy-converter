@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { MeasurementConverter } from '@/components/MeasurementConverter';
+import { useAnalytics } from '@/hooks/useAnalytics';
 
 interface OutputScreenProps {
   result: ConvertedRecipe;
@@ -51,6 +52,7 @@ export default function OutputScreen({
   onHome, 
   onMyRecipes 
 }: OutputScreenProps) {
+  const { trackEvent } = useAnalytics();
   const [recipeName, setRecipeName] = useState('');
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -63,6 +65,11 @@ export default function OutputScreen({
 
   const handleDownloadPDF = () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
+    
+    // Track PDF download
+    trackEvent('pdf_downloaded', {
+      conversion_direction: result.direction
+    });
     
     toast({
       title: "Generating PDF...",
@@ -85,6 +92,12 @@ export default function OutputScreen({
     }
 
     saveRecipe(recipeName, originalRecipeText, result);
+    
+    // Track recipe saved
+    trackEvent('recipe_saved', {
+      conversion_direction: result.direction
+    });
+    
     toast({
       title: "✅ Saved!",
       description: `Find it under "My Recipes" in the menu.`,
