@@ -14,7 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analytics_daily_stats: {
+        Row: {
+          ai_parsing_success_rate: number | null
+          avg_session_duration_seconds: number | null
+          date: string
+          file_uploads: number | null
+          pdf_downloads: number | null
+          recipes_saved: number | null
+          sourdough_to_yeast_count: number | null
+          total_conversions: number | null
+          total_sessions: number | null
+          updated_at: string | null
+          yeast_to_sourdough_count: number | null
+        }
+        Insert: {
+          ai_parsing_success_rate?: number | null
+          avg_session_duration_seconds?: number | null
+          date: string
+          file_uploads?: number | null
+          pdf_downloads?: number | null
+          recipes_saved?: number | null
+          sourdough_to_yeast_count?: number | null
+          total_conversions?: number | null
+          total_sessions?: number | null
+          updated_at?: string | null
+          yeast_to_sourdough_count?: number | null
+        }
+        Update: {
+          ai_parsing_success_rate?: number | null
+          avg_session_duration_seconds?: number | null
+          date?: string
+          file_uploads?: number | null
+          pdf_downloads?: number | null
+          recipes_saved?: number | null
+          sourdough_to_yeast_count?: number | null
+          total_conversions?: number | null
+          total_sessions?: number | null
+          updated_at?: string | null
+          yeast_to_sourdough_count?: number | null
+        }
+        Relationships: []
+      }
+      analytics_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          session_id?: string
+        }
+        Relationships: []
+      }
+      analytics_sessions: {
+        Row: {
+          conversion_completed: boolean | null
+          conversion_direction: string | null
+          ended_at: string | null
+          events_count: number | null
+          id: string
+          page_views: number | null
+          started_at: string | null
+        }
+        Insert: {
+          conversion_completed?: boolean | null
+          conversion_direction?: string | null
+          ended_at?: string | null
+          events_count?: number | null
+          id?: string
+          page_views?: number | null
+          started_at?: string | null
+        }
+        Update: {
+          conversion_completed?: boolean | null
+          conversion_direction?: string | null
+          ended_at?: string | null
+          events_count?: number | null
+          id?: string
+          page_views?: number | null
+          started_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
