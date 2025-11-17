@@ -328,7 +328,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   
   const pageSubtitle = direction === 'sourdough-to-yeast'
     ? "We'll turn your sourdough recipe into a perfectly leavened yeast loaf"
-    : "We'll transform your yeast recipe into an artisan sourdough bread";
+    : "We'll transform your commercial yeast recipe into artisan sourdough";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
