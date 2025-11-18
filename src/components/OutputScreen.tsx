@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConvertedRecipe } from '@/types/recipe';
@@ -27,6 +27,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from 'lucide-react';
 import { MeasurementConverter } from '@/components/MeasurementConverter';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
@@ -262,18 +268,53 @@ export default function OutputScreen({
                       </tr>
                     </thead>
                     <tbody>
-                      {doughIngredients.map((item, index) => (
-                        <tr 
-                          key={index}
-                          className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}
-                        >
-                          <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]">
-                            {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">{item.amount.toFixed(0)}g</td>
-                          <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage.toFixed(0)}%</td>
-                        </tr>
-                      ))}
+                      {doughIngredients.map((item, index) => {
+                        const isStarter = item.ingredient.toLowerCase().includes('starter') || 
+                                         item.ingredient.toLowerCase().includes('levain');
+                        const starterAmount = item.amount;
+                        const starterFlour = starterAmount / 2; // 100% hydration = 50% flour
+                        const starterWater = starterAmount / 2; // 100% hydration = 50% water
+                        
+                        return (
+                          <React.Fragment key={index}>
+                            <tr 
+                              className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}
+                            >
+                              <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]">
+                                {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">{item.amount.toFixed(0)}g</td>
+                              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage.toFixed(0)}%</td>
+                            </tr>
+                            
+                            {/* Starter Breakdown - Only show for yeast-to-sourdough conversions */}
+                            {isStarter && result.direction === 'yeast-to-sourdough' && (
+                              <tr className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}>
+                                <td colSpan={3} className="px-4 pb-3">
+                                  <Collapsible>
+                                    <CollapsibleTrigger className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors w-full">
+                                      <ChevronDown className="h-3 w-3" />
+                                      <span className="italic">What's in the starter? (Click to expand)</span>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="mt-2 ml-5 text-xs text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))]/20 p-3 rounded border border-[hsl(var(--border))]">
+                                      <p className="mb-2 font-semibold text-[hsl(var(--foreground))]">
+                                        Starter Composition (100% hydration):
+                                      </p>
+                                      <ul className="space-y-1 ml-4">
+                                        <li>• Flour: {starterFlour.toFixed(1)}g</li>
+                                        <li>• Water: {starterWater.toFixed(1)}g</li>
+                                      </ul>
+                                      <p className="mt-2 text-[hsl(var(--muted-foreground))]">
+                                        This flour is included in the total flour calculation.
+                                      </p>
+                                    </CollapsibleContent>
+                                  </Collapsible>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                       <tr className="border-t-2 border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5 font-bold">
                         <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]" colSpan={2}>
                           Total Hydration
