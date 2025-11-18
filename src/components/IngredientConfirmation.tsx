@@ -351,6 +351,23 @@ export function IngredientConfirmation({
             </div>
           </div>
 
+          {/* Validation Warning for Missing Amounts */}
+          {edited.some(ing => !ing.amount || ing.amount === 0) && (
+            <Card className="p-4 mb-4 bg-destructive/10 border-destructive/30">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-sm">
+                  <p className="font-semibold text-destructive mb-1">Missing ingredient amounts detected</p>
+                  <p className="text-muted-foreground">
+                    Some ingredients are missing amounts (shown in red above). 
+                    Please fill them in or set to 0g to skip them before generating your recipe. 
+                    Continuing without amounts may cause errors.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Bottom Action Buttons */}
           <Card className="p-6 bg-bread-light/80 border-bread-medium/40">
             <div className="flex flex-col sm:flex-row gap-4">

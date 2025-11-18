@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Home } from 'lucide-react';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -66,13 +66,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               </ul>
             </div>
 
-            <div className="pt-4">
+            <div className="pt-4 flex gap-3">
               <Button
                 size="lg"
                 onClick={this.handleStartOver}
-                className="w-full bg-gradient-to-r from-bread-gold to-bread-wheat hover:from-bread-wheat hover:to-bread-gold transition-all duration-300 shadow-lg text-bread-earth font-semibold"
+                className="flex-1 bg-gradient-to-r from-bread-gold to-bread-wheat hover:from-bread-wheat hover:to-bread-gold transition-all duration-300 shadow-lg text-bread-earth font-semibold"
               >
-                Start Over
+                <Home className="mr-2 h-5 w-5" />
+                Return Home
               </Button>
             </div>
 
