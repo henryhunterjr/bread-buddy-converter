@@ -109,6 +109,14 @@ function getHydrationWarnings(recipe: ParsedRecipe, comp: DoughComposition): Rec
   const warnings: RecipeWarning[] = [];
   const hydration = recipe.hydration;
   
+  // EXTREMELY HIGH HYDRATION WARNING (>150%)
+  if (hydration > 150) {
+    warnings.push({
+      type: 'warning',
+      message: `⚠️ This hydration percentage seems unusually high (${hydration.toFixed(0)}%). Please verify your ingredient amounts before proceeding. This may indicate an error in the recipe or conversion.`
+    });
+  }
+  
   // HIGH HYDRATION WARNINGS (context-aware)
   if (hydration > 75) {
     if (comp.isEnriched) {
