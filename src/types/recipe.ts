@@ -6,6 +6,7 @@ export interface ParsedIngredient {
   confidence?: 'high' | 'medium' | 'low';
   source?: 'regex' | 'ai' | 'corrected' | 'estimated';
   aiSuggestion?: string;
+  isLevainReference?: boolean; // True when referencing levain built in separate section
 }
 
 export interface ParsedRecipe {

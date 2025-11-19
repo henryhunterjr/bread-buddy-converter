@@ -94,6 +94,18 @@ PARSING RULES:
 5. Classify each ingredient type: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other
 6. Refine method instructions to be clear, sensory-focused, and in Henry's voice
 
+CRITICAL LEVAIN BUILD DETECTION:
+When a recipe has separate sections like "Levain" or "Starter Build" or "Preferment" followed by "Main Dough":
+- If the main dough lists "Xg levain" or "Xg ripe levain" or "levain (from above)" or "levain from step 1"
+- Mark that ingredient with "isLevainReference": true
+- This prevents double-counting the flour/water (once in levain build, once in main dough)
+
+Examples of levain references:
+- "151g levain (from above)" → isLevainReference: true
+- "ripe levain" → isLevainReference: true  
+- "levain from step 1" → isLevainReference: true
+- "all of the levain" → isLevainReference: true
+
 Return a JSON object with this structure:
 {
   "ingredients": [
@@ -102,6 +114,13 @@ Return a JSON object with this structure:
       "amount": 500,
       "unit": "g",
       "type": "flour"
+    },
+    {
+      "name": "levain",
+      "amount": 151,
+      "unit": "g",
+      "type": "starter",
+      "isLevainReference": true
     }
   ],
   "method": "extracted and refined method text with sensory cues"
@@ -110,6 +129,7 @@ Return a JSON object with this structure:
 IMPORTANT: 
 - Classify ingredient types accurately: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other
 - All amounts must be in grams
+- Mark levain references with isLevainReference: true to prevent double-counting
 - Do NOT calculate totals or hydration - just parse and classify ingredients`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -200,11 +220,16 @@ IMPORTANT:
         totalLiquid += amount;
       } else if (ing.type === 'starter') {
         starterAmount += amount;
-        // Calculate flour and water from starter
-        const flourFromStarter = amount / (1 + starterHydration / 100);
-        const waterFromStarter = (amount * (starterHydration / 100)) / (1 + starterHydration / 100);
-        totalFlour += flourFromStarter;
-        totalLiquid += waterFromStarter;
+        // Only break down starter into flour/water if it's NOT a reference to a previously built levain
+        // (which would already have its flour/water counted in the levain build section)
+        if (!ing.isLevainReference) {
+          // Calculate flour and water from starter
+          const flourFromStarter = amount / (1 + starterHydration / 100);
+          const waterFromStarter = (amount * (starterHydration / 100)) / (1 + starterHydration / 100);
+          totalFlour += flourFromStarter;
+          totalLiquid += waterFromStarter;
+        }
+        // If isLevainReference is true, the flour/water are already counted in the levain build section
       } else if (ing.type === 'yeast') {
         yeastAmount += amount;
       } else if (ing.type === 'salt') {
