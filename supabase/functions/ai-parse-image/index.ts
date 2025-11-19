@@ -40,7 +40,18 @@ serve(async (req) => {
             content: [
               {
                 type: 'text',
-                text: `Extract the recipe ingredients and method from this image. Return as structured text:
+                text: `Analyze this image and extract recipe information.
+
+IMPORTANT: If you detect multiple recipes on this card/image, return them in this JSON format:
+{
+  "multipleRecipes": true,
+  "recipes": [
+    {"title": "Recipe Name 1", "text": "INGREDIENTS:\\n[ingredients]\\n\\nMETHOD:\\n[steps]"},
+    {"title": "Recipe Name 2", "text": "INGREDIENTS:\\n[ingredients]\\n\\nMETHOD:\\n[steps]"}
+  ]
+}
+
+If there is only ONE recipe, return as structured text:
 
 INGREDIENTS:
 [list each ingredient with amount and name]
@@ -88,6 +99,30 @@ Pay special attention to flour types, liquids, salt, and leavening agents.`
 
     console.log('[AI Vision] Successfully extracted text');
 
+    // Check if AI returned multiple recipes in JSON format
+    let parsedResponse;
+    try {
+      // Try to parse as JSON first (for multi-recipe case)
+      parsedResponse = JSON.parse(extractedText);
+      
+      if (parsedResponse.multipleRecipes && parsedResponse.recipes) {
+        console.log(`[AI Vision] Detected ${parsedResponse.recipes.length} recipes`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            multipleRecipes: parsedResponse.recipes,
+            method: 'ai-vision'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    } catch (e) {
+      // Not JSON, treat as single recipe text
+    }
+
+    // Single recipe case
     return new Response(
       JSON.stringify({
         success: true,

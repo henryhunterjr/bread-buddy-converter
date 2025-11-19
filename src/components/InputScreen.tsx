@@ -73,6 +73,8 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [showAIRetryButton, setShowAIRetryButton] = useState(false);
   const [doughType, setDoughType] = useState<'plain' | 'enriched' | 'whole-grain'>('plain');
+  const [multipleRecipes, setMultipleRecipes] = useState<Array<{title: string, text: string}>>([]);
+  const [showRecipeSelector, setShowRecipeSelector] = useState(false);
   const { toast } = useToast();
   
   // BUG FIX #2: Validate only on blur, not on every keystroke
@@ -257,6 +259,17 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'AI vision parsing failed');
 
+      // Check if multiple recipes were detected
+      if (data.multipleRecipes && data.multipleRecipes.length > 1) {
+        setMultipleRecipes(data.multipleRecipes);
+        setShowRecipeSelector(true);
+        toast({
+          title: "📋 Multiple recipes detected",
+          description: `Found ${data.multipleRecipes.length} recipes. Please select which one to convert.`,
+        });
+        return;
+      }
+
       setRecipeText(data.text);
       setOcrConfidence(100); // AI vision is considered high confidence
       setShowAIRetryButton(false);
@@ -348,6 +361,16 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(recipeText);
       
       if (!hasFlour || !hasWater || !hasLeavening) {
+        // If user uploaded an image and parsing failed, try AI vision
+        if (uploadedImageFile) {
+          toast({
+            title: "Having trouble parsing",
+            description: "Using AI vision to interpret recipe... (5-10 seconds)",
+          });
+          await parseImageWithAI(uploadedImageFile);
+          return;
+        }
+        
         setErrors(['🤔 Need flour, water, and yeast/starter amounts to convert. Add those and try again!']);
         return;
       }
@@ -388,6 +411,16 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       
       const validationErrors = validateRecipe(validated);
       if (validationErrors.length > 0) {
+        // If parsing failed and user uploaded an image, try AI vision
+        if (uploadedImageFile && validated.totalFlour === 0) {
+          toast({
+            title: "Parser found < 3 ingredients",
+            description: "Using AI vision to interpret recipe... (5-10 seconds)",
+          });
+          await parseImageWithAI(uploadedImageFile);
+          return;
+        }
+        
         setErrors(validationErrors);
         setAiParseAvailable(true);
         return;
@@ -398,6 +431,17 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       
     } catch (error) {
       console.error('Parsing error:', error);
+      
+      // If parsing error occurred and user uploaded an image, try AI vision
+      if (uploadedImageFile) {
+        toast({
+          title: "Having trouble parsing",
+          description: "Using AI vision to interpret recipe... (5-10 seconds)",
+        });
+        await parseImageWithAI(uploadedImageFile);
+        return;
+      }
+      
       setErrors(['Could not parse recipe. Please check the format.']);
       setAiParseAvailable(true);
     } finally {
@@ -441,8 +485,59 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     ? "We'll turn your sourdough recipe into a perfectly leavened yeast loaf"
     : "We'll transform your commercial yeast recipe into artisan sourdough";
 
+  const handleRecipeSelection = (selectedRecipe: {title: string, text: string}) => {
+    setRecipeText(selectedRecipe.text);
+    setShowRecipeSelector(false);
+    setMultipleRecipes([]);
+    setOcrConfidence(100);
+    setShowAIRetryButton(false);
+    
+    toast({
+      title: "✓ Recipe selected",
+      description: `Loaded: ${selectedRecipe.title}`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
+      {/* Multiple Recipe Selector Modal */}
+      {showRecipeSelector && multipleRecipes.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
+            <h3 className="text-xl font-semibold mb-4">Multiple Recipes Detected</h3>
+            <p className="text-muted-foreground mb-6">
+              We found {multipleRecipes.length} recipes on this card. Which one would you like to convert?
+            </p>
+            
+            <div className="space-y-3">
+              {multipleRecipes.map((recipe, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleRecipeSelection(recipe)}
+                  className="w-full text-left p-4 border rounded-lg hover:bg-accent transition-colors"
+                >
+                  <div className="font-medium mb-2">{recipe.title}</div>
+                  <div className="text-sm text-muted-foreground line-clamp-3">
+                    {recipe.text.substring(0, 150)}...
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRecipeSelector(false);
+                setMultipleRecipes([]);
+              }}
+              className="mt-4 w-full"
+            >
+              Cancel
+            </Button>
+          </Card>
+        </div>
+      )}
+
       {/* Hero Header */}
       <HeroHeader 
         pageTitle={pageTitle}
