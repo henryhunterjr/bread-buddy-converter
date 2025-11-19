@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
 import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat, ChefHat } from 'lucide-react';
 import { HeroHeader } from '@/components/HeroHeader';
-import { extractTextFromFile } from '@/utils/lazyFileExtractor';
+import { extractTextFromFile, ExtractedContent } from '@/utils/lazyFileExtractor';
 import { useToast } from '@/hooks/use-toast';
 import { SavedRecipes } from '@/components/SavedRecipes';
 import { SavedRecipe } from '@/utils/recipeStorage';
@@ -69,6 +69,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const [showHelp, setShowHelp] = useState(false);
   const [showSavedRecipes, setShowSavedRecipes] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
+  const [showAIRetryButton, setShowAIRetryButton] = useState(false);
   const [doughType, setDoughType] = useState<'plain' | 'enriched' | 'whole-grain'>('plain');
   const { toast } = useToast();
   
@@ -155,6 +158,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     setIsProcessing(true);
     setErrors([]);
     setUploadedFileName(file.name);
+    setShowAIRetryButton(false);
     
     // Track file upload
     trackEvent('file_uploaded', {
@@ -163,22 +167,117 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     });
     
     try {
-      const extractedText = await extractTextFromFile(file);
-      setRecipeText(extractedText);
+      const result: ExtractedContent = await extractTextFromFile(file);
+      setRecipeText(result.text);
+      setOcrConfidence(result.confidence);
+      
+      // Store image file for potential AI vision retry
+      if (file.type.startsWith('image/')) {
+        setUploadedImageFile(file);
+      }
+
+      // Check if AI vision fallback is needed
+      if (result.requiresAIFallback && file.type.startsWith('image/')) {
+        toast({
+          title: "⚠️ Low OCR confidence",
+          description: `Confidence: ${result.confidence.toFixed(0)}%. Handwritten recipe detected. Using AI vision to improve accuracy...`,
+        });
+        
+        // Automatically trigger AI vision for better results
+        await parseImageWithAI(file);
+        return;
+      }
+
       toast({
         title: "✓ Recipe extracted",
-        description: `From ${file.name} - Review and edit if needed`,
+        description: `From ${file.name}${result.confidence < 100 ? ` (${result.confidence.toFixed(0)}% confidence)` : ''} - Review and edit if needed`,
       });
+      
+      // Show retry button for images with moderate confidence
+      if (file.type.startsWith('image/') && result.confidence < 90) {
+        setShowAIRetryButton(true);
+      }
+      
     } catch (error) {
       setUploadedFileName('');
+      setUploadedImageFile(null);
+      
+      // Check if this is a parsing failure that needs AI vision
+      const errorMsg = error instanceof Error ? error.message : "Could not extract text from file";
+      
+      if (file.type.startsWith('image/') && errorMsg.includes('No text found')) {
+        toast({
+          title: "OCR failed",
+          description: "Trying AI vision to read handwritten text...",
+        });
+        
+        setUploadedImageFile(file);
+        await parseImageWithAI(file);
+        return;
+      }
+      
       toast({
         title: "Extraction failed",
-        description: error instanceof Error ? error.message : "Could not extract text from file",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
       e.target.value = '';
+    }
+  };
+
+  const parseImageWithAI = async (file: File) => {
+    setIsAIParsing(true);
+    
+    try {
+      // Convert image to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const imageBase64 = await base64Promise;
+      
+      // Track AI vision usage
+      trackEvent('ai_vision_parsing', {
+        file_name: file.name,
+        ocr_confidence: ocrConfidence
+      });
+      
+      const { data, error } = await supabase.functions.invoke('ai-parse-image', {
+        body: { 
+          imageBase64,
+          fileName: file.name
+        }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'AI vision parsing failed');
+
+      setRecipeText(data.text);
+      setOcrConfidence(100); // AI vision is considered high confidence
+      setShowAIRetryButton(false);
+      
+      toast({
+        title: "✓ AI vision successful",
+        description: "Recipe extracted using AI - Review and edit if needed",
+      });
+      
+    } catch (error) {
+      console.error('AI vision error:', error);
+      toast({
+        title: "AI vision failed",
+        description: error instanceof Error ? error.message : "Could not process image with AI",
+        variant: "destructive",
+      });
+      
+      // Keep the retry button visible
+      setShowAIRetryButton(true);
+    } finally {
+      setIsAIParsing(false);
     }
   };
 
@@ -522,6 +621,36 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
                 </div>
               </div>
             </div>
+
+            {/* AI Vision Retry Button */}
+            {showAIRetryButton && uploadedImageFile && (
+              <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 text-base font-medium border-burnt-orange bg-burnt-orange/10 hover:bg-burnt-orange hover:text-white"
+                  disabled={isAIParsing}
+                  onClick={() => parseImageWithAI(uploadedImageFile)}
+                >
+                  {isAIParsing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing with AI Vision...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-5 w-5" />
+                      Try AI Parse (for handwritten recipes)
+                    </>
+                  )}
+                </Button>
+                {ocrConfidence && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Current OCR confidence: {ocrConfidence.toFixed(0)}% - AI vision may provide better results
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Errors */}
             {errors.length > 0 && (
