@@ -11,6 +11,7 @@ export type AnalyticsEvent =
   | 'file_uploaded'
   | 'ai_parsing_success'
   | 'ai_parsing_failed'
+  | 'ai_vision_parsing'
   | 'regex_parsing_used'
   | 'ingredient_confirmation_shown'
   | 'ingredient_edited';

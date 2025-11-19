@@ -76,7 +76,13 @@ function checkRateLimit(): void {
   uploadAttempts.push(now);
 }
 
-export async function extractTextFromFile(file: File): Promise<string> {
+export interface ExtractedContent {
+  text: string;
+  confidence: number;
+  requiresAIFallback: boolean;
+}
+
+export async function extractTextFromFile(file: File): Promise<ExtractedContent> {
   // Rate limiting check
   checkRateLimit();
 
@@ -89,7 +95,12 @@ export async function extractTextFromFile(file: File): Promise<string> {
   }
 
   if (fileType === 'application/pdf') {
-    return await extractTextFromPDF(file);
+    const text = await extractTextFromPDF(file);
+    return {
+      text,
+      confidence: 100, // PDFs don't have OCR confidence
+      requiresAIFallback: false
+    };
   } else if (fileType.startsWith('image/')) {
     return await extractTextFromImage(file);
   }
@@ -124,12 +135,12 @@ async function extractTextFromPDF(file: File): Promise<string> {
   }
 }
 
-async function extractTextFromImage(file: File): Promise<string> {
+async function extractTextFromImage(file: File): Promise<ExtractedContent> {
   try {
     const worker = await createWorker('eng');
     
     const imageUrl = URL.createObjectURL(file);
-    const { data: { text } } = await worker.recognize(imageUrl);
+    const { data: { text, confidence } } = await worker.recognize(imageUrl);
     await worker.terminate();
     URL.revokeObjectURL(imageUrl);
 
@@ -137,7 +148,17 @@ async function extractTextFromImage(file: File): Promise<string> {
       throw new Error('No text found in image. Make sure the recipe text is clear and readable.');
     }
 
-    return text;
+    // Calculate if AI fallback is needed
+    const avgConfidence = confidence || 0;
+    const requiresAIFallback = avgConfidence < 70;
+
+    console.log(`[OCR] Confidence: ${avgConfidence.toFixed(1)}%, AI fallback: ${requiresAIFallback}`);
+
+    return {
+      text,
+      confidence: avgConfidence,
+      requiresAIFallback
+    };
   } catch (error) {
     throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }

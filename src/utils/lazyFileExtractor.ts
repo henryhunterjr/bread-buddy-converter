@@ -11,3 +11,5 @@ export const extractTextFromFile = async (...args: Parameters<typeof import('./f
   }
   return fileExtractorModule.extractTextFromFile(...args);
 };
+
+export type { ExtractedContent } from './fileExtractor';

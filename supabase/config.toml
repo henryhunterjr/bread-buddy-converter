@@ -3,6 +3,9 @@ project_id = "uarkvbjvpzgdkizhkbhd"
 [functions.ai-parse-recipe]
 verify_jwt = false
 
+[functions.ai-parse-image]
+verify_jwt = false
+
 [functions.ai-validate-recipe]
 verify_jwt = false
 
