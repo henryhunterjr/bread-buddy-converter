@@ -265,6 +265,10 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     i => i.type !== 'starter' && i.type !== 'liquid' && i.type !== 'flour'
   );
   
+  // LIQUID PRESERVATION: Extract original liquid ingredients (excluding starter)
+  const originalLiquids = recipe.ingredients.filter(i => i.type === 'liquid');
+  const totalOriginalLiquid = originalLiquids.reduce((sum, l) => sum + l.amount, 0);
+  
   // Calculate yeast amount: 0.7-1.1% of flour weight
   const instantYeastAmount = Math.round(trueFlour * 0.011); // 1.1%
   const activeDryYeastAmount = Math.round(instantYeastAmount * 1.25);
@@ -296,15 +300,57 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
     };
   });
   
-  // Build final ingredient list - PRESERVE multi-flour ratios
-  const convertedIngredients: ParsedIngredient[] = [
-    ...adjustedFlourIngredients,
-    {
+  // LIQUID PRESERVATION: Distribute total liquid proportionally across original liquid types
+  let adjustedLiquidIngredients: ParsedIngredient[];
+  
+  if (originalLiquids.length === 0) {
+    // No liquids in original recipe - default to water (rare case)
+    console.log('[LIQUID PRESERVATION] No original liquids detected, defaulting to water');
+    adjustedLiquidIngredients = [{
       name: 'water (80-85°F)',
       amount: trueWater,
       unit: 'g',
       type: 'liquid'
-    },
+    }];
+  } else if (originalLiquids.length === 1) {
+    // Single liquid type - preserve it and add starter water to it
+    const liquid = originalLiquids[0];
+    const liquidName = liquid.name.toLowerCase();
+    let displayName = liquid.name;
+    
+    // Add temperature guidance for water
+    if (liquidName.includes('water')) {
+      displayName = displayName.replace(/water/i, 'water (80-85°F)');
+    } else if (liquidName.includes('milk')) {
+      displayName = displayName.replace(/milk/i, 'milk (80-85°F)');
+    }
+    
+    console.log(`[LIQUID PRESERVATION] Single liquid detected: ${liquid.name}, total: ${trueWater}g`);
+    adjustedLiquidIngredients = [{
+      ...liquid,
+      name: displayName,
+      amount: trueWater
+    }];
+  } else {
+    // Multiple liquids - distribute proportionally
+    console.log(`[LIQUID PRESERVATION] Multiple liquids detected, distributing ${trueWater}g proportionally`);
+    adjustedLiquidIngredients = originalLiquids.map(liquid => {
+      const proportion = liquid.amount / totalOriginalLiquid;
+      const newAmount = Math.round(trueWater * proportion);
+      
+      console.log(`[LIQUID PRESERVATION] ${liquid.name}: ${liquid.amount}g → ${newAmount}g (${(proportion * 100).toFixed(1)}%)`);
+      
+      return {
+        ...liquid,
+        amount: newAmount
+      };
+    });
+  }
+  
+  // Build final ingredient list - PRESERVE multi-flour ratios AND liquid types
+  const convertedIngredients: ParsedIngredient[] = [
+    ...adjustedFlourIngredients,
+    ...adjustedLiquidIngredients,
     ...nonStarterIngredients,
     {
       name: `instant yeast (${instantYeastAmount}g) OR active dry yeast (${activeDryYeastAmount}g)`,
