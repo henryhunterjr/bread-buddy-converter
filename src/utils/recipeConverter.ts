@@ -247,16 +247,32 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   const isMultiDay = originalRecipeText ? detectMultiDaySourdough(originalRecipeText) : false;
   
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
+  // CRITICAL FIX: Only sum starter amounts that are NOT levain references
+  // Levain references point to levain builds already counted elsewhere
+  const actualStarterAmount = recipe.ingredients
+    .filter(i => i.type === 'starter' && !i.isLevainReference)
+    .reduce((sum, i) => sum + i.amount, 0);
+  
   // Starter hydration ratio calculation
   const starterFlourRatio = 100 / (100 + starterHydration);
   const starterWaterRatio = starterHydration / (100 + starterHydration);
-  const starterFlour = recipe.starterAmount * starterFlourRatio;
-  const starterWater = recipe.starterAmount * starterWaterRatio;
+  const starterFlour = actualStarterAmount * starterFlourRatio;
+  const starterWater = actualStarterAmount * starterWaterRatio;
   
   // TRUE totals including what's IN the starter
   const trueFlour = recipe.totalFlour; // Already includes starter flour from parser
   const trueWater = recipe.totalLiquid; // Already includes starter water from parser
   const trueHydration = (trueWater / trueFlour) * 100;
+  
+  console.log('[convertSourdoughToYeast] LEVAIN DEBUG:', {
+    totalStarterAmount: recipe.starterAmount,
+    actualStarterAmount,
+    starterFlour,
+    starterWater,
+    trueFlour,
+    trueWater,
+    trueHydration: trueHydration.toFixed(1) + '%'
+  });
   
   // STEP 2: Build clean ingredient list for yeast version - PRESERVE multi-flour ratios
   // Separate flour ingredients from non-flour ingredients
