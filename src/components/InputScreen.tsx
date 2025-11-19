@@ -175,10 +175,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       
       // Store image file for potential AI vision retry
       if (file.type.startsWith('image/')) {
-        console.log('[handleFileUpload] Storing image file for AI vision retry:', file.name);
         setUploadedImageFile(file);
-      } else {
-        console.log('[handleFileUpload] Not an image file:', file.type);
       }
 
       // Check if AI vision fallback is needed
@@ -363,13 +360,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(recipeText);
       const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(recipeText);
       
-      console.log('[handleConvert] Ingredient check:', { hasFlour, hasWater, hasLeavening, hasUploadedImage: !!uploadedImageFile });
-      
       if (!hasFlour || !hasWater || !hasLeavening) {
-        console.log('[handleConvert] Missing ingredients, checking for AI vision fallback');
         // If user uploaded an image and parsing failed, try AI vision
         if (uploadedImageFile) {
-          console.log('[handleConvert] Triggering AI vision fallback');
           toast({
             title: "Having trouble parsing",
             description: "Using AI vision to interpret recipe... (5-10 seconds)",
@@ -378,7 +371,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
           return;
         }
         
-        console.log('[handleConvert] No uploaded image file, showing error');
         setErrors(['🤔 Need flour, water, and yeast/starter amounts to convert. Add those and try again!']);
         return;
       }
