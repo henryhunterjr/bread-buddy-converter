@@ -75,6 +75,20 @@ interface FailedRecipe {
   created_at: string;
 }
 
+interface DetailedError {
+  id: string;
+  error_type: string;
+  error_severity: string;
+  error_code?: string;
+  error_message: string;
+  stack_trace?: string;
+  context: any;
+  edge_function_logs?: string;
+  request_data?: any;
+  response_data?: any;
+  created_at: string;
+}
+
 interface ErrorStats {
   category: string;
   count: number;
@@ -120,6 +134,7 @@ export default function Analytics() {
   const [conversionBreakdown, setConversionBreakdown] = useState<ConversionBreakdown[]>([]);
   const [parsingMethodStats, setParsingMethodStats] = useState<ParsingMethodStats[]>([]);
   const [failedRecipes, setFailedRecipes] = useState<FailedRecipe[]>([]);
+  const [detailedErrors, setDetailedErrors] = useState<DetailedError[]>([]);
   const [errorStats, setErrorStats] = useState<ErrorStats[]>([]);
   const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
   const [trafficSourceData, setTrafficSourceData] = useState<TrafficSourceData[]>([]);
@@ -310,7 +325,7 @@ export default function Analytics() {
         { method: 'Regex Parsing', count: regexParsing },
       ]);
 
-      // Get failed recipe examples for pattern analysis
+      // Get failed recipe examples for pattern analysis (old method - fallback)
       const failedEvents = filteredEvents
         .filter(e => e.event_type === 'ai_parsing_failed')
         .map(e => ({
@@ -319,9 +334,24 @@ export default function Analytics() {
           conversion_direction: (e.event_data as any)?.conversion_direction,
           created_at: e.created_at
         }))
-        .slice(0, 10); // Last 10 failures
+        .slice(0, 10);
       
       setFailedRecipes(failedEvents);
+
+      // Fetch detailed error information from the new table
+      const { data: detailedErrorData } = await supabase
+        .from('analytics_error_details')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (detailedErrorData) {
+        // Filter by time period
+        const filteredDetailedErrors = detailedErrorData.filter(
+          e => e.created_at >= cutoffISO
+        );
+        setDetailedErrors(filteredDetailedErrors);
+      }
 
       // Calculate error statistics by category
       const errorCategories: Record<string, { count: number; severity: string }> = {};
@@ -932,8 +962,139 @@ export default function Analytics() {
             )}
           </div>
 
-          {/* Failed Recipes - Error Analysis */}
-          {failedRecipes.length > 0 && (
+          {/* Detailed Error Analysis */}
+          {detailedErrors.length > 0 && (
+            <Card className="p-6 mb-8 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-foreground">Detailed Error Analysis ({detailedErrors.length})</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Comprehensive error details with context, request/response data, and edge function logs for actionable debugging
+              </p>
+              <div className="space-y-4">
+                {detailedErrors.map((error) => (
+                  <div key={error.id} className="bg-card p-4 rounded-lg border border-red-200 dark:border-red-900/50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-1 text-xs font-medium rounded ${
+                            error.error_severity === 'critical' ? 'bg-red-600 text-white' :
+                            error.error_severity === 'high' ? 'bg-orange-500 text-white' :
+                            error.error_severity === 'medium' ? 'bg-yellow-500 text-white' :
+                            'bg-blue-500 text-white'
+                          }`}>
+                            {error.error_severity.toUpperCase()}
+                          </span>
+                          <span className="px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-gray-700 rounded">
+                            {error.error_type.replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                          {error.error_code && (
+                            <span className="px-2 py-1 text-xs font-mono bg-gray-100 dark:bg-gray-800 rounded">
+                              {error.error_code}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium text-red-700 dark:text-red-300 mt-2">{error.error_message}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(error.created_at).toLocaleDateString()} at {new Date(error.created_at).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Context Information */}
+                    {error.context && Object.keys(error.context).length > 0 && (
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900/30">
+                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2">📋 Context:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                          {error.context.conversion_direction && (
+                            <div><span className="font-medium">Direction:</span> {error.context.conversion_direction}</div>
+                          )}
+                          {error.context.recipe_length && (
+                            <div><span className="font-medium">Recipe Length:</span> {error.context.recipe_length} chars</div>
+                          )}
+                          {error.context.has_starter !== undefined && (
+                            <div><span className="font-medium">Has Starter:</span> {error.context.has_starter ? 'Yes' : 'No'}</div>
+                          )}
+                          {error.context.file_uploaded && (
+                            <div><span className="font-medium">File Uploaded:</span> Yes</div>
+                          )}
+                          {error.context.file_name && (
+                            <div><span className="font-medium">File:</span> {error.context.file_name}</div>
+                          )}
+                          {error.context.ocr_confidence && (
+                            <div><span className="font-medium">OCR Confidence:</span> {error.context.ocr_confidence}%</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Partial Results (What DID work) */}
+                    {error.response_data && Object.keys(error.response_data).length > 0 && (
+                      <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900/30">
+                        <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">✓ Partial Results (What was detected):</p>
+                        <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-x-auto max-h-32">
+                          {JSON.stringify(error.response_data, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Edge Function Logs */}
+                    {error.edge_function_logs && (
+                      <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950/20 rounded border border-purple-200 dark:border-purple-900/30">
+                        <p className="text-xs font-semibold text-purple-800 dark:text-purple-200 mb-2">🔍 Edge Function Logs:</p>
+                        <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+                          {error.edge_function_logs}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Request Data */}
+                    {error.request_data && Object.keys(error.request_data).length > 0 && (
+                      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded border border-gray-200 dark:border-gray-800">
+                        <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2">📤 Request Data:</p>
+                        <div className="space-y-2 text-xs">
+                          {error.request_data.recipeText && (
+                            <div>
+                              <span className="font-medium">Recipe Text (first 300 chars):</span>
+                              <pre className="text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-x-auto mt-1">
+                                {error.request_data.recipeText.substring(0, 300)}...
+                              </pre>
+                            </div>
+                          )}
+                          {error.request_data.starterHydration && (
+                            <div><span className="font-medium">Starter Hydration:</span> {error.request_data.starterHydration}%</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stack Trace (for developers) */}
+                    {error.stack_trace && (
+                      <details className="mt-3">
+                        <summary className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
+                          View Stack Trace
+                        </summary>
+                        <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto max-h-40 overflow-y-auto mt-2 border">
+                          {error.stack_trace}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900/30">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  💡 <strong>How to use this data:</strong> Look for patterns in error types, check partial results to see what the AI DID detect, 
+                  review edge function logs for technical failures, and examine request data to understand recipe format issues. 
+                  Group similar errors by error_type to prioritize fixes.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {/* Legacy Failed Recipes (fallback if new table is empty) */}
+          {detailedErrors.length === 0 && failedRecipes.length > 0 && (
             <Card className="p-6 mb-8 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30">
               <div className="flex items-center gap-2 mb-4">
                 <AlertCircle className="h-5 w-5 text-red-600" />

@@ -59,7 +59,7 @@ const getButtonText = (direction: string) =>
     : 'Convert to Yeast';
 
 export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
-  const { trackEvent } = useAnalytics();
+  const { trackEvent, logDetailedError } = useAnalytics();
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -290,7 +290,27 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     } catch (error) {
       console.error('AI vision error:', error);
       
-      // Track AI vision failure
+      // Log detailed error for AI vision failure
+      await logDetailedError({
+        errorType: 'ai_vision_error',
+        errorSeverity: 'high',
+        errorMessage: error instanceof Error ? error.message : 'AI vision failed',
+        stackTrace: error instanceof Error ? error.stack : undefined,
+        context: {
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          ocr_confidence: ocrConfidence,
+          conversion_direction: direction,
+          browser: navigator.userAgent
+        },
+        requestData: {
+          fileName: file.name,
+          fileType: file.type
+        }
+      });
+      
+      // Track AI vision failure event
       trackEvent('ai_parsing_failed', {
         error_message: error instanceof Error ? error.message : 'AI vision failed',
         file_type: 'image',
@@ -312,25 +332,70 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
 
   const parseWithAI = async (): Promise<ParsedRecipe | null> => {
     try {
+      const requestData = { 
+        recipeText, 
+        starterHydration 
+      };
+
       const { data, error } = await supabase.functions.invoke('ai-parse-recipe', {
-        body: { 
-          recipeText, 
-          starterHydration 
-        }
+        body: requestData
       });
 
       if (error) throw error;
+      
+      // Check for structured error response from edge function
+      if (!data.success && data.errorType) {
+        // Log detailed error
+        await logDetailedError({
+          errorType: data.errorType,
+          errorSeverity: data.errorSeverity || 'high',
+          errorCode: data.errorCode,
+          errorMessage: data.error,
+          context: {
+            conversion_direction: direction,
+            recipe_length: recipeText.length,
+            has_starter: /starter|levain/i.test(recipeText),
+            file_uploaded: !!uploadedFileName,
+            browser: navigator.userAgent
+          },
+          edgeFunctionLogs: data.errorDetails,
+          requestData,
+          responseData: data.partialResults
+        });
+
+        throw new Error(data.error || 'AI parsing failed');
+      }
+
       if (!data.success) throw new Error(data.error || 'AI parsing failed');
 
       return data.recipe;
     } catch (error) {
       console.error('AI parse error:', error);
-      // Track AI parsing failure with recipe text for pattern analysis
+      
+      // Track AI parsing failure event
       trackEvent('ai_parsing_failed', {
         error_message: error instanceof Error ? error.message : 'Unknown error',
-        recipe_text: recipeText.substring(0, 500), // First 500 chars
+        recipe_text: recipeText.substring(0, 500),
         conversion_direction: direction
       });
+
+      // If not already logged as detailed error, log it now
+      if (!(error instanceof Error && error.message.includes('errorType'))) {
+        await logDetailedError({
+          errorType: 'unknown_parsing_error',
+          errorSeverity: 'high',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          stackTrace: error instanceof Error ? error.stack : undefined,
+          context: {
+            conversion_direction: direction,
+            recipe_text: recipeText.substring(0, 500),
+            recipe_length: recipeText.length,
+            browser: navigator.userAgent
+          },
+          requestData: { recipeText, starterHydration }
+        });
+      }
+
       return null;
     }
   };
