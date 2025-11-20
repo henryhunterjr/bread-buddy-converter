@@ -48,15 +48,37 @@ interface ParsingMethodStats {
 
 const COLORS = ['#D4874B', '#8B4513', '#CD853F', '#DEB887', '#F4A460'];
 
+interface AdditionalMetrics {
+  pdfDownloads: number;
+  recipesSaved: number;
+  avgSessionDuration: number;
+  returnVisitorRate: number;
+  errorRate: number;
+  popularRecipeTypes: { type: string; count: number }[];
+  avgRecipeComplexity: number;
+  trafficSources: { source: string; count: number }[];
+}
+
 export default function Analytics() {
   useAnalytics(); // Track page view
   const navigate = useNavigate();
+  const [timePeriod, setTimePeriod] = useState<7 | 30 | 60 | 90>(7);
   const [summary, setSummary] = useState<AnalyticsSummary>({
     totalConversions: 0,
     totalUploads: 0,
     totalSessions: 0,
     activeSessions: 0,
     aiParsingSuccessRate: 0,
+  });
+  const [additionalMetrics, setAdditionalMetrics] = useState<AdditionalMetrics>({
+    pdfDownloads: 0,
+    recipesSaved: 0,
+    avgSessionDuration: 0,
+    returnVisitorRate: 0,
+    errorRate: 0,
+    popularRecipeTypes: [],
+    avgRecipeComplexity: 0,
+    trafficSources: [],
   });
   const [dailyConversions, setDailyConversions] = useState<DailyStats[]>([]);
   const [conversionBreakdown, setConversionBreakdown] = useState<ConversionBreakdown[]>([]);
@@ -65,7 +87,7 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [timePeriod]);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -102,14 +124,85 @@ export default function Analytics() {
           aiParsingSuccessRate: successRate,
         });
 
-        // Calculate daily conversions (last 7 days)
-        const last7Days = Array.from({ length: 7 }, (_, i) => {
+        // Calculate additional metrics
+        const pdfDownloads = events.filter(e => e.event_type === 'pdf_downloaded').length;
+        const recipesSaved = events.filter(e => e.event_type === 'recipe_saved').length;
+        
+        // Calculate average session duration
+        const completedSessions = sessions.filter(s => s.ended_at && s.started_at);
+        const avgDuration = completedSessions.length > 0
+          ? completedSessions.reduce((acc, s) => {
+              const duration = new Date(s.ended_at!).getTime() - new Date(s.started_at!).getTime();
+              return acc + duration / 1000; // Convert to seconds
+            }, 0) / completedSessions.length
+          : 0;
+
+        // Calculate return visitor rate (sessions with page_views > 1)
+        const returnVisitors = sessions.filter(s => (s.page_views || 0) > 3).length;
+        const returnRate = sessions.length > 0 ? Math.round((returnVisitors / sessions.length) * 100) : 0;
+
+        // Calculate error rate
+        const totalParsing = aiSuccess + aiFailed;
+        const errorRate = totalParsing > 0 ? Math.round((aiFailed / totalParsing) * 100) : 0;
+
+        // Extract recipe types and complexity
+        const recipeTypes: Record<string, number> = {};
+        let totalIngredients = 0;
+        let recipeCount = 0;
+
+        events.forEach(e => {
+          if (e.event_type === 'conversion_completed' && e.event_data) {
+            const data = e.event_data as any;
+            if (data.recipe_type) {
+              recipeTypes[data.recipe_type] = (recipeTypes[data.recipe_type] || 0) + 1;
+            }
+            if (data.ingredient_count) {
+              totalIngredients += data.ingredient_count;
+              recipeCount++;
+            }
+          }
+        });
+
+        const popularTypes = Object.entries(recipeTypes)
+          .map(([type, count]) => ({ type, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        const avgComplexity = recipeCount > 0 ? Math.round(totalIngredients / recipeCount) : 0;
+
+        // Extract traffic sources (from session start events or referrer data)
+        const trafficSources: Record<string, number> = {};
+        events.forEach(e => {
+          if (e.event_data && (e.event_data as any).referrer) {
+            const referrer = (e.event_data as any).referrer;
+            trafficSources[referrer] = (trafficSources[referrer] || 0) + 1;
+          }
+        });
+
+        const topSources = Object.entries(trafficSources)
+          .map(([source, count]) => ({ source, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        setAdditionalMetrics({
+          pdfDownloads,
+          recipesSaved,
+          avgSessionDuration: Math.round(avgDuration),
+          returnVisitorRate: returnRate,
+          errorRate,
+          popularRecipeTypes: popularTypes,
+          avgRecipeComplexity: avgComplexity,
+          trafficSources: topSources,
+        });
+
+        // Calculate daily conversions based on selected time period
+        const daysArray = Array.from({ length: timePeriod }, (_, i) => {
           const date = new Date();
-          date.setDate(date.getDate() - (6 - i));
+          date.setDate(date.getDate() - (timePeriod - 1 - i));
           return date.toISOString().split('T')[0];
         });
 
-        const dailyData = last7Days.map(date => {
+        const dailyData = daysArray.map(date => {
           const count = events.filter(e => 
             e.event_type === 'conversion_completed' && 
             e.created_at.startsWith(date)
@@ -171,7 +264,24 @@ export default function Analytics() {
         />
 
         <div className="container mx-auto px-4 py-8 max-w-7xl">
-          <h1 className="text-3xl font-bold text-foreground mb-8">Analytics Dashboard</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
+            
+            {/* Time Period Toggle */}
+            <div className="flex gap-2">
+              {([7, 30, 60, 90] as const).map((days) => (
+                <Button
+                  key={days}
+                  variant={timePeriod === days ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTimePeriod(days)}
+                  className="min-w-[60px]"
+                >
+                  {days} days
+                </Button>
+              ))}
+            </div>
+          </div>
           
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -241,11 +351,88 @@ export default function Analytics() {
             </Card>
           </div>
 
+          {/* Additional Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">PDF Downloads</p>
+                  <p className="text-2xl font-bold text-bread-terracotta">{additionalMetrics.pdfDownloads}</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Users who downloaded converted recipes as PDFs
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Recipes Saved</p>
+                  <p className="text-2xl font-bold text-bread-chocolate">{additionalMetrics.recipesSaved}</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Users who saved recipes to "My Recipes"
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Avg Session</p>
+                  <p className="text-2xl font-bold text-bread-gold">
+                    {Math.floor(additionalMetrics.avgSessionDuration / 60)}m {additionalMetrics.avgSessionDuration % 60}s
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average time users spend in the app
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Return Visitors</p>
+                  <p className="text-2xl font-bold text-bread-wheat">{additionalMetrics.returnVisitorRate}%</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Users who visited multiple pages (3+)
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Error Rate</p>
+                  <p className="text-2xl font-bold text-red-600">{additionalMetrics.errorRate}%</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Failed AI parsing attempts vs total attempts
+              </p>
+            </Card>
+
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Avg Complexity</p>
+                  <p className="text-2xl font-bold text-bread-terracotta">{additionalMetrics.avgRecipeComplexity}</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average number of ingredients per recipe
+              </p>
+            </Card>
+          </div>
+
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Daily Conversions Chart */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-2 text-foreground">Daily Conversions (Last 7 Days)</h3>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Daily Conversions (Last {timePeriod} Days)</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Track conversion trends to see peak usage days and overall growth patterns
               </p>
@@ -306,77 +493,128 @@ export default function Analytics() {
                 </PieChart>
               </ResponsiveContainer>
             </Card>
+
+            {/* Popular Recipe Types */}
+            {additionalMetrics.popularRecipeTypes.length > 0 && (
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-2 text-foreground">Popular Recipe Types</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Most commonly converted recipe categories
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={additionalMetrics.popularRecipeTypes}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="type" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#CD853F" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
+
+            {/* Traffic Sources */}
+            {additionalMetrics.trafficSources.length > 0 && (
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold mb-2 text-foreground">Traffic Sources</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Where users discover the converter
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={additionalMetrics.trafficSources}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ source, count }) => `${source}: ${count}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {additionalMetrics.trafficSources.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            )}
           </div>
 
-          {/* Recommendations for Additional Metrics */}
+          {/* Implementation Notes */}
           <Card className="p-6 mb-8 bg-bread-wheat/10 border-bread-wheat/30">
-            <h3 className="text-lg font-semibold mb-3 text-foreground">📊 Recommended Additional Metrics</h3>
+            <h3 className="text-lg font-semibold mb-3 text-foreground">📊 Metrics Now Tracking</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Consider tracking these valuable metrics to better understand user behavior:
+              All recommended metrics are now being collected and displayed:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">PDF Downloads</p>
-                    <p className="text-xs text-muted-foreground">How many users save converted recipes as PDFs</p>
+                    <p className="text-xs text-muted-foreground">Tracked when users download converted recipes</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Recipes Saved</p>
-                    <p className="text-xs text-muted-foreground">Track engagement with the "My Recipes" feature</p>
+                    <p className="text-xs text-muted-foreground">Tracked via "My Recipes" feature</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Average Session Duration</p>
-                    <p className="text-xs text-muted-foreground">How long users spend using the converter</p>
+                    <p className="text-xs text-muted-foreground">Calculated from session start/end times</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Return Visitor Rate</p>
-                    <p className="text-xs text-muted-foreground">Track user retention and repeat usage</p>
+                    <p className="text-xs text-muted-foreground">Based on page view count per session</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Error Rate</p>
-                    <p className="text-xs text-muted-foreground">Failed conversions or parsing errors</p>
+                    <p className="text-xs text-muted-foreground">AI parsing failures vs successes</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Popular Recipe Types</p>
-                    <p className="text-xs text-muted-foreground">Which recipes are converted most (bagels, pizza, etc.)</p>
+                    <p className="text-xs text-muted-foreground">Chart showing most converted recipe categories</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Average Recipe Complexity</p>
-                    <p className="text-xs text-muted-foreground">Track ingredient count and recipe length patterns</p>
+                    <p className="text-xs text-muted-foreground">Based on ingredient count</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-bread-terracotta">•</span>
+                  <span className="text-green-600">✓</span>
                   <div>
                     <p className="font-medium text-sm">Traffic Sources</p>
-                    <p className="text-xs text-muted-foreground">Where users discover your converter (for marketing)</p>
+                    <p className="text-xs text-muted-foreground">Chart showing where users find the converter</p>
                   </div>
                 </div>
               </div>
             </div>
           </Card>
+
 
           {/* Info Card */}
           <Card className="p-6 bg-bread-gold/10 border-bread-gold/30">

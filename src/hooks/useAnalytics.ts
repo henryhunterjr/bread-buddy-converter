@@ -14,13 +14,17 @@ export type AnalyticsEvent =
   | 'ai_vision_parsing'
   | 'regex_parsing_used'
   | 'ingredient_confirmation_shown'
-  | 'ingredient_edited';
+  | 'ingredient_edited'
+  | 'error_occurred';
 
 interface EventData {
   conversion_direction?: 'sourdough-to-yeast' | 'yeast-to-sourdough';
   parser_used?: 'ai' | 'regex';
   file_type?: string;
   error_message?: string;
+  referrer?: string;
+  recipe_type?: string;
+  ingredient_count?: number;
   [key: string]: any;
 }
 
@@ -66,6 +70,11 @@ class AnalyticsService {
       this.sessionStartTime = Date.now();
       sessionStorage.setItem('analytics_session_id', data.id);
       sessionStorage.setItem('analytics_session_start', this.sessionStartTime.toString());
+
+      // Track traffic source on first page view
+      const referrer = document.referrer || 'direct';
+      const source = referrer === 'direct' ? 'Direct' : new URL(referrer).hostname;
+      this.trackEvent('page_view', { referrer: source });
     } catch (err) {
       console.error('[Analytics] Session creation error:', err);
     }
