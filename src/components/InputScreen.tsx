@@ -281,6 +281,14 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       
     } catch (error) {
       console.error('AI vision error:', error);
+      
+      // Track AI vision failure
+      trackEvent('ai_parsing_failed', {
+        error_message: error instanceof Error ? error.message : 'AI vision failed',
+        file_type: 'image',
+        conversion_direction: direction
+      });
+      
       toast({
         title: "AI vision failed",
         description: error instanceof Error ? error.message : "Could not process image with AI",
@@ -309,9 +317,11 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       return data.recipe;
     } catch (error) {
       console.error('AI parse error:', error);
-      // Track AI parsing failure
+      // Track AI parsing failure with recipe text for pattern analysis
       trackEvent('ai_parsing_failed', {
-        error_message: error instanceof Error ? error.message : 'Unknown error'
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        recipe_text: recipeText.substring(0, 500), // First 500 chars
+        conversion_direction: direction
       });
       return null;
     }
