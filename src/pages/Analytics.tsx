@@ -3,10 +3,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/Navigation';
-import { Home, TrendingUp, Upload, CheckCircle, Users } from 'lucide-react';
+import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { PasswordProtection } from '@/components/PasswordProtection';
+import { toast } from '@/hooks/use-toast';
 import {
   LineChart,
   Line,
@@ -59,6 +60,13 @@ interface AdditionalMetrics {
   trafficSources: { source: string; count: number }[];
 }
 
+interface FailedRecipe {
+  error_message: string;
+  recipe_text?: string;
+  conversion_direction?: string;
+  created_at: string;
+}
+
 export default function Analytics() {
   useAnalytics(); // Track page view
   const navigate = useNavigate();
@@ -83,6 +91,7 @@ export default function Analytics() {
   const [dailyConversions, setDailyConversions] = useState<DailyStats[]>([]);
   const [conversionBreakdown, setConversionBreakdown] = useState<ConversionBreakdown[]>([]);
   const [parsingMethodStats, setParsingMethodStats] = useState<ParsingMethodStats[]>([]);
+  const [failedRecipes, setFailedRecipes] = useState<FailedRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -237,12 +246,54 @@ export default function Analytics() {
           { method: 'AI Parsing', count: aiParsing },
           { method: 'Regex Parsing', count: regexParsing },
         ]);
+
+        // Get failed recipe examples for pattern analysis
+        const failedEvents = events
+          .filter(e => e.event_type === 'ai_parsing_failed')
+          .map(e => ({
+            error_message: (e.event_data as any)?.error_message || 'Unknown error',
+            recipe_text: (e.event_data as any)?.recipe_text,
+            conversion_direction: (e.event_data as any)?.conversion_direction,
+            created_at: e.created_at
+          }))
+          .slice(0, 10); // Last 10 failures
+        
+        setFailedRecipes(failedEvents);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: 'BGB Recipe Converter Analytics',
+      text: `Analytics Summary:\n• Total Conversions: ${summary.totalConversions}\n• Total Sessions: ${summary.totalSessions}\n• AI Success Rate: ${summary.aiParsingSuccessRate}%\n• PDF Downloads: ${additionalMetrics.pdfDownloads}\n• Error Rate: ${additionalMetrics.errorRate}%`,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        toast({ description: 'Shared successfully!' });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          copyToClipboard(shareData.text);
+        }
+      }
+    } else {
+      copyToClipboard(shareData.text);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ description: 'Analytics summary copied to clipboard!' });
   };
 
   if (isLoading) {
@@ -267,19 +318,52 @@ export default function Analytics() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
             
-            {/* Time Period Toggle */}
-            <div className="flex gap-2">
-              {([7, 30, 60, 90] as const).map((days) => (
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Time Period Toggle */}
+              <div className="flex gap-2">
+                {([7, 30, 60, 90] as const).map((days) => (
+                  <Button
+                    key={days}
+                    variant={timePeriod === days ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimePeriod(days)}
+                    className="min-w-[60px]"
+                  >
+                    {days} days
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
                 <Button
-                  key={days}
-                  variant={timePeriod === days ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
-                  onClick={() => setTimePeriod(days)}
-                  className="min-w-[60px]"
+                  onClick={handlePrint}
+                  className="gap-2"
                 >
-                  {days} days
+                  <Printer className="h-4 w-4" />
+                  Print
                 </Button>
-              ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShare}
+                  className="gap-2"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/')}
+                  className="gap-2"
+                >
+                  <Home className="h-4 w-4" />
+                  Home
+                </Button>
+              </div>
             </div>
           </div>
           
@@ -544,6 +628,47 @@ export default function Analytics() {
               </Card>
             )}
           </div>
+
+          {/* Failed Recipes - Error Analysis */}
+          {failedRecipes.length > 0 && (
+            <Card className="p-6 mb-8 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-foreground">Failed Recipe Examples ({failedRecipes.length})</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Analyze these failed parsing attempts to identify patterns and improve AI accuracy
+              </p>
+              <div className="space-y-4">
+                {failedRecipes.map((failure, index) => (
+                  <div key={index} className="bg-card p-4 rounded-lg border">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-600">{failure.error_message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(failure.created_at).toLocaleDateString()} at {new Date(failure.created_at).toLocaleTimeString()}
+                          {failure.conversion_direction && ` • ${failure.conversion_direction}`}
+                        </p>
+                      </div>
+                    </div>
+                    {failure.recipe_text && (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Recipe Text (first 500 chars):</p>
+                        <pre className="text-xs bg-muted p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+                          {failure.recipe_text}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-900/30">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  💡 <strong>Tip:</strong> Look for common patterns in failed recipes (formatting issues, missing units, unusual ingredients) to improve parsing rules.
+                </p>
+              </div>
+            </Card>
+          )}
 
           {/* Implementation Notes */}
           <Card className="p-6 mb-8 bg-bread-wheat/10 border-bread-wheat/30">
