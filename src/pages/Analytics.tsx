@@ -96,6 +96,26 @@ interface ErrorStats {
   severity: string;
 }
 
+interface ErrorPattern {
+  pattern_id: string;
+  pattern_name: string;
+  error_count: number;
+  affected_users: number;
+  common_characteristics: string[];
+  example_errors: DetailedError[];
+  suggested_fix: string;
+  fix_priority: 'critical' | 'high' | 'medium' | 'low';
+  impact_score: number;
+}
+
+interface ErrorGroup {
+  group_name: string;
+  error_type: string;
+  count: number;
+  errors: DetailedError[];
+  commonContext: Record<string, any>;
+}
+
 interface FunnelStage {
   stage: string;
   count: number;
@@ -135,6 +155,8 @@ export default function Analytics() {
   const [parsingMethodStats, setParsingMethodStats] = useState<ParsingMethodStats[]>([]);
   const [failedRecipes, setFailedRecipes] = useState<FailedRecipe[]>([]);
   const [detailedErrors, setDetailedErrors] = useState<DetailedError[]>([]);
+  const [errorPatterns, setErrorPatterns] = useState<ErrorPattern[]>([]);
+  const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [errorStats, setErrorStats] = useState<ErrorStats[]>([]);
   const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
   const [trafficSourceData, setTrafficSourceData] = useState<TrafficSourceData[]>([]);
@@ -144,6 +166,178 @@ export default function Analytics() {
   useEffect(() => {
     fetchAnalytics();
   }, [timePeriod, selectedSource]);
+
+  // Pattern detection and analysis function
+  const analyzeErrorPatterns = (errors: DetailedError[]): { patterns: ErrorPattern[], groups: ErrorGroup[] } => {
+    // Group errors by type
+    const errorsByType: Record<string, DetailedError[]> = {};
+    errors.forEach(error => {
+      if (!errorsByType[error.error_type]) {
+        errorsByType[error.error_type] = [];
+      }
+      errorsByType[error.error_type].push(error);
+    });
+
+    // Create error groups
+    const groups: ErrorGroup[] = Object.entries(errorsByType).map(([type, typeErrors]) => {
+      const commonContext: Record<string, any> = {};
+      
+      // Find common characteristics
+      const contexts = typeErrors.map(e => e.context || {}).filter(c => Object.keys(c).length > 0);
+      if (contexts.length > 0) {
+        // Check conversion_direction
+        const directions = contexts.map(c => c.conversion_direction).filter(Boolean) as string[];
+        if (directions.length > 0) {
+          const directionCounts = directions.reduce((acc, d) => ({ ...acc, [d]: (acc[d] || 0) + 1 }), {} as Record<string, number>);
+          const entries = Object.entries(directionCounts).sort((a, b) => (b[1] as number) - (a[1] as number));
+          if (entries.length > 0) {
+            const mostCommon = entries[0];
+            const count = mostCommon[1] as number;
+            if (count > directions.length * 0.5) {
+              commonContext.conversion_direction = mostCommon[0];
+            }
+          }
+        }
+
+        // Check file uploads
+        const fileUploads = contexts.filter(c => c.file_uploaded).length;
+        if (fileUploads > contexts.length * 0.5) {
+          commonContext.mostly_file_uploads = true;
+        }
+      }
+
+      return {
+        group_name: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        error_type: type,
+        count: typeErrors.length,
+        errors: typeErrors,
+        commonContext
+      };
+    }).sort((a, b) => b.count - a.count);
+
+    // Detect patterns and generate recommendations
+    const patterns: ErrorPattern[] = [];
+
+    // Pattern 1: Missing Flour
+    const missingFlourErrors = errors.filter(e => e.error_type === 'missing_flour');
+    if (missingFlourErrors.length > 0) {
+      const characteristics: string[] = [];
+      const shortRecipes = missingFlourErrors.filter(e => e.context?.recipe_length < 200).length;
+      const fileUploads = missingFlourErrors.filter(e => e.context?.file_uploaded).length;
+      
+      if (shortRecipes > missingFlourErrors.length * 0.5) {
+        characteristics.push('Most failures from very short recipe text (<200 chars)');
+      }
+      if (fileUploads > missingFlourErrors.length * 0.3) {
+        characteristics.push(`${fileUploads} out of ${missingFlourErrors.length} were file uploads - OCR may be incomplete`);
+      }
+
+      patterns.push({
+        pattern_id: 'missing_flour',
+        pattern_name: 'Missing Flour Detection',
+        error_count: missingFlourErrors.length,
+        affected_users: new Set(missingFlourErrors.map(e => e.context?.session_id)).size,
+        common_characteristics: characteristics.length > 0 ? characteristics : ['No clear pattern detected'],
+        example_errors: missingFlourErrors.slice(0, 3),
+        suggested_fix: 'Add fallback flour detection (look for "bread flour", "AP flour", "all purpose", "wheat"). For file uploads, improve OCR preprocessing or prompt users to verify ingredient extraction.',
+        fix_priority: missingFlourErrors.length > 5 ? 'high' : 'medium',
+        impact_score: missingFlourErrors.length * (shortRecipes > 0 ? 2 : 1)
+      });
+    }
+
+    // Pattern 2: AI Gateway Errors (Rate Limit / Usage Limit)
+    const aiGatewayErrors = errors.filter(e => e.error_type === 'rate_limit' || e.error_type === 'usage_limit' || e.error_type === 'ai_gateway_error');
+    if (aiGatewayErrors.length > 0) {
+      const rateLimits = aiGatewayErrors.filter(e => e.error_type === 'rate_limit').length;
+      const usageLimits = aiGatewayErrors.filter(e => e.error_type === 'usage_limit').length;
+      
+      patterns.push({
+        pattern_id: 'ai_gateway',
+        pattern_name: 'AI Gateway Availability',
+        error_count: aiGatewayErrors.length,
+        affected_users: new Set(aiGatewayErrors.map(e => e.context?.session_id)).size,
+        common_characteristics: [
+          rateLimits > 0 ? `${rateLimits} rate limit errors (429)` : null,
+          usageLimits > 0 ? `${usageLimits} usage limit errors (402)` : null,
+          'Temporary service limitations'
+        ].filter(Boolean) as string[],
+        example_errors: aiGatewayErrors.slice(0, 2),
+        suggested_fix: rateLimits > 0 
+          ? 'Implement automatic retry with exponential backoff (2s, 4s, 8s delays). Add queue system for high-traffic periods.'
+          : 'Check Lovable workspace credits. Consider implementing fallback to regex-only parsing when AI is unavailable.',
+        fix_priority: aiGatewayErrors.length > 10 ? 'critical' : 'high',
+        impact_score: aiGatewayErrors.length * 3
+      });
+    }
+
+    // Pattern 3: AI Vision Errors
+    const visionErrors = errors.filter(e => e.error_type === 'ai_vision_error');
+    if (visionErrors.length > 0) {
+      const lowConfidence = visionErrors.filter(e => e.context?.ocr_confidence && e.context.ocr_confidence < 60).length;
+      const handwritten = visionErrors.filter(e => e.context?.file_name && /handwritten|scan/i.test(e.context.file_name)).length;
+      
+      patterns.push({
+        pattern_id: 'ai_vision',
+        pattern_name: 'AI Vision Processing',
+        error_count: visionErrors.length,
+        affected_users: new Set(visionErrors.map(e => e.context?.session_id)).size,
+        common_characteristics: [
+          lowConfidence > 0 ? `${lowConfidence} had low OCR confidence (<60%)` : null,
+          handwritten > 0 ? `${handwritten} appear to be handwritten` : null,
+          'Image quality or format issues'
+        ].filter(Boolean) as string[],
+        example_errors: visionErrors.slice(0, 2),
+        suggested_fix: 'Improve image preprocessing (contrast enhancement, deskewing). Add user guidance for best image capture (good lighting, flat surface). Consider supporting manual text correction after OCR.',
+        fix_priority: visionErrors.length > 3 ? 'high' : 'medium',
+        impact_score: visionErrors.length * 2
+      });
+    }
+
+    // Pattern 4: JSON Parse Errors
+    const jsonErrors = errors.filter(e => e.error_type === 'json_parse_error');
+    if (jsonErrors.length > 0) {
+      patterns.push({
+        pattern_id: 'json_parse',
+        pattern_name: 'AI Response Formatting',
+        error_count: jsonErrors.length,
+        affected_users: new Set(jsonErrors.map(e => e.context?.session_id)).size,
+        common_characteristics: [
+          'AI returned malformed JSON',
+          'Response cleaning may have failed',
+          'Model may be including explanatory text'
+        ],
+        example_errors: jsonErrors.slice(0, 2),
+        suggested_fix: 'Strengthen JSON extraction (look for first { to last }). Add system prompt instruction: "Return ONLY valid JSON with no markdown, no explanation, no text before or after the JSON object." Consider retrying with stricter temperature=0.1.',
+        fix_priority: jsonErrors.length > 5 ? 'high' : 'medium',
+        impact_score: jsonErrors.length * 2.5
+      });
+    }
+
+    // Pattern 5: Unknown/Uncategorized Errors
+    const unknownErrors = errors.filter(e => e.error_type === 'unknown_error' || e.error_type === 'unknown_parsing_error');
+    if (unknownErrors.length > 2) {
+      patterns.push({
+        pattern_id: 'unknown',
+        pattern_name: 'Uncategorized Errors',
+        error_count: unknownErrors.length,
+        affected_users: new Set(unknownErrors.map(e => e.context?.session_id)).size,
+        common_characteristics: [
+          'Errors not fitting known categories',
+          'May indicate new edge cases',
+          'Requires manual review'
+        ],
+        example_errors: unknownErrors.slice(0, 3),
+        suggested_fix: 'Review error messages and stack traces to identify new error categories. Update edge function error handling to categorize these specific failures. Add logging for unexpected error paths.',
+        fix_priority: unknownErrors.length > 5 ? 'high' : 'low',
+        impact_score: unknownErrors.length
+      });
+    }
+
+    // Sort patterns by impact score
+    patterns.sort((a, b) => b.impact_score - a.impact_score);
+
+    return { patterns, groups };
+  };
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -343,7 +537,7 @@ export default function Analytics() {
         .from('analytics_error_details')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50); // Get more for pattern analysis
 
       if (detailedErrorData) {
         // Filter by time period
@@ -351,6 +545,11 @@ export default function Analytics() {
           e => e.created_at >= cutoffISO
         );
         setDetailedErrors(filteredDetailedErrors);
+
+        // Analyze patterns
+        const { patterns, groups } = analyzeErrorPatterns(filteredDetailedErrors);
+        setErrorPatterns(patterns);
+        setErrorGroups(groups);
       }
 
       // Calculate error statistics by category
@@ -962,7 +1161,148 @@ export default function Analytics() {
             )}
           </div>
 
-          {/* Detailed Error Analysis */}
+          {/* Error Pattern Analysis */}
+          {errorPatterns.length > 0 && (
+            <Card className="p-6 mb-8 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingDown className="h-5 w-5 text-purple-600" />
+                <h3 className="text-lg font-semibold text-foreground">Automated Error Pattern Detection</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                AI-powered analysis identifying common error patterns, their impact, and actionable fixes ranked by priority
+              </p>
+              
+              <div className="space-y-4">
+                {errorPatterns.map((pattern) => (
+                  <div 
+                    key={pattern.pattern_id} 
+                    className="bg-white dark:bg-gray-900 p-5 rounded-lg border-2 shadow-sm"
+                    style={{
+                      borderColor: 
+                        pattern.fix_priority === 'critical' ? '#dc2626' :
+                        pattern.fix_priority === 'high' ? '#f97316' :
+                        pattern.fix_priority === 'medium' ? '#eab308' :
+                        '#3b82f6'
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="text-base font-bold text-foreground">{pattern.pattern_name}</h4>
+                          <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                            pattern.fix_priority === 'critical' ? 'bg-red-600 text-white' :
+                            pattern.fix_priority === 'high' ? 'bg-orange-500 text-white' :
+                            pattern.fix_priority === 'medium' ? 'bg-yellow-500 text-white' :
+                            'bg-blue-500 text-white'
+                          }`}>
+                            {pattern.fix_priority.toUpperCase()} PRIORITY
+                          </span>
+                          <span className="px-2 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                            Impact Score: {pattern.impact_score}
+                          </span>
+                        </div>
+                        <div className="flex gap-4 text-sm text-muted-foreground mb-3">
+                          <span>🔢 <strong>{pattern.error_count}</strong> occurrences</span>
+                          <span>👥 <strong>{pattern.affected_users}</strong> users affected</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Common Characteristics */}
+                    <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-900/30">
+                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mb-2">🔍 Pattern Characteristics:</p>
+                      <ul className="space-y-1">
+                        {pattern.common_characteristics.map((char, idx) => (
+                          <li key={idx} className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                            <span className="mt-0.5">•</span>
+                            <span>{char}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Suggested Fix */}
+                    <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded border border-green-200 dark:border-green-900/30">
+                      <p className="text-xs font-semibold text-green-800 dark:text-green-200 mb-2">💡 Suggested Fix:</p>
+                      <p className="text-xs text-green-700 dark:text-green-300">{pattern.suggested_fix}</p>
+                    </div>
+
+                    {/* Example Errors */}
+                    <details className="mt-3">
+                      <summary className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
+                        View {pattern.example_errors.length} Example Error{pattern.example_errors.length > 1 ? 's' : ''}
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {pattern.example_errors.map((error, idx) => (
+                          <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-900/50 rounded border text-xs">
+                            <div className="font-medium text-red-600 dark:text-red-400">{error.error_message}</div>
+                            <div className="text-gray-600 dark:text-gray-400 mt-1">
+                              {new Date(error.created_at).toLocaleString()}
+                              {error.context?.conversion_direction && ` • ${error.context.conversion_direction}`}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 rounded-lg border border-purple-300 dark:border-purple-800">
+                <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                  🎯 How to Use This Analysis
+                </p>
+                <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1">
+                  <li>• <strong>Critical/High priority:</strong> Fix these immediately - they affect many users</li>
+                  <li>• <strong>Impact score:</strong> Higher = more users affected × severity</li>
+                  <li>• <strong>Suggested fixes:</strong> Specific, actionable changes you can implement now</li>
+                  <li>• <strong>Characteristics:</strong> Help identify root cause patterns</li>
+                </ul>
+              </div>
+            </Card>
+          )}
+
+          {/* Error Grouping by Type */}
+          {errorGroups.length > 0 && (
+            <Card className="p-6 mb-8 bg-orange-50/50 dark:bg-orange-950/10 border-orange-200 dark:border-orange-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <Filter className="h-5 w-5 text-orange-600" />
+                <h3 className="text-lg font-semibold text-foreground">Error Groups by Type ({errorGroups.length} groups)</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Errors clustered by type with common characteristics to help identify system-wide issues
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {errorGroups.map((group) => (
+                  <div key={group.error_type} className="bg-white dark:bg-gray-900 p-4 rounded-lg border shadow-sm">
+                    <h4 className="font-semibold text-foreground mb-2">{group.group_name}</h4>
+                    <div className="text-2xl font-bold text-orange-600 mb-2">{group.count}</div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      {((group.count / detailedErrors.length) * 100).toFixed(1)}% of all errors
+                    </div>
+                    
+                    {Object.keys(group.commonContext).length > 0 && (
+                      <div className="p-2 bg-orange-50 dark:bg-orange-950/20 rounded border border-orange-200 dark:border-orange-900/30">
+                        <p className="text-xs font-semibold text-orange-800 dark:text-orange-200 mb-1">Common traits:</p>
+                        {group.commonContext.conversion_direction && (
+                          <div className="text-xs text-orange-700 dark:text-orange-300">
+                            → {group.commonContext.conversion_direction}
+                          </div>
+                        )}
+                        {group.commonContext.mostly_file_uploads && (
+                          <div className="text-xs text-orange-700 dark:text-orange-300">
+                            → Mostly file uploads
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
           {detailedErrors.length > 0 && (
             <Card className="p-6 mb-8 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30">
               <div className="flex items-center gap-2 mb-4">
