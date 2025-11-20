@@ -100,6 +100,11 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   };
   
   const handleTextChange = (text: string) => {
+    // Track funnel stage when user first starts typing
+    if (recipeText.length === 0 && text.length > 0) {
+      trackEvent('funnel_input_started', { input_method: 'text' });
+    }
+    
     setRecipeText(text);
     // Clear errors when user is typing
     if (errors.length > 0) {
@@ -161,6 +166,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     setErrors([]);
     setUploadedFileName(file.name);
     setShowAIRetryButton(false);
+    
+    // Track funnel stage for file upload
+    trackEvent('funnel_input_started', { input_method: 'file' });
     
     // Track file upload
     trackEvent('file_uploaded', {
@@ -363,6 +371,9 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const handleConvert = async () => {
     setIsProcessing(true);
     setAiParseAvailable(false);
+    
+    // Track funnel stage for parsing
+    trackEvent('funnel_parsing_started', { conversion_direction: direction });
     
     try {
       // Check for essential ingredients upfront

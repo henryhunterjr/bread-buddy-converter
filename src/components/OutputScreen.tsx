@@ -63,6 +63,11 @@ export default function OutputScreen({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const { toast } = useToast();
   
+  // Track funnel stage when conversion result is viewed
+  useState(() => {
+    trackEvent('funnel_conversion_viewed', { conversion_direction: result.direction });
+  });
+  
   const convertedPercentages = calculateBakersPercentages(result.converted);
 
   const handlePrint = () => {
@@ -73,6 +78,7 @@ export default function OutputScreen({
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
     
     // Track PDF download
+    trackEvent('funnel_download');
     trackEvent('pdf_downloaded', {
       conversion_direction: result.direction
     });
@@ -100,6 +106,7 @@ export default function OutputScreen({
     saveRecipe(recipeName, originalRecipeText, result);
     
     // Track recipe saved
+    trackEvent('funnel_save');
     trackEvent('recipe_saved', {
       conversion_direction: result.direction
     });
