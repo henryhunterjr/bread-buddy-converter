@@ -176,53 +176,68 @@ export default function Analytics() {
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <Card className="p-6 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Total Conversions</p>
                   <p className="text-3xl font-bold text-bread-terracotta">{summary.totalConversions}</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-bread-terracotta" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Number of completed recipe conversions (sourdough↔yeast)
+              </p>
             </Card>
             
             <Card className="p-6 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">File Uploads</p>
                   <p className="text-3xl font-bold text-bread-chocolate">{summary.totalUploads}</p>
                 </div>
                 <Upload className="h-8 w-8 text-bread-chocolate" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Recipe images/PDFs uploaded for AI parsing
+              </p>
             </Card>
             
             <Card className="p-6 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Total Sessions</p>
                   <p className="text-3xl font-bold text-bread-gold">{summary.totalSessions}</p>
                 </div>
                 <Users className="h-8 w-8 text-bread-gold" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Unique visitor sessions (all-time)
+              </p>
             </Card>
             
             <Card className="p-6 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Active Sessions</p>
                   <p className="text-3xl font-bold text-bread-wheat">{summary.activeSessions}</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-bread-wheat" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Users active in the last 24 hours
+              </p>
             </Card>
             
             <Card className="p-6 bg-card">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">AI Success Rate</p>
                   <p className="text-3xl font-bold text-green-600">{summary.aiParsingSuccessRate}%</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Successfully parsed recipes using AI
+              </p>
             </Card>
           </div>
 
@@ -230,7 +245,10 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Daily Conversions Chart */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Daily Conversions (Last 7 Days)</h3>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Daily Conversions (Last 7 Days)</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Track conversion trends to see peak usage days and overall growth patterns
+              </p>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={dailyConversions}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -245,7 +263,10 @@ export default function Analytics() {
 
             {/* Conversion Breakdown Chart */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Conversion Breakdown</h3>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Conversion Breakdown</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Which direction users prefer: converting sourdough recipes to yeast, or vice versa
+              </p>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={conversionBreakdown}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -260,7 +281,10 @@ export default function Analytics() {
 
             {/* Parsing Method Stats Chart */}
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4 text-foreground">Parsing Methods Used</h3>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Parsing Methods Used</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                How users input recipes: AI-powered image/PDF parsing vs. manual regex pattern matching
+              </p>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -283,6 +307,76 @@ export default function Analytics() {
               </ResponsiveContainer>
             </Card>
           </div>
+
+          {/* Recommendations for Additional Metrics */}
+          <Card className="p-6 mb-8 bg-bread-wheat/10 border-bread-wheat/30">
+            <h3 className="text-lg font-semibold mb-3 text-foreground">📊 Recommended Additional Metrics</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Consider tracking these valuable metrics to better understand user behavior:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">PDF Downloads</p>
+                    <p className="text-xs text-muted-foreground">How many users save converted recipes as PDFs</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Recipes Saved</p>
+                    <p className="text-xs text-muted-foreground">Track engagement with the "My Recipes" feature</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Average Session Duration</p>
+                    <p className="text-xs text-muted-foreground">How long users spend using the converter</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Return Visitor Rate</p>
+                    <p className="text-xs text-muted-foreground">Track user retention and repeat usage</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Error Rate</p>
+                    <p className="text-xs text-muted-foreground">Failed conversions or parsing errors</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Popular Recipe Types</p>
+                    <p className="text-xs text-muted-foreground">Which recipes are converted most (bagels, pizza, etc.)</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Average Recipe Complexity</p>
+                    <p className="text-xs text-muted-foreground">Track ingredient count and recipe length patterns</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-bread-terracotta">•</span>
+                  <div>
+                    <p className="font-medium text-sm">Traffic Sources</p>
+                    <p className="text-xs text-muted-foreground">Where users discover your converter (for marketing)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
 
           {/* Info Card */}
           <Card className="p-6 bg-bread-gold/10 border-bread-gold/30">
