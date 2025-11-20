@@ -15,16 +15,32 @@ export type AnalyticsEvent =
   | 'regex_parsing_used'
   | 'ingredient_confirmation_shown'
   | 'ingredient_edited'
-  | 'error_occurred';
+  | 'error_occurred'
+  | 'funnel_landing'
+  | 'funnel_input_started'
+  | 'funnel_parsing_started'
+  | 'funnel_conversion_viewed'
+  | 'funnel_download'
+  | 'funnel_save';
+
+export type ErrorCategory = 
+  | 'parsing_error'
+  | 'network_error'
+  | 'validation_error'
+  | 'file_upload_error'
+  | 'unknown_error';
 
 interface EventData {
   conversion_direction?: 'sourdough-to-yeast' | 'yeast-to-sourdough';
   parser_used?: 'ai' | 'regex';
   file_type?: string;
   error_message?: string;
+  error_category?: ErrorCategory;
+  error_severity?: 'low' | 'medium' | 'high';
   referrer?: string;
   recipe_type?: string;
   ingredient_count?: number;
+  funnel_stage?: string;
   [key: string]: any;
 }
 
@@ -73,10 +89,41 @@ class AnalyticsService {
 
       // Track traffic source on first page view
       const referrer = document.referrer || 'direct';
-      const source = referrer === 'direct' ? 'Direct' : new URL(referrer).hostname;
-      this.trackEvent('page_view', { referrer: source });
+      const source = this.categorizeTrafficSource(referrer);
+      this.trackEvent('funnel_landing', { referrer: source });
     } catch (err) {
       console.error('[Analytics] Session creation error:', err);
+    }
+  }
+
+  private categorizeTrafficSource(referrer: string): string {
+    if (!referrer || referrer === 'direct') return 'Direct';
+    
+    try {
+      const url = new URL(referrer);
+      const hostname = url.hostname.toLowerCase();
+      
+      // Social media
+      if (hostname.includes('facebook') || hostname.includes('fb.')) return 'Social - Facebook';
+      if (hostname.includes('twitter') || hostname.includes('t.co')) return 'Social - Twitter';
+      if (hostname.includes('instagram')) return 'Social - Instagram';
+      if (hostname.includes('linkedin')) return 'Social - LinkedIn';
+      if (hostname.includes('pinterest')) return 'Social - Pinterest';
+      if (hostname.includes('reddit')) return 'Social - Reddit';
+      if (hostname.includes('youtube')) return 'Social - YouTube';
+      
+      // Search engines
+      if (hostname.includes('google')) return 'Search - Google';
+      if (hostname.includes('bing')) return 'Search - Bing';
+      if (hostname.includes('yahoo')) return 'Search - Yahoo';
+      if (hostname.includes('duckduckgo')) return 'Search - DuckDuckGo';
+      
+      // Email
+      if (hostname.includes('mail') || hostname.includes('email')) return 'Email';
+      
+      return `Referral - ${hostname}`;
+    } catch {
+      return 'Direct';
     }
   }
 

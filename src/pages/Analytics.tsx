@@ -3,11 +3,19 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/Navigation';
-import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle } from 'lucide-react';
+import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle, Download, Filter, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import { toast } from '@/hooks/use-toast';
+import { exportToCSV, exportToJSON, ExportData } from '@/utils/analyticsExport';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   LineChart,
   Line,
@@ -67,6 +75,26 @@ interface FailedRecipe {
   created_at: string;
 }
 
+interface ErrorStats {
+  category: string;
+  count: number;
+  percentage: number;
+  severity: string;
+}
+
+interface FunnelStage {
+  stage: string;
+  count: number;
+  conversionRate: number;
+  dropOffRate: number;
+}
+
+interface TrafficSourceData {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
 export default function Analytics() {
   useAnalytics(); // Track page view
   const navigate = useNavigate();
@@ -92,174 +120,264 @@ export default function Analytics() {
   const [conversionBreakdown, setConversionBreakdown] = useState<ConversionBreakdown[]>([]);
   const [parsingMethodStats, setParsingMethodStats] = useState<ParsingMethodStats[]>([]);
   const [failedRecipes, setFailedRecipes] = useState<FailedRecipe[]>([]);
+  const [errorStats, setErrorStats] = useState<ErrorStats[]>([]);
+  const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
+  const [trafficSourceData, setTrafficSourceData] = useState<TrafficSourceData[]>([]);
+  const [selectedSource, setSelectedSource] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [timePeriod]);
+  }, [timePeriod, selectedSource]);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
     try {
-      // Fetch summary statistics
-      const { data: events } = await supabase
+      // Fetch events and sessions
+      const { data: allEvents } = await supabase
         .from('analytics_events')
         .select('*');
 
-      const { data: sessions } = await supabase
+      const { data: allSessions } = await supabase
         .from('analytics_sessions')
         .select('*');
 
-      if (events && sessions) {
-        const conversions = events.filter(e => e.event_type === 'conversion_completed').length;
-        const uploads = events.filter(e => e.event_type === 'file_uploaded').length;
-        const aiSuccess = events.filter(e => e.event_type === 'ai_parsing_success').length;
-        const aiFailed = events.filter(e => e.event_type === 'ai_parsing_failed').length;
-        const successRate = aiSuccess + aiFailed > 0 
-          ? Math.round((aiSuccess / (aiSuccess + aiFailed)) * 100) 
-          : 0;
+      if (!allEvents || !allSessions) return;
 
-        // Calculate active sessions (sessions in last 24 hours without end time)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const active = sessions.filter(s => 
-          s.started_at > oneDayAgo && !s.ended_at
-        ).length;
+      // Filter by time period
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - timePeriod);
+      const cutoffISO = cutoffDate.toISOString();
 
-        setSummary({
-          totalConversions: conversions,
-          totalUploads: uploads,
-          totalSessions: sessions.length,
-          activeSessions: active,
-          aiParsingSuccessRate: successRate,
-        });
+      const events = allEvents.filter(e => e.created_at >= cutoffISO);
+      const sessions = allSessions.filter(s => s.started_at && s.started_at >= cutoffISO);
 
-        // Calculate additional metrics
-        const pdfDownloads = events.filter(e => e.event_type === 'pdf_downloaded').length;
-        const recipesSaved = events.filter(e => e.event_type === 'recipe_saved').length;
-        
-        // Calculate average session duration
-        const completedSessions = sessions.filter(s => s.ended_at && s.started_at);
-        const avgDuration = completedSessions.length > 0
-          ? completedSessions.reduce((acc, s) => {
-              const duration = new Date(s.ended_at!).getTime() - new Date(s.started_at!).getTime();
-              return acc + duration / 1000; // Convert to seconds
-            }, 0) / completedSessions.length
-          : 0;
-
-        // Calculate return visitor rate (sessions with page_views > 1)
-        const returnVisitors = sessions.filter(s => (s.page_views || 0) > 3).length;
-        const returnRate = sessions.length > 0 ? Math.round((returnVisitors / sessions.length) * 100) : 0;
-
-        // Calculate error rate
-        const totalParsing = aiSuccess + aiFailed;
-        const errorRate = totalParsing > 0 ? Math.round((aiFailed / totalParsing) * 100) : 0;
-
-        // Extract recipe types and complexity
-        const recipeTypes: Record<string, number> = {};
-        let totalIngredients = 0;
-        let recipeCount = 0;
-
-        events.forEach(e => {
-          if (e.event_type === 'conversion_completed' && e.event_data) {
-            const data = e.event_data as any;
-            if (data.recipe_type) {
-              recipeTypes[data.recipe_type] = (recipeTypes[data.recipe_type] || 0) + 1;
-            }
-            if (data.ingredient_count) {
-              totalIngredients += data.ingredient_count;
-              recipeCount++;
-            }
-          }
-        });
-
-        const popularTypes = Object.entries(recipeTypes)
-          .map(([type, count]) => ({ type, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-
-        const avgComplexity = recipeCount > 0 ? Math.round(totalIngredients / recipeCount) : 0;
-
-        // Extract traffic sources (from session start events or referrer data)
-        const trafficSources: Record<string, number> = {};
-        events.forEach(e => {
-          if (e.event_data && (e.event_data as any).referrer) {
-            const referrer = (e.event_data as any).referrer;
-            trafficSources[referrer] = (trafficSources[referrer] || 0) + 1;
-          }
-        });
-
-        const topSources = Object.entries(trafficSources)
-          .map(([source, count]) => ({ source, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-
-        setAdditionalMetrics({
-          pdfDownloads,
-          recipesSaved,
-          avgSessionDuration: Math.round(avgDuration),
-          returnVisitorRate: returnRate,
-          errorRate,
-          popularRecipeTypes: popularTypes,
-          avgRecipeComplexity: avgComplexity,
-          trafficSources: topSources,
-        });
-
-        // Calculate daily conversions based on selected time period
-        const daysArray = Array.from({ length: timePeriod }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - (timePeriod - 1 - i));
-          return date.toISOString().split('T')[0];
-        });
-
-        const dailyData = daysArray.map(date => {
-          const count = events.filter(e => 
-            e.event_type === 'conversion_completed' && 
-            e.created_at.startsWith(date)
-          ).length;
-          return {
-            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            conversions: count
-          };
-        });
-        setDailyConversions(dailyData);
-
-        // Calculate conversion breakdown
-        const sourdoughToYeast = events.filter(e => 
-          e.event_type === 'conversion_completed' && 
-          (e.event_data as any)?.conversion_direction === 'sourdough-to-yeast'
-        ).length;
-        const yeastToSourdough = events.filter(e => 
-          e.event_type === 'conversion_completed' && 
-          (e.event_data as any)?.conversion_direction === 'yeast-to-sourdough'
-        ).length;
-
-        setConversionBreakdown([
-          { type: 'Sourdough → Yeast', count: sourdoughToYeast },
-          { type: 'Yeast → Sourdough', count: yeastToSourdough },
-        ]);
-
-        // Calculate parsing method stats
-        const aiParsing = events.filter(e => e.event_type === 'ai_parsing_success').length;
-        const regexParsing = events.filter(e => e.event_type === 'regex_parsing_used').length;
-
-        setParsingMethodStats([
-          { method: 'AI Parsing', count: aiParsing },
-          { method: 'Regex Parsing', count: regexParsing },
-        ]);
-
-        // Get failed recipe examples for pattern analysis
-        const failedEvents = events
-          .filter(e => e.event_type === 'ai_parsing_failed')
-          .map(e => ({
-            error_message: (e.event_data as any)?.error_message || 'Unknown error',
-            recipe_text: (e.event_data as any)?.recipe_text,
-            conversion_direction: (e.event_data as any)?.conversion_direction,
-            created_at: e.created_at
-          }))
-          .slice(0, 10); // Last 10 failures
-        
-        setFailedRecipes(failedEvents);
+      // Filter by source if not 'all'
+      let filteredEvents = events;
+      let filteredSessions = sessions;
+      
+      if (selectedSource !== 'all') {
+        const sessionIds = new Set(
+          events
+            .filter(e => (e.event_data as any)?.referrer === selectedSource)
+            .map(e => e.session_id)
+        );
+        filteredEvents = events.filter(e => sessionIds.has(e.session_id));
+        filteredSessions = sessions.filter(s => sessionIds.has(s.id));
       }
+
+      // Calculate summary statistics
+      const conversions = filteredEvents.filter(e => e.event_type === 'conversion_completed').length;
+      const uploads = filteredEvents.filter(e => e.event_type === 'file_uploaded').length;
+      const aiSuccess = filteredEvents.filter(e => e.event_type === 'ai_parsing_success').length;
+      const aiFailed = filteredEvents.filter(e => e.event_type === 'ai_parsing_failed').length;
+      const successRate = aiSuccess + aiFailed > 0 
+        ? Math.round((aiSuccess / (aiSuccess + aiFailed)) * 100) 
+        : 0;
+
+      // Calculate active sessions (sessions in last 24 hours without end time)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const active = filteredSessions.filter(s => 
+        s.started_at > oneDayAgo && !s.ended_at
+      ).length;
+
+      setSummary({
+        totalConversions: conversions,
+        totalUploads: uploads,
+        totalSessions: filteredSessions.length,
+        activeSessions: active,
+        aiParsingSuccessRate: successRate,
+      });
+
+      // Calculate additional metrics
+      const pdfDownloads = filteredEvents.filter(e => e.event_type === 'pdf_downloaded').length;
+      const recipesSaved = filteredEvents.filter(e => e.event_type === 'recipe_saved').length;
+      
+      // Calculate average session duration
+      const completedSessions = filteredSessions.filter(s => s.ended_at && s.started_at);
+      const avgDuration = completedSessions.length > 0
+        ? completedSessions.reduce((acc, s) => {
+            const duration = new Date(s.ended_at!).getTime() - new Date(s.started_at!).getTime();
+            return acc + duration / 1000; // Convert to seconds
+          }, 0) / completedSessions.length
+        : 0;
+
+      // Calculate return visitor rate (sessions with page_views > 1)
+      const returnVisitors = filteredSessions.filter(s => (s.page_views || 0) > 3).length;
+      const returnRate = filteredSessions.length > 0 ? Math.round((returnVisitors / filteredSessions.length) * 100) : 0;
+
+      // Calculate error rate
+      const totalParsing = aiSuccess + aiFailed;
+      const errorRate = totalParsing > 0 ? Math.round((aiFailed / totalParsing) * 100) : 0;
+
+      // Extract recipe types and complexity
+      const recipeTypes: Record<string, number> = {};
+      let totalIngredients = 0;
+      let recipeCount = 0;
+
+      filteredEvents.forEach(e => {
+        if (e.event_type === 'conversion_completed' && e.event_data) {
+          const data = e.event_data as any;
+          if (data.recipe_type) {
+            recipeTypes[data.recipe_type] = (recipeTypes[data.recipe_type] || 0) + 1;
+          }
+          if (data.ingredient_count) {
+            totalIngredients += data.ingredient_count;
+            recipeCount++;
+          }
+        }
+      });
+
+      const popularTypes = Object.entries(recipeTypes)
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      const avgComplexity = recipeCount > 0 ? Math.round(totalIngredients / recipeCount) : 0;
+
+      // Extract traffic sources (from funnel_landing events)
+      const trafficSources: Record<string, number> = {};
+      events.forEach(e => {
+        if (e.event_type === 'funnel_landing' && e.event_data && (e.event_data as any).referrer) {
+          const referrer = (e.event_data as any).referrer;
+          trafficSources[referrer] = (trafficSources[referrer] || 0) + 1;
+        }
+      });
+
+      const topSources = Object.entries(trafficSources)
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const totalSources = topSources.reduce((sum, s) => sum + s.count, 0);
+      const sourcesWithPercentage = topSources.map(s => ({
+        ...s,
+        percentage: totalSources > 0 ? Math.round((s.count / totalSources) * 100) : 0
+      }));
+
+      setTrafficSourceData(sourcesWithPercentage);
+
+      setAdditionalMetrics({
+        pdfDownloads,
+        recipesSaved,
+        avgSessionDuration: Math.round(avgDuration),
+        returnVisitorRate: returnRate,
+        errorRate,
+        popularRecipeTypes: popularTypes,
+        avgRecipeComplexity: avgComplexity,
+        trafficSources: topSources,
+      });
+
+      // Calculate daily conversions based on selected time period
+      const daysArray = Array.from({ length: timePeriod }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (timePeriod - 1 - i));
+        return date.toISOString().split('T')[0];
+      });
+
+      const dailyData = daysArray.map(date => {
+        const count = filteredEvents.filter(e => 
+          e.event_type === 'conversion_completed' && 
+          e.created_at.startsWith(date)
+        ).length;
+        return {
+          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          conversions: count
+        };
+      });
+      setDailyConversions(dailyData);
+
+      // Calculate conversion breakdown
+      const sourdoughToYeast = filteredEvents.filter(e => 
+        e.event_type === 'conversion_completed' && 
+        (e.event_data as any)?.conversion_direction === 'sourdough-to-yeast'
+      ).length;
+      const yeastToSourdough = filteredEvents.filter(e => 
+        e.event_type === 'conversion_completed' && 
+        (e.event_data as any)?.conversion_direction === 'yeast-to-sourdough'
+      ).length;
+
+      setConversionBreakdown([
+        { type: 'Sourdough → Yeast', count: sourdoughToYeast },
+        { type: 'Yeast → Sourdough', count: yeastToSourdough },
+      ]);
+
+      // Calculate parsing method stats
+      const aiParsing = filteredEvents.filter(e => e.event_type === 'ai_parsing_success').length;
+      const regexParsing = filteredEvents.filter(e => e.event_type === 'regex_parsing_used').length;
+
+      setParsingMethodStats([
+        { method: 'AI Parsing', count: aiParsing },
+        { method: 'Regex Parsing', count: regexParsing },
+      ]);
+
+      // Get failed recipe examples for pattern analysis
+      const failedEvents = filteredEvents
+        .filter(e => e.event_type === 'ai_parsing_failed')
+        .map(e => ({
+          error_message: (e.event_data as any)?.error_message || 'Unknown error',
+          recipe_text: (e.event_data as any)?.recipe_text,
+          conversion_direction: (e.event_data as any)?.conversion_direction,
+          created_at: e.created_at
+        }))
+        .slice(0, 10); // Last 10 failures
+      
+      setFailedRecipes(failedEvents);
+
+      // Calculate error statistics by category
+      const errorCategories: Record<string, { count: number; severity: string }> = {};
+      filteredEvents.forEach(e => {
+        if (e.event_type === 'error_occurred' || e.event_type === 'ai_parsing_failed') {
+          const category = (e.event_data as any)?.error_category || 'unknown_error';
+          const severity = (e.event_data as any)?.error_severity || 'medium';
+          if (!errorCategories[category]) {
+            errorCategories[category] = { count: 0, severity };
+          }
+          errorCategories[category].count++;
+        }
+      });
+
+      const totalErrors = Object.values(errorCategories).reduce((sum, cat) => sum + cat.count, 0);
+      const errorStatsData = Object.entries(errorCategories)
+        .map(([category, data]) => ({
+          category: category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          count: data.count,
+          percentage: totalErrors > 0 ? Math.round((data.count / totalErrors) * 100) : 0,
+          severity: data.severity
+        }))
+        .sort((a, b) => b.count - a.count);
+      
+      setErrorStats(errorStatsData);
+
+      // Calculate funnel data
+      const funnelLanding = events.filter(e => e.event_type === 'funnel_landing').length;
+      const funnelInputStarted = events.filter(e => e.event_type === 'funnel_input_started').length;
+      const funnelParsingStarted = events.filter(e => e.event_type === 'funnel_parsing_started').length;
+      const funnelConversionViewed = events.filter(e => e.event_type === 'funnel_conversion_viewed').length;
+      const funnelDownload = events.filter(e => e.event_type === 'funnel_download').length;
+      const funnelSave = events.filter(e => e.event_type === 'funnel_save').length;
+
+      const funnelStages = [
+        { stage: 'Landing', count: funnelLanding || filteredSessions.length },
+        { stage: 'Input Started', count: funnelInputStarted },
+        { stage: 'Parsing', count: funnelParsingStarted },
+        { stage: 'Conversion Viewed', count: funnelConversionViewed || conversions },
+        { stage: 'Downloaded/Saved', count: funnelDownload + funnelSave || pdfDownloads + recipesSaved },
+      ];
+
+      const funnelWithRates = funnelStages.map((stage, index) => {
+        const prevCount = index > 0 ? funnelStages[index - 1].count : stage.count;
+        const conversionRate = prevCount > 0 ? Math.round((stage.count / prevCount) * 100) : 0;
+        const dropOffRate = prevCount > 0 ? 100 - conversionRate : 0;
+        
+        return {
+          stage: stage.stage,
+          count: stage.count,
+          conversionRate,
+          dropOffRate
+        };
+      });
+
+      setFunnelData(funnelWithRates);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
@@ -274,7 +392,7 @@ export default function Analytics() {
   const handleShare = async () => {
     const shareData = {
       title: 'BGB Recipe Converter Analytics',
-      text: `Analytics Summary:\n• Total Conversions: ${summary.totalConversions}\n• Total Sessions: ${summary.totalSessions}\n• AI Success Rate: ${summary.aiParsingSuccessRate}%\n• PDF Downloads: ${additionalMetrics.pdfDownloads}\n• Error Rate: ${additionalMetrics.errorRate}%`,
+      text: `Analytics Summary (Last ${timePeriod} days${selectedSource !== 'all' ? ` - ${selectedSource}` : ''}):\n• Total Conversions: ${summary.totalConversions}\n• Total Sessions: ${summary.totalSessions}\n• AI Success Rate: ${summary.aiParsingSuccessRate}%\n• PDF Downloads: ${additionalMetrics.pdfDownloads}\n• Error Rate: ${additionalMetrics.errorRate}%`,
     };
 
     if (navigator.share) {
@@ -296,6 +414,38 @@ export default function Analytics() {
     toast({ description: 'Analytics summary copied to clipboard!' });
   };
 
+  const handleExportCSV = () => {
+    const exportData: ExportData = {
+      summary,
+      additionalMetrics,
+      dailyConversions,
+      conversionBreakdown,
+      parsingMethodStats,
+      failedRecipes,
+      errorStats,
+      funnelData,
+      trafficSources: trafficSourceData
+    };
+    exportToCSV(exportData, timePeriod);
+    toast({ description: 'Analytics exported as CSV!' });
+  };
+
+  const handleExportJSON = () => {
+    const exportData: ExportData = {
+      summary,
+      additionalMetrics,
+      dailyConversions,
+      conversionBreakdown,
+      parsingMethodStats,
+      failedRecipes,
+      errorStats,
+      funnelData,
+      trafficSources: trafficSourceData
+    };
+    exportToJSON(exportData, timePeriod);
+    toast({ description: 'Analytics exported as JSON!' });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -315,55 +465,100 @@ export default function Analytics() {
         />
 
         <div className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
-            
-            <div className="flex flex-col sm:flex-row gap-2">
-              {/* Time Period Toggle */}
-              <div className="flex gap-2">
-                {([7, 30, 60, 90] as const).map((days) => (
-                  <Button
-                    key={days}
-                    variant={timePeriod === days ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTimePeriod(days)}
-                    className="min-w-[60px]"
-                  >
-                    {days} days
-                  </Button>
-                ))}
-              </div>
+          <div className="flex flex-col gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
               
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShare}
-                  className="gap-2"
-                >
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/')}
-                  className="gap-2"
-                >
-                  <Home className="h-4 w-4" />
-                  Home
-                </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {/* Time Period Toggle */}
+                <div className="flex gap-2">
+                  {([7, 30, 60, 90] as const).map((days) => (
+                    <Button
+                      key={days}
+                      variant={timePeriod === days ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTimePeriod(days)}
+                      className="min-w-[60px]"
+                    >
+                      {days} days
+                    </Button>
+                  ))}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportCSV}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportJSON}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrint}
+                    className="gap-2"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShare}
+                    className="gap-2"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/')}
+                    className="gap-2"
+                  >
+                    <Home className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+            </div>
+
+            {/* Source Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filter by source:</span>
+              <Select value={selectedSource} onValueChange={setSelectedSource}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  {trafficSourceData.map(source => (
+                    <SelectItem key={source.source} value={source.source}>
+                      {source.source} ({source.count})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedSource !== 'all' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedSource('all')}
+                >
+                  Clear Filter
+                </Button>
+              )}
             </div>
           </div>
           
@@ -434,6 +629,114 @@ export default function Analytics() {
               </p>
             </Card>
           </div>
+
+          {/* Error Dashboard */}
+          {errorStats.length > 0 && (
+            <Card className="p-6 mb-8 bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-foreground">Error Dashboard</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Categorized error tracking showing frequency, impact, and severity levels
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={errorStats}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="category" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#ef4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
+                  {errorStats.map((error, index) => (
+                    <div key={index} className="bg-card p-3 rounded-lg border">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm">{error.category}</span>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          error.severity === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          error.severity === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {error.severity}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{error.count} occurrences</span>
+                        <span>•</span>
+                        <span>{error.percentage}% of errors</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {errorStats.some(e => e.severity === 'high') && (
+                <div className="mt-4 p-3 bg-red-100 dark:bg-red-950/30 rounded border border-red-300 dark:border-red-900">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    ⚠️ <strong>High-severity errors detected!</strong> Consider investigating these issues immediately to improve user experience.
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Conversion Funnel */}
+          {funnelData.length > 0 && (
+            <Card className="p-6 mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingDown className="h-5 w-5 text-bread-terracotta" />
+                <h3 className="text-lg font-semibold text-foreground">Conversion Funnel Analysis</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Track user journey through the conversion process and identify drop-off points
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={funnelData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="stage" angle={-15} textAnchor="end" height={80} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#D4874B" name="Users" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="space-y-3">
+                  {funnelData.map((stage, index) => (
+                    <div key={index} className="bg-card p-4 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{stage.stage}</span>
+                        <span className="text-2xl font-bold text-bread-terracotta">{stage.count}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Conversion:</span>
+                          <span className="font-medium text-green-600">{stage.conversionRate}%</span>
+                        </div>
+                        {stage.dropOffRate > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">Drop-off:</span>
+                            <span className="font-medium text-red-600">{stage.dropOffRate}%</span>
+                          </div>
+                        )}
+                      </div>
+                      {stage.dropOffRate > 30 && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                          ⚠️ High drop-off rate - consider investigating this stage
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
 
           {/* Additional Metrics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
