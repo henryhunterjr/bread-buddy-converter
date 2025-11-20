@@ -252,6 +252,42 @@ class AnalyticsService {
       console.error('[Analytics] Failed to end session:', err);
     }
   }
+
+  // Log detailed error information
+  async logDetailedError(params: {
+    errorType: string;
+    errorSeverity: 'critical' | 'high' | 'medium' | 'low';
+    errorCode?: string;
+    errorMessage: string;
+    stackTrace?: string;
+    context?: Record<string, any>;
+    edgeFunctionLogs?: string;
+    requestData?: Record<string, any>;
+    responseData?: Record<string, any>;
+  }) {
+    if (!this.sessionId) return;
+
+    try {
+      const { error } = await supabase
+        .from('analytics_error_details')
+        .insert({
+          session_id: this.sessionId,
+          error_type: params.errorType,
+          error_severity: params.errorSeverity,
+          error_code: params.errorCode,
+          error_message: params.errorMessage,
+          stack_trace: params.stackTrace,
+          context: params.context || {},
+          edge_function_logs: params.edgeFunctionLogs,
+          request_data: params.requestData,
+          response_data: params.responseData
+        });
+
+      if (error) console.error('[Analytics] Failed to log detailed error:', error);
+    } catch (error) {
+      console.error('[Analytics] Failed to log detailed error:', error);
+    }
+  }
 }
 
 // Singleton instance
@@ -277,5 +313,7 @@ export function useAnalytics() {
   return {
     trackEvent: (event_type: AnalyticsEvent, event_data?: EventData) => 
       analytics.trackEvent(event_type, event_data),
+    logDetailedError: (params: Parameters<typeof analytics.logDetailedError>[0]) => 
+      analytics.logDetailedError(params),
   };
 }

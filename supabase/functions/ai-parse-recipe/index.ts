@@ -155,21 +155,34 @@ IMPORTANT:
       const errorText = await response.text();
       console.error('AI Gateway error:', response.status, errorText);
       
+      // Return structured error response
+      const errorResponse = {
+        error: '',
+        errorType: '',
+        errorCode: response.status.toString(),
+        errorSeverity: 'high',
+        errorDetails: errorText,
+        partialResults: null
+      };
+
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        errorResponse.error = 'Rate limit exceeded. Please try again in a moment.';
+        errorResponse.errorType = 'rate_limit';
+        errorResponse.errorSeverity = 'medium';
+      } else if (response.status === 402) {
+        errorResponse.error = 'AI usage limit reached. Please check your workspace credits.';
+        errorResponse.errorType = 'usage_limit';
+        errorResponse.errorSeverity = 'critical';
+      } else {
+        errorResponse.error = `AI Gateway error: ${response.status}`;
+        errorResponse.errorType = 'ai_gateway_error';
+        errorResponse.errorSeverity = 'high';
       }
       
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'AI usage limit reached. Please check your workspace credits.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${response.status}`);
+      return new Response(
+        JSON.stringify(errorResponse),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
@@ -251,7 +264,15 @@ IMPORTANT:
     if (!parsedRecipe.totalFlour || parsedRecipe.totalFlour === 0) {
       return new Response(
         JSON.stringify({ 
-          error: 'AI parser could not find any flour in the recipe. Please check the recipe format.' 
+          error: 'AI parser could not find any flour in the recipe. Please check the recipe format.',
+          errorType: 'missing_flour',
+          errorCode: 'PARSE_001',
+          errorSeverity: 'high',
+          errorDetails: 'No flour ingredients detected in the recipe text. Recipe must contain flour measurements.',
+          partialResults: {
+            foundIngredients: parsedRecipe.ingredients.map((ing: any) => ing.name),
+            ingredientCount: parsedRecipe.ingredients.length
+          }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -275,10 +296,32 @@ IMPORTANT:
 
   } catch (error) {
     console.error('Error in ai-parse-recipe function:', error);
+    
+    // Determine error type and severity
+    let errorType = 'unknown_error';
+    let errorSeverity = 'high';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('JSON')) {
+        errorType = 'json_parse_error';
+        errorSeverity = 'high';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorType = 'network_error';
+        errorSeverity = 'medium';
+      } else if (error.message.includes('LOVABLE_API_KEY')) {
+        errorType = 'configuration_error';
+        errorSeverity = 'critical';
+      }
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error occurred',
-        details: error instanceof Error ? error.stack : undefined
+        errorType,
+        errorCode: '500',
+        errorSeverity,
+        errorDetails: error instanceof Error ? error.stack : undefined,
+        partialResults: null
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

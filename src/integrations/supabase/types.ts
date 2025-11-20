@@ -56,6 +56,69 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_error_details: {
+        Row: {
+          context: Json | null
+          created_at: string
+          edge_function_logs: string | null
+          error_code: string | null
+          error_message: string
+          error_severity: string
+          error_type: string
+          event_id: string | null
+          id: string
+          request_data: Json | null
+          response_data: Json | null
+          session_id: string | null
+          stack_trace: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          edge_function_logs?: string | null
+          error_code?: string | null
+          error_message: string
+          error_severity: string
+          error_type: string
+          event_id?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          session_id?: string | null
+          stack_trace?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          edge_function_logs?: string | null
+          error_code?: string | null
+          error_message?: string
+          error_severity?: string
+          error_type?: string
+          event_id?: string | null
+          id?: string
+          request_data?: Json | null
+          response_data?: Json | null
+          session_id?: string | null
+          stack_trace?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_error_details_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "analytics_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_error_details_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "analytics_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       analytics_events: {
         Row: {
           created_at: string | null
