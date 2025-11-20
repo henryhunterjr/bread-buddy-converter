@@ -123,6 +123,22 @@ interface FunnelStage {
   dropOffRate: number;
 }
 
+interface EnhancedFunnelStage extends FunnelStage {
+  avgTimeSpent?: number;
+  errorEncounters?: number;
+  topDropOffReasons?: string[];
+  userCategory?: 'curiosity_browser' | 'attempted_user' | 'successful_explorer';
+}
+
+interface DropOffAnalysis {
+  category: 'Curiosity Browsers' | 'Attempted Users' | 'Successful Explorers';
+  count: number;
+  percentage: number;
+  characteristics: string[];
+  avgTimeSpent: number;
+  actionNeeded: string;
+}
+
 interface TrafficSourceData {
   source: string;
   count: number;
@@ -158,7 +174,8 @@ export default function Analytics() {
   const [errorPatterns, setErrorPatterns] = useState<ErrorPattern[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [errorStats, setErrorStats] = useState<ErrorStats[]>([]);
-  const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
+  const [funnelData, setFunnelData] = useState<EnhancedFunnelStage[]>([]);
+  const [dropOffAnalysis, setDropOffAnalysis] = useState<DropOffAnalysis[]>([]);
   const [trafficSourceData, setTrafficSourceData] = useState<TrafficSourceData[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -577,7 +594,7 @@ export default function Analytics() {
       
       setErrorStats(errorStatsData);
 
-      // Calculate funnel data
+      // Enhanced funnel data with detailed journey analysis
       const funnelLanding = events.filter(e => e.event_type === 'funnel_landing').length;
       const funnelInputStarted = events.filter(e => e.event_type === 'funnel_input_started').length;
       const funnelParsingStarted = events.filter(e => e.event_type === 'funnel_parsing_started').length;
@@ -585,15 +602,48 @@ export default function Analytics() {
       const funnelDownload = events.filter(e => e.event_type === 'funnel_download').length;
       const funnelSave = events.filter(e => e.event_type === 'funnel_save').length;
 
+      // Calculate error encounters at each stage
+      const errorsByStage: Record<string, number> = {
+        'Landing': 0,
+        'Input Started': filteredEvents.filter(e => 
+          e.event_type === 'ai_parsing_failed' || e.event_type === 'error_occurred'
+        ).length,
+        'Parsing': filteredEvents.filter(e => 
+          e.event_type === 'ai_parsing_failed'
+        ).length,
+        'Conversion Viewed': 0,
+        'Downloaded/Saved': 0
+      };
+
       const funnelStages = [
-        { stage: 'Landing', count: funnelLanding || filteredSessions.length },
-        { stage: 'Input Started', count: funnelInputStarted },
-        { stage: 'Parsing', count: funnelParsingStarted },
-        { stage: 'Conversion Viewed', count: funnelConversionViewed || conversions },
-        { stage: 'Downloaded/Saved', count: funnelDownload + funnelSave || pdfDownloads + recipesSaved },
+        { 
+          stage: 'Landing', 
+          count: funnelLanding || filteredSessions.length,
+          errorEncounters: errorsByStage['Landing']
+        },
+        { 
+          stage: 'Input Started', 
+          count: funnelInputStarted,
+          errorEncounters: errorsByStage['Input Started']
+        },
+        { 
+          stage: 'Parsing', 
+          count: funnelParsingStarted,
+          errorEncounters: errorsByStage['Parsing']
+        },
+        { 
+          stage: 'Conversion Viewed', 
+          count: funnelConversionViewed || conversions,
+          errorEncounters: errorsByStage['Conversion Viewed']
+        },
+        { 
+          stage: 'Downloaded/Saved', 
+          count: funnelDownload + funnelSave || pdfDownloads + recipesSaved,
+          errorEncounters: errorsByStage['Downloaded/Saved']
+        },
       ];
 
-      const funnelWithRates = funnelStages.map((stage, index) => {
+      const enhancedFunnelWithRates: EnhancedFunnelStage[] = funnelStages.map((stage, index) => {
         const prevCount = index > 0 ? funnelStages[index - 1].count : stage.count;
         const conversionRate = prevCount > 0 ? Math.round((stage.count / prevCount) * 100) : 0;
         const dropOffRate = prevCount > 0 ? 100 - conversionRate : 0;
@@ -602,11 +652,129 @@ export default function Analytics() {
           stage: stage.stage,
           count: stage.count,
           conversionRate,
-          dropOffRate
+          dropOffRate,
+          errorEncounters: stage.errorEncounters
         };
       });
 
-      setFunnelData(funnelWithRates);
+      setFunnelData(enhancedFunnelWithRates);
+
+      // Categorize users by behavior (Drop-off Analysis)
+      const dropOffCategories: DropOffAnalysis[] = [];
+
+      // 1. Curiosity Browsers: landed, looked around, left quickly without input
+      const curiosityBrowsers = filteredSessions.filter(s => {
+        const sessionEvents = filteredEvents.filter(e => e.session_id === s.id);
+        const hasInput = sessionEvents.some(e => e.event_type === 'funnel_input_started');
+        const pageViews = s.page_views || 0;
+        const duration = s.ended_at && s.started_at 
+          ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 
+          : 0;
+        
+        return !hasInput && pageViews <= 2 && duration < 60;
+      });
+
+      const avgCuriosityTime = curiosityBrowsers.length > 0
+        ? curiosityBrowsers.reduce((acc, s) => {
+            const duration = s.ended_at && s.started_at 
+              ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 
+              : 0;
+            return acc + duration;
+          }, 0) / curiosityBrowsers.length
+        : 0;
+
+      dropOffCategories.push({
+        category: 'Curiosity Browsers',
+        count: curiosityBrowsers.length,
+        percentage: filteredSessions.length > 0 ? Math.round((curiosityBrowsers.length / filteredSessions.length) * 100) : 0,
+        characteristics: [
+          'Landed on site and looked around',
+          'No input attempt',
+          `Average time: ${Math.round(avgCuriosityTime)}s`,
+          'Left within 1 minute'
+        ],
+        avgTimeSpent: Math.round(avgCuriosityTime),
+        actionNeeded: 'Normal traffic - no action needed. These are exploratory visits.'
+      });
+
+      // 2. Attempted Users: started input/upload but encountered error and left
+      const attemptedUsers = filteredSessions.filter(s => {
+        const sessionEvents = filteredEvents.filter(e => e.session_id === s.id);
+        const hasInput = sessionEvents.some(e => e.event_type === 'funnel_input_started');
+        const hasError = sessionEvents.some(e => 
+          e.event_type === 'ai_parsing_failed' || e.event_type === 'error_occurred'
+        );
+        const hasConversion = sessionEvents.some(e => e.event_type === 'conversion_completed');
+        
+        return hasInput && hasError && !hasConversion;
+      });
+
+      const avgAttemptedTime = attemptedUsers.length > 0
+        ? attemptedUsers.reduce((acc, s) => {
+            const duration = s.ended_at && s.started_at 
+              ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 
+              : 0;
+            return acc + duration;
+          }, 0) / attemptedUsers.length
+        : 0;
+
+      // Find most common error that caused abandonment
+      const attemptedUserErrors = filteredEvents.filter(e => 
+        attemptedUsers.some(s => s.id === e.session_id) && 
+        (e.event_type === 'ai_parsing_failed' || e.event_type === 'error_occurred')
+      );
+      const errorTypes = attemptedUserErrors.map(e => (e.event_data as any)?.error_message || 'Unknown error');
+      const topError = errorTypes.length > 0 ? errorTypes[0] : 'Various errors';
+
+      dropOffCategories.push({
+        category: 'Attempted Users',
+        count: attemptedUsers.length,
+        percentage: filteredSessions.length > 0 ? Math.round((attemptedUsers.length / filteredSessions.length) * 100) : 0,
+        characteristics: [
+          'Started typing or uploaded file',
+          'Encountered parsing error',
+          'Abandoned without conversion',
+          `Most common: ${topError.substring(0, 50)}...`
+        ],
+        avgTimeSpent: Math.round(avgAttemptedTime),
+        actionNeeded: '⚠️ CRITICAL - These are lost conversions! Focus on fixing errors that caused abandonment.'
+      });
+
+      // 3. Successful Explorers: completed conversion, downloaded/saved, happy users
+      const successfulExplorers = filteredSessions.filter(s => {
+        const sessionEvents = filteredEvents.filter(e => e.session_id === s.id);
+        const hasConversion = sessionEvents.some(e => e.event_type === 'conversion_completed');
+        const hasDownload = sessionEvents.some(e => 
+          e.event_type === 'funnel_download' || e.event_type === 'funnel_save'
+        );
+        
+        return hasConversion && hasDownload;
+      });
+
+      const avgSuccessfulTime = successfulExplorers.length > 0
+        ? successfulExplorers.reduce((acc, s) => {
+            const duration = s.ended_at && s.started_at 
+              ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 
+              : 0;
+            return acc + duration;
+          }, 0) / successfulExplorers.length
+        : 0;
+
+      dropOffCategories.push({
+        category: 'Successful Explorers',
+        count: successfulExplorers.length,
+        percentage: filteredSessions.length > 0 ? Math.round((successfulExplorers.length / filteredSessions.length) * 100) : 0,
+        characteristics: [
+          'Completed full conversion flow',
+          'Downloaded PDF or saved recipe',
+          'No critical errors',
+          `Average time: ${Math.round(avgSuccessfulTime)}s`
+        ],
+        avgTimeSpent: Math.round(avgSuccessfulTime),
+        actionNeeded: 'Target for return visits and feedback. Consider adding "Share" or "Rate" prompts.'
+      });
+
+      setDropOffAnalysis(dropOffCategories);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
@@ -962,6 +1130,74 @@ export default function Analytics() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Drop-off Analysis by User Category */}
+          {dropOffAnalysis.length > 0 && (
+            <Card className="p-6 mb-8 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-950/20 dark:to-teal-950/20 border-cyan-200 dark:border-cyan-900/30">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="h-5 w-5 text-cyan-600" />
+                <h3 className="text-lg font-semibold text-foreground">User Behavior Categories</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Users segmented by behavior patterns: Curiosity Browsers (normal), Attempted Users (lost conversions ⚠️), and Successful Explorers (target for retention)
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {dropOffAnalysis.map((category) => (
+                  <div 
+                    key={category.category} 
+                    className={`p-5 rounded-lg border-2 shadow-sm ${
+                      category.category === 'Curiosity Browsers' ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-900' :
+                      category.category === 'Attempted Users' ? 'bg-red-50 dark:bg-red-950/20 border-red-400 dark:border-red-900' :
+                      'bg-green-50 dark:bg-green-950/20 border-green-400 dark:border-green-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-foreground">{category.category}</h4>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        category.category === 'Curiosity Browsers' ? 'bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100' :
+                        category.category === 'Attempted Users' ? 'bg-red-200 dark:bg-red-900 text-red-900 dark:text-red-100' :
+                        'bg-green-200 dark:bg-green-900 text-green-900 dark:text-green-100'
+                      }`}>
+                        {category.percentage}%
+                      </span>
+                    </div>
+                    
+                    <div className="text-3xl font-bold mb-3 text-foreground">{category.count}</div>
+                    
+                    <div className="space-y-2 mb-4">
+                      {category.characteristics.map((char, idx) => (
+                        <div key={idx} className="text-xs text-muted-foreground flex items-start gap-1">
+                          <span className="mt-0.5">•</span>
+                          <span>{char}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className={`p-3 rounded border text-xs ${
+                      category.category === 'Curiosity Browsers' ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-200' :
+                      category.category === 'Attempted Users' ? 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-800 text-red-800 dark:text-red-200' :
+                      'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-800 text-green-800 dark:text-green-200'
+                    }`}>
+                      <strong>Action:</strong> {category.actionNeeded}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 bg-gradient-to-r from-cyan-100 to-teal-100 dark:from-cyan-900/30 dark:to-teal-900/30 rounded-lg border border-cyan-300 dark:border-cyan-800">
+                <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100 mb-2">
+                  🎯 How to Interpret This Data
+                </p>
+                <ul className="text-sm text-cyan-800 dark:text-cyan-200 space-y-1">
+                  <li>• <strong>Curiosity Browsers:</strong> Normal exploratory traffic - no concerns</li>
+                  <li>• <strong>Attempted Users:</strong> These users TRIED to convert but failed due to errors - focus here!</li>
+                  <li>• <strong>Successful Explorers:</strong> Happy users who completed the full flow - target for retention and feedback</li>
+                  <li>• <strong>Critical metric:</strong> If "Attempted Users" &gt; 20%, you're losing significant conversions to errors</li>
+                </ul>
               </div>
             </Card>
           )}
