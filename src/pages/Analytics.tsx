@@ -171,7 +171,119 @@ export default function Analytics() {
         />
 
         <div className="container mx-auto px-4 py-8 max-w-7xl">
-...
+          <h1 className="text-3xl font-bold text-foreground mb-8">Analytics Dashboard</h1>
+          
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Conversions</p>
+                  <p className="text-3xl font-bold text-bread-terracotta">{summary.totalConversions}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-bread-terracotta" />
+              </div>
+            </Card>
+            
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">File Uploads</p>
+                  <p className="text-3xl font-bold text-bread-chocolate">{summary.totalUploads}</p>
+                </div>
+                <Upload className="h-8 w-8 text-bread-chocolate" />
+              </div>
+            </Card>
+            
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Sessions</p>
+                  <p className="text-3xl font-bold text-bread-gold">{summary.totalSessions}</p>
+                </div>
+                <Users className="h-8 w-8 text-bread-gold" />
+              </div>
+            </Card>
+            
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Sessions</p>
+                  <p className="text-3xl font-bold text-bread-wheat">{summary.activeSessions}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-bread-wheat" />
+              </div>
+            </Card>
+            
+            <Card className="p-6 bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">AI Success Rate</p>
+                  <p className="text-3xl font-bold text-green-600">{summary.aiParsingSuccessRate}%</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+            </Card>
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Daily Conversions Chart */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Daily Conversions (Last 7 Days)</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dailyConversions}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="conversions" stroke="#D4874B" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+
+            {/* Conversion Breakdown Chart */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Conversion Breakdown</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={conversionBreakdown}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="type" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="count" fill="#D4874B" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+
+            {/* Parsing Method Stats Chart */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-foreground">Parsing Methods Used</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={parsingMethodStats}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ method, count }) => `${method}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                  >
+                    {parsingMethodStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+
           {/* Info Card */}
           <Card className="p-6 bg-bread-gold/10 border-bread-gold/30">
             <p className="text-sm text-muted-foreground">
