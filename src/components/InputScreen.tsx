@@ -14,6 +14,8 @@ import { SavedRecipe } from '@/utils/recipeStorage';
 import { ConvertedRecipe, ParsedRecipe } from '@/types/recipe';
 import { MeasurementConverter } from '@/components/MeasurementConverter';
 import { InlineMeasurementConverter } from '@/components/InlineMeasurementConverter';
+import { preprocessRecipeText, shouldUseAIVision, generateCorrectionSuggestions } from '@/utils/recipePreprocessor';
+import { retryAPICall, getRetryStatusMessage } from '@/utils/retryLogic';
 import { 
   Select, 
   SelectContent, 
@@ -337,38 +339,67 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
         starterHydration 
       };
 
-      const { data, error } = await supabase.functions.invoke('ai-parse-recipe', {
-        body: requestData
-      });
-
-      if (error) throw error;
-      
-      // Check for structured error response from edge function
-      if (!data.success && data.errorType) {
-        // Log detailed error
-        await logDetailedError({
-          errorType: data.errorType,
-          errorSeverity: data.errorSeverity || 'high',
-          errorCode: data.errorCode,
-          errorMessage: data.error,
-          context: {
-            conversion_direction: direction,
-            recipe_length: recipeText.length,
-            has_starter: /starter|levain/i.test(recipeText),
-            file_uploaded: !!uploadedFileName,
-            browser: navigator.userAgent
-          },
-          edgeFunctionLogs: data.errorDetails,
-          requestData,
-          responseData: data.partialResults
+      // Use retry logic for AI parsing
+      const result = await retryAPICall(async () => {
+        const { data, error } = await supabase.functions.invoke('ai-parse-recipe', {
+          body: requestData
         });
 
-        throw new Error(data.error || 'AI parsing failed');
+        if (error) throw error;
+        
+        // Check for structured error response from edge function
+        if (!data.success && data.errorType) {
+          // Log detailed error
+          await logDetailedError({
+            errorType: data.errorType,
+            errorSeverity: data.errorSeverity || 'high',
+            errorCode: data.errorCode,
+            errorMessage: data.error,
+            context: {
+              conversion_direction: direction,
+              recipe_length: recipeText.length,
+              has_starter: /starter|levain/i.test(recipeText),
+              file_uploaded: !!uploadedFileName,
+              browser: navigator.userAgent
+            },
+            edgeFunctionLogs: data.errorDetails,
+            requestData,
+            responseData: data.partialResults
+          });
+
+          const apiError: any = new Error(data.error || 'AI parsing failed');
+          apiError.type = data.errorType;
+          apiError.code = data.errorCode;
+          throw apiError;
+        }
+
+        if (!data.success) throw new Error(data.error || 'AI parsing failed');
+
+        return data.recipe;
+      }, 'AI recipe parsing');
+
+      if (!result.success) {
+        // Show retry-specific error message
+        const suggestions = generateCorrectionSuggestions(
+          result.error?.message || 'Unknown error',
+          recipeText
+        );
+
+        toast({
+          title: "AI Parsing Failed",
+          description: suggestions[0] || result.error?.message,
+          variant: "destructive",
+        });
+
+        throw result.error;
       }
 
-      if (!data.success) throw new Error(data.error || 'AI parsing failed');
+      toast({
+        title: `✓ Parsed successfully (${result.attempts} attempt${result.attempts > 1 ? 's' : ''})`,
+        description: result.attempts > 1 ? `Took ${Math.round(result.totalTime / 1000)}s with automatic retry` : undefined,
+      });
 
-      return data.recipe;
+      return result.data!;
     } catch (error) {
       console.error('AI parse error:', error);
       
@@ -380,7 +411,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       });
 
       // If not already logged as detailed error, log it now
-      if (!(error instanceof Error && error.message.includes('errorType'))) {
+      if (!(error instanceof Error && (error as any).type)) {
         await logDetailedError({
           errorType: 'unknown_parsing_error',
           errorSeverity: 'high',
@@ -439,12 +470,39 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     
     // Track funnel stage for parsing
     trackEvent('funnel_parsing_started', { conversion_direction: direction });
+
+    // Apply smart preprocessing
+    const preprocessResult = preprocessRecipeText(recipeText);
+    
+    if (preprocessResult.appliedFixes.length > 0) {
+      console.log('[Preprocessing] Applied fixes:', preprocessResult.appliedFixes);
+      toast({
+        title: "🔧 Auto-fixed recipe format",
+        description: `Applied ${preprocessResult.appliedFixes.length} fix${preprocessResult.appliedFixes.length > 1 ? 'es' : ''}: ${preprocessResult.appliedFixes[0]}`,
+        duration: 3000,
+      });
+      // Update the recipe text with cleaned version
+      setRecipeText(preprocessResult.cleanedText);
+    }
+
+    // Check if should use AI vision instead
+    const visionCheck = shouldUseAIVision(preprocessResult.cleanedText);
+    if (visionCheck.useVision && uploadedImageFile) {
+      toast({
+        title: "🔍 Switching to AI vision",
+        description: visionCheck.reason,
+      });
+      await parseImageWithAI(uploadedImageFile);
+      setIsProcessing(false);
+      return;
+    }
     
     try {
       // Check for essential ingredients upfront
-      const hasFlour = /\d+\s*(g|grams?|oz|ounces?|cups?|lbs?|pounds?).*?(flour|bread|wheat|rye|spelt)/i.test(recipeText);
-      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(recipeText);
-      const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(recipeText);
+      const textToCheck = preprocessResult.cleanedText;
+      const hasFlour = /\d+\s*(g|grams?|oz|ounces?|cups?|lbs?|pounds?).*?(flour|bread|wheat|rye|spelt)/i.test(textToCheck);
+      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(textToCheck);
+      const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(textToCheck);
       
       if (!hasFlour || !hasWater || !hasLeavening) {
         // If user uploaded an image and parsing failed, try AI vision
@@ -457,12 +515,16 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
           return;
         }
         
-        setErrors(['🤔 Need flour, water, and yeast/starter amounts to convert. Add those and try again!']);
+        const suggestions = generateCorrectionSuggestions('Missing essential ingredients', textToCheck);
+        setErrors([
+          '🤔 Need flour, water, and yeast/starter amounts to convert.',
+          ...suggestions
+        ]);
         return;
       }
       
       const [regexResult, aiResult] = await Promise.all([
-        Promise.resolve(parseRecipe(recipeText, starterHydration)),
+        Promise.resolve(parseRecipe(preprocessResult.cleanedText, starterHydration)),
         parseWithAI()
       ]);
 
