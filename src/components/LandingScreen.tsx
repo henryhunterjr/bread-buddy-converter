@@ -35,21 +35,9 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
         <div className="max-w-4xl w-full space-y-4 md:space-y-6">
           <Card className="w-full p-5 md:p-8 space-y-4 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
             <div className="text-center space-y-3">
-              <div className="flex items-center justify-center gap-3">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
-                  Baking Great Bread at Home
-                </h1>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-sm px-3 py-1 cursor-help">
-                      BETA
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>We're testing! Found a bug? Let us know.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
+                Baking Great Bread at Home
+              </h1>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground font-serif">
                 Sourdough & Yeast Bread Recipe Converter
               </h2>
@@ -122,7 +110,7 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
             asChild
             className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
           >
-            <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback">
+            <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Feedback">
               <Mail className="h-4 w-4 mr-2" />
               Report an Issue
             </a>
