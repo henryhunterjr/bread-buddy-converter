@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2 } from 'lucide-react';
+import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import heroImage from '@/assets/presentation-hero.jpeg';
+import qrCodeImage from '@/assets/qr-code-converter.png';
 import {
   LineChart,
   Line,
@@ -25,6 +26,14 @@ import {
   PolarRadiusAxis,
   Radar
 } from 'recharts';
+
+// Partner Configuration - Easy to customize for different partners
+const partnerConfig = {
+  name: "Wire Monkey",
+  url: "wiremonkey.com",
+  logo: "", // Optional partner logo path
+  accentColor: "#FF6B35" // Optional brand color
+};
 
 const COLORS = ['#D4874B', '#8B4513', '#CD853F', '#DEB887', '#F4A460'];
 
@@ -197,7 +206,7 @@ export default function Presentation() {
                 Bread Buddy Converter
               </h1>
               <p className="text-2xl md:text-3xl text-white drop-shadow-xl">
-                Professional Recipe Converter for Wire Monkey
+                Professional Recipe Converter for Premium Bread Brands
               </p>
               <p className="text-xl text-white italic drop-shadow-lg">
                 Built for Home Bakers by Baking Great Bread at Home
@@ -213,7 +222,7 @@ export default function Presentation() {
               Production-Ready & Battle-Tested
             </h2>
             <p className="text-lg text-bread-earth/80 leading-relaxed">
-              After one week of real-world testing, the Bread Buddy Converter has proven its value with <strong>93% parsing accuracy</strong>, <strong>41 successful conversions</strong>, and <strong>343 engaged sessions</strong>. The app is ready to serve the Wire Monkey community with proven reliability and professional-grade features.
+              After one week of real-world testing, the Bread Buddy Converter has proven its value with <strong>93% parsing accuracy</strong>, <strong>41 successful conversions</strong>, and <strong>343 engaged sessions</strong>. The app is ready to serve your community with proven reliability and professional-grade features.
             </p>
           </Card>
 
@@ -262,6 +271,100 @@ export default function Presentation() {
                 delay={0.5}
               />
             </div>
+          </section>
+
+          {/* Embedded Video Section */}
+          <section>
+            <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
+              See It In Action: 6-Minute Deep Dive
+            </h2>
+            <Card className="p-8 bg-gradient-to-br from-purple-50 to-indigo-50">
+              <div className="space-y-6">
+                <div className="relative" style={{
+                  paddingBottom: '56.25%',
+                  height: 0,
+                  overflow: 'hidden',
+                  maxWidth: '100%',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
+                }}>
+                  <iframe 
+                    src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      border: 0,
+                      borderRadius: '12px'
+                    }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="Bread Buddy Converter Demo"
+                  />
+                </div>
+                
+                <div className="text-center space-y-3">
+                  <p className="text-lg text-muted-foreground leading-relaxed">
+                    Google's NotebookLM analyzed all our testing data, documentation, and user feedback. 
+                    Here's what the AI discovered about Bread Buddy.
+                  </p>
+                  
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 rounded-full">
+                    <Zap className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-semibold text-purple-900">
+                      AI-generated analysis of real-world performance
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          {/* Interactive Demo Section */}
+          <section>
+            <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
+              Try It Right Now
+            </h2>
+            <Card className="p-8 bg-gradient-to-br from-green-50 to-emerald-50">
+              <div className="space-y-6 text-center">
+                <p className="text-xl text-muted-foreground">
+                  Don't take our word for it - paste any recipe and watch it work
+                </p>
+                
+                <div className="flex flex-col md:flex-row items-center justify-center gap-8 py-6">
+                  <a 
+                    href="https://bread-buddy-converter.lovable.app" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-bread-earth to-bread-terracotta text-white text-lg font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  >
+                    <PlayCircle className="h-6 w-6" />
+                    Try The Converter
+                  </a>
+                  
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">OR</p>
+                  </div>
+                  
+                  <div className="flex flex-col items-center gap-3">
+                    <img 
+                      src={qrCodeImage} 
+                      alt="QR Code to Bread Buddy Converter"
+                      className="w-32 h-32 rounded-lg shadow-md"
+                    />
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Scan to test on your phone
+                    </p>
+                  </div>
+                </div>
+                
+                <p className="text-muted-foreground italic">
+                  No signup required. No commitment. See the magic in 30 seconds.
+                </p>
+              </div>
+            </Card>
           </section>
 
           {/* What It Does */}
@@ -756,14 +859,14 @@ export default function Presentation() {
           {/* Competitive Advantages */}
           <section>
             <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
-              Why Wire Monkey Bakers Need This
+              Why Your Customers Need This
             </h2>
             <Card className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-xl font-semibold text-blue-900 mb-3">The Wire Monkey Baker Profile</h3>
+                  <h3 className="text-xl font-semibold text-blue-900 mb-3">Your Customer Profile</h3>
                   <ul className="space-y-2 text-blue-800">
-                    <li>✓ Owns premium tools (Wire Monkey lames, quality equipment)</li>
+                    <li>✓ Owns premium tools and quality equipment</li>
                     <li>✓ Experiments with different recipes and techniques</li>
                     <li>✓ Values precision and consistent results</li>
                     <li>✓ Part of the bread baking community</li>
@@ -798,7 +901,7 @@ export default function Presentation() {
           {/* Value Proposition */}
           <section>
             <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
-              What Wire Monkey Gets
+              What Your Brand Gets
             </h2>
             <div className="grid md:grid-cols-2 gap-6">
               <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50">
@@ -815,7 +918,7 @@ export default function Presentation() {
               </Card>
               <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50">
                 <h3 className="text-lg font-semibold text-purple-900 mb-3">Brand Enhancement</h3>
-                <p className="text-purple-800">Positions Wire Monkey as education-focused, not just transactional</p>
+                <p className="text-purple-800">Positions your brand as education-focused, not just transactional</p>
               </Card>
               <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50">
                 <h3 className="text-lg font-semibold text-purple-900 mb-3">SEO Benefits</h3>
@@ -831,7 +934,7 @@ export default function Presentation() {
           {/* Call to Action */}
           <Card className="p-12 bg-gradient-to-r from-bread-gold to-bread-wheat text-center">
             <h2 className="text-4xl font-bold text-bread-earth mb-4 font-serif">
-              Ready to Enhance the Wire Monkey Experience?
+              Ready to Enhance Your Brand Experience?
             </h2>
             <p className="text-xl text-bread-earth/80 mb-8">
               Let's bring this proven tool to your community
