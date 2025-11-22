@@ -6,7 +6,6 @@ import { Navigation } from '@/components/Navigation';
 import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle, Download, Filter, TrendingDown, Presentation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { PasswordProtection } from '@/components/PasswordProtection';
 import { toast } from '@/hooks/use-toast';
 import { exportToCSV, exportToJSON, ExportData } from '@/utils/analyticsExport';
 import {
@@ -855,13 +854,12 @@ export default function Analytics() {
   }
 
   return (
-    <PasswordProtection correctPassword="40664066">
-      <div className="min-h-screen bg-gradient-to-b from-background to-bread-light">
-        <Navigation 
-          onHome={() => navigate('/')}
-        />
+    <div className="min-h-screen bg-gradient-to-b from-background to-bread-light">
+      <Navigation 
+        onHome={() => navigate('/')}
+      />
 
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
           <div className="flex flex-col gap-4 mb-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
@@ -1799,6 +1797,5 @@ export default function Analytics() {
           </Card>
         </div>
       </div>
-    </PasswordProtection>
-  );
-}
+    );
+  }
