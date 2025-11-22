@@ -30,8 +30,15 @@ export const PasswordProtection = ({ children, correctPassword, storageKey }: Pa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (password === correctPassword) {
+
+    const normalizedInput = String(password).trim();
+    const normalizedCorrect = String(correctPassword).trim();
+
+    console.log("[PasswordProtection] Submitted password:", normalizedInput);
+    console.log("[PasswordProtection] Correct password:", normalizedCorrect);
+    console.log("[PasswordProtection] Equal?", normalizedInput === normalizedCorrect);
+
+    if (normalizedInput === normalizedCorrect) {
       setIsAuthenticated(true);
       sessionStorage.setItem(authKey, "true");
       toast.success("Access granted");
@@ -40,7 +47,6 @@ export const PasswordProtection = ({ children, correctPassword, storageKey }: Pa
       setPassword("");
     }
   };
-
   if (isLoading) {
     return null;
   }
