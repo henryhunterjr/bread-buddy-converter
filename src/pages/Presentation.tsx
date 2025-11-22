@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Navigation } from '@/components/Navigation';
-import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge } from 'lucide-react';
+import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { PasswordProtection } from '@/components/PasswordProtection';
 import heroImage from '@/assets/presentation-hero.jpeg';
 import {
@@ -105,6 +105,16 @@ export default function Presentation() {
     setAnimateStats(true);
   }, []);
 
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied to clipboard!");
+    } catch (err) {
+      toast.error("Failed to copy link");
+    }
+  };
+
   const StatCard = ({ 
     value, 
     label, 
@@ -159,7 +169,22 @@ export default function Presentation() {
       `}</style>
       
       <div className="min-h-screen bg-gradient-to-b from-background to-bread-light">
-        <Navigation onHome={() => navigate('/')} />
+        {/* Custom Navigation with Share Button */}
+        <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 className="text-sm sm:text-base md:text-lg font-semibold text-foreground">Baking Great Bread at Home</h1>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+                <Share2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Share</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Home</span>
+              </Button>
+            </div>
+          </div>
+        </nav>
 
         {/* Hero Section with Image */}
         <div className="relative h-[400px] overflow-hidden">
