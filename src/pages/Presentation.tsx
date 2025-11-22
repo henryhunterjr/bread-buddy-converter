@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { PasswordProtection } from '@/components/PasswordProtection';
 import heroImage from '@/assets/presentation-hero.jpeg';
 import {
   LineChart,
@@ -147,7 +146,7 @@ export default function Presentation() {
   );
 
   return (
-    <PasswordProtection correctPassword="wiremonkey">
+    <>
       <style>{`
         @keyframes slideUp {
           from {
@@ -858,6 +857,6 @@ export default function Presentation() {
           </div>
         </div>
       </div>
-    </PasswordProtection>
+    </>
   );
 }
