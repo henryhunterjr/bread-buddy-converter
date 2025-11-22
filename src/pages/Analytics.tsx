@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/Navigation';
-import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle, Download, Filter, TrendingDown } from 'lucide-react';
+import { Home, TrendingUp, Upload, CheckCircle, Users, Printer, Share2, AlertCircle, Download, Filter, TrendingDown, Presentation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { PasswordProtection } from '@/components/PasswordProtection';
@@ -917,6 +917,15 @@ export default function Analytics() {
                     className="gap-2"
                   >
                     <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => navigate('/presentation')}
+                    className="gap-2 bg-bread-gold hover:bg-bread-wheat text-bread-earth"
+                  >
+                    <Presentation className="h-4 w-4" />
+                    <span className="hidden sm:inline">Presentation</span>
                   </Button>
                   <Button
                     variant="outline"
