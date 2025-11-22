@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, useInView } from 'framer-motion';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
+import { PasswordProtection } from '@/components/PasswordProtection';
 import heroImage from '@/assets/presentation-hero.jpeg';
 import qrCodeImage from '@/assets/qr-code-converter.png';
 import {
@@ -107,13 +108,131 @@ const securityMetrics = [
   { metric: 'Open Source', score: 100 }
 ];
 
-export default function Presentation() {
-  const navigate = useNavigate();
-  const [animateStats, setAnimateStats] = useState(false);
+// Animated Pie Chart Component
+const AnimatedPieChart = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+  const [animationProgress, setAnimationProgress] = useState(0);
 
   useEffect(() => {
-    setAnimateStats(true);
-  }, []);
+    if (isInView) {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 2;
+        if (progress >= 100) {
+          setAnimationProgress(100);
+          clearInterval(interval);
+        } else {
+          setAnimationProgress(progress);
+        }
+      }, 20);
+      return () => clearInterval(interval);
+    }
+  }, [isInView]);
+
+  const animatedData = conversionBreakdown.map(item => ({
+    ...item,
+    count: Math.floor((item.count * animationProgress) / 100)
+  }));
+
+  return (
+    <section ref={ref}>
+      <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
+        Conversion Direction Split
+      </h2>
+      <Card className="p-8">
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie
+              data={animatedData}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={({ type, percentage }) => animationProgress === 100 ? `${type}: ${percentage}%` : ''}
+              outerRadius={100}
+              fill="#8884d8"
+              dataKey="count"
+              startAngle={90}
+              endAngle={90 + (360 * animationProgress / 100)}
+              className="transition-all duration-300"
+            >
+              {animatedData.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={COLORS[index % COLORS.length]}
+                  className="hover:opacity-80 transition-opacity cursor-pointer"
+                  style={{
+                    filter: 'drop-shadow(0px 4px 6px rgba(0,0,0,0.1))',
+                  }}
+                />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+        <p className="text-center text-muted-foreground mt-4">
+          Nearly equal usage in both directions proves genuine bidirectional capability
+        </p>
+      </Card>
+    </section>
+  );
+};
+
+// Animated Bar Chart Component
+const AnimatedBarChart = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+  const [animationProgress, setAnimationProgress] = useState(0);
+
+  useEffect(() => {
+    if (isInView) {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 2;
+        if (progress >= 100) {
+          setAnimationProgress(100);
+          clearInterval(interval);
+        } else {
+          setAnimationProgress(progress);
+        }
+      }, 20);
+      return () => clearInterval(interval);
+    }
+  }, [isInView]);
+
+  const animatedData = trafficSources.map(item => ({
+    ...item,
+    percentage: (item.percentage * animationProgress) / 100
+  }));
+
+  return (
+    <section ref={ref}>
+      <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
+        Traffic Sources & Community Reach
+      </h2>
+      <Card className="p-8">
+        <ResponsiveContainer width="100%" height={350}>
+          <BarChart data={animatedData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="source" angle={-15} textAnchor="end" height={80} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="percentage" fill="#D4874B" name="% of Traffic" />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="mt-6 space-y-2">
+          <p className="text-muted-foreground"><strong>48% Direct Traffic:</strong> Users bookmarking and returning</p>
+          <p className="text-muted-foreground"><strong>19% from bakinggreatbread.blog:</strong> Community validation and trust</p>
+          <p className="text-muted-foreground"><strong>4% from Facebook:</strong> Organic social sharing beginning</p>
+        </div>
+      </Card>
+    </section>
+  );
+};
+
+export default function Presentation() {
+  const navigate = useNavigate();
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -164,8 +283,9 @@ export default function Presentation() {
   };
 
   return (
-    <>
-      <style>{`
+    <PasswordProtection correctPassword="40664066" storageKey="presentation-auth">
+      <>
+        <style>{`
         @keyframes slideUp {
           from {
             opacity: 0;
@@ -311,7 +431,7 @@ export default function Presentation() {
                   boxShadow: '0 10px 30px rgba(0,0,0,0.1)'
                 }}>
                   <iframe 
-                    src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                    src="https://drive.google.com/file/d/18J3zpWHohHyn10lJHi9TJDRMZhUVaeDs/preview"
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -448,59 +568,10 @@ export default function Presentation() {
           </section>
 
           {/* Conversion Breakdown Chart */}
-          <section>
-            <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
-              Conversion Direction Split
-            </h2>
-            <Card className="p-8 fade-in">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={conversionBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ type, percentage }) => `${type}: ${percentage}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="count"
-                  >
-                    {conversionBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              <p className="text-center text-muted-foreground mt-4">
-                Nearly equal usage in both directions proves genuine bidirectional capability
-              </p>
-            </Card>
-          </section>
+          <AnimatedPieChart />
 
           {/* Traffic Sources */}
-          <section>
-            <h2 className="text-3xl font-bold text-foreground mb-6 font-serif border-b-4 border-bread-gold pb-3">
-              Traffic Sources & Community Reach
-            </h2>
-            <Card className="p-8 fade-in">
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={trafficSources}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="source" angle={-15} textAnchor="end" height={80} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="percentage" fill="#D4874B" name="% of Traffic" />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-6 space-y-2">
-                <p className="text-muted-foreground"><strong>48% Direct Traffic:</strong> Users bookmarking and returning</p>
-                <p className="text-muted-foreground"><strong>19% from bakinggreatbread.blog:</strong> Community validation and trust</p>
-                <p className="text-muted-foreground"><strong>4% from Facebook:</strong> Organic social sharing beginning</p>
-              </div>
-            </Card>
-          </section>
+          <AnimatedBarChart />
 
           {/* Weekly Trend */}
           <section>
@@ -1336,6 +1407,7 @@ export default function Presentation() {
           </div>
         </div>
       </div>
-    </>
+      </>
+    </PasswordProtection>
   );
 }
