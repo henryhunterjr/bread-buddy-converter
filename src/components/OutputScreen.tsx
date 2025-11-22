@@ -197,7 +197,7 @@ export default function OutputScreen({
           className="bg-white/90 backdrop-blur-sm shadow-md hover:bg-white"
           asChild
         >
-          <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback">
+          <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Feedback">
             <Mail className="h-4 w-4 mr-2" />
             Report Issue
           </a>

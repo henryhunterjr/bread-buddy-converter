@@ -56,7 +56,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
             <div className="space-y-4 text-muted-foreground">
               <p className="text-base leading-relaxed">
-                This is a beta - we're still fixing bugs. Please try:
+                Something unexpected happened. Please try:
               </p>
 
               <ul className="space-y-2 ml-4 text-base">

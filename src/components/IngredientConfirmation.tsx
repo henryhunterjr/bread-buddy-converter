@@ -287,9 +287,6 @@ export function IngredientConfirmation({
           {/* Top Bar with Report Issue */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Badge className="bg-burnt-orange hover:bg-burnt-orange text-white text-xs px-3 py-1">
-                BETA
-              </Badge>
               {(confidenceStats.low > 0 || confidenceStats.estimated > 0) && (
                 <span className="text-sm text-muted-foreground">
                   ⚠️ Please verify {confidenceStats.low + confidenceStats.estimated} ingredient(s) with warnings
@@ -297,7 +294,7 @@ export function IngredientConfirmation({
               )}
             </div>
             <a 
-              href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Beta%20Feedback"
+              href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Feedback"
               className="text-sm text-muted-foreground hover:text-burnt-orange underline-offset-4 hover:underline flex items-center gap-1"
             >
               <Mail className="h-3 w-3" />
