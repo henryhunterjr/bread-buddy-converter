@@ -8,28 +8,32 @@ import { toast } from "sonner";
 interface PasswordProtectionProps {
   children: React.ReactNode;
   correctPassword: string;
+  storageKey?: string;
 }
 
-export const PasswordProtection = ({ children, correctPassword }: PasswordProtectionProps) => {
+export const PasswordProtection = ({ children, correctPassword, storageKey }: PasswordProtectionProps) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Create a unique storage key based on the password if not provided
+  const authKey = storageKey || `auth_${correctPassword.slice(0, 8)}`;
+
   useEffect(() => {
     // Check if already authenticated in this session
-    const authenticated = sessionStorage.getItem("analytics_authenticated");
+    const authenticated = sessionStorage.getItem(authKey);
     if (authenticated === "true") {
       setIsAuthenticated(true);
     }
     setIsLoading(false);
-  }, []);
+  }, [authKey]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password === correctPassword) {
       setIsAuthenticated(true);
-      sessionStorage.setItem("analytics_authenticated", "true");
+      sessionStorage.setItem(authKey, "true");
       toast.success("Access granted");
     } else {
       toast.error("Incorrect password");
