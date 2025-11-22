@@ -167,16 +167,15 @@ export default function Presentation() {
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${heroImage})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-bread-earth/90 to-bread-terracotta/80" />
           <div className="relative h-full flex items-center justify-center px-4">
-            <div className="max-w-6xl mx-auto text-center space-y-4">
-              <h1 className="text-5xl md:text-6xl font-bold font-serif text-white drop-shadow-lg">
+            <div className="max-w-6xl mx-auto text-center space-y-4 bg-gradient-to-r from-bread-earth/85 to-bread-terracotta/75 backdrop-blur-sm px-12 py-8 rounded-lg">
+              <h1 className="text-5xl md:text-6xl font-bold font-serif text-white drop-shadow-2xl">
                 Bread Buddy Converter
               </h1>
-              <p className="text-2xl md:text-3xl text-white/95 drop-shadow-md">
+              <p className="text-2xl md:text-3xl text-white drop-shadow-xl">
                 Professional Recipe Converter for Wire Monkey
               </p>
-              <p className="text-xl text-white/90 italic drop-shadow-md">
+              <p className="text-xl text-white italic drop-shadow-lg">
                 Built for Home Bakers by Baking Great Bread at Home
               </p>
             </div>
