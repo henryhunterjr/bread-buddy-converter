@@ -107,6 +107,15 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           <Button
             variant="outline"
             size="sm"
+            onClick={() => navigate('/presentation')}
+            className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            View Presentation
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             asChild
             className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
           >
