@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2, PlayCircle, Clock, ArrowRight, Calendar } from 'lucide-react';
+import { Home, CheckCircle, TrendingUp, Zap, Shield, Users, Lock, Globe, Gauge, Share2, PlayCircle, Clock, ArrowRight, Calendar, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, useInView } from 'framer-motion';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { PasswordProtection } from '@/components/PasswordProtection';
+import { supabase } from '@/integrations/supabase/client';
 import heroImage from '@/assets/presentation-hero.jpeg';
 import qrCodeImage from '@/assets/qr-code-converter.png';
 import {
@@ -40,8 +41,8 @@ const partnerConfig = {
 
 const COLORS = ['#D4874B', '#8B4513', '#CD853F', '#DEB887', '#F4A460'];
 
-// Data from 7-day analytics
-const performanceMetrics = {
+// Default/fallback data (will be replaced with live data)
+const defaultPerformanceMetrics = {
   totalConversions: 41,
   totalSessions: 343,
   avgSessionDuration: 88, // minutes
@@ -50,12 +51,12 @@ const performanceMetrics = {
   errorRate: 7
 };
 
-const conversionBreakdown = [
+const defaultConversionBreakdown = [
   { type: 'Sourdough → Yeast', count: 22, percentage: 54 },
   { type: 'Yeast → Sourdough', count: 19, percentage: 46 }
 ];
 
-const trafficSources = [
+const defaultTrafficSources = [
   { source: 'Direct Traffic', count: 48, percentage: 48 },
   { source: 'bakinggreatbread.blog', count: 19, percentage: 19 },
   { source: 'vercel.com', count: 19, percentage: 19 },
@@ -63,7 +64,7 @@ const trafficSources = [
   { source: 'Facebook', count: 4, percentage: 4 }
 ];
 
-const weeklyTrend = [
+const defaultWeeklyTrend = [
   { date: 'Nov 14', conversions: 3, sessions: 42 },
   { date: 'Nov 15', conversions: 5, sessions: 48 },
   { date: 'Nov 16', conversions: 7, sessions: 55 },
@@ -109,7 +110,7 @@ const securityMetrics = [
 ];
 
 // Animated Pie Chart Component
-const AnimatedPieChart = () => {
+const AnimatedPieChart = ({ data }: { data: typeof defaultConversionBreakdown }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
   const [animationProgress, setAnimationProgress] = useState(0);
@@ -130,7 +131,7 @@ const AnimatedPieChart = () => {
     }
   }, [isInView]);
 
-  const animatedData = conversionBreakdown.map(item => ({
+  const animatedData = data.map(item => ({
     ...item,
     count: Math.floor((item.count * animationProgress) / 100)
   }));
@@ -179,7 +180,7 @@ const AnimatedPieChart = () => {
 };
 
 // Animated Bar Chart Component
-const AnimatedBarChart = () => {
+const AnimatedBarChart = ({ data }: { data: typeof defaultTrafficSources }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
   const [animationProgress, setAnimationProgress] = useState(0);
@@ -200,7 +201,7 @@ const AnimatedBarChart = () => {
     }
   }, [isInView]);
 
-  const animatedData = trafficSources.map(item => ({
+  const animatedData = data.map(item => ({
     ...item,
     percentage: (item.percentage * animationProgress) / 100
   }));
@@ -233,6 +234,160 @@ const AnimatedBarChart = () => {
 
 export default function Presentation() {
   const navigate = useNavigate();
+  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Live analytics state
+  const [performanceMetrics, setPerformanceMetrics] = useState(defaultPerformanceMetrics);
+  const [conversionBreakdown, setConversionBreakdown] = useState(defaultConversionBreakdown);
+  const [trafficSources, setTrafficSources] = useState(defaultTrafficSources);
+  const [weeklyTrend, setWeeklyTrend] = useState(defaultWeeklyTrend);
+
+  // Fetch live analytics data
+  const fetchAnalytics = async () => {
+    setIsRefreshing(true);
+    try {
+      // Fetch last 7 days of data
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 7);
+      const cutoffISO = cutoffDate.toISOString();
+
+      const { data: allEvents } = await supabase
+        .from('analytics_events')
+        .select('*')
+        .gte('created_at', cutoffISO);
+
+      const { data: allSessions } = await supabase
+        .from('analytics_sessions')
+        .select('*')
+        .gte('started_at', cutoffISO);
+
+      if (allEvents && allSessions) {
+        // Calculate metrics
+        const conversions = allEvents.filter(e => e.event_type === 'conversion_completed').length;
+        const pdfDownloads = allEvents.filter(e => e.event_type === 'pdf_downloaded').length;
+        const aiSuccess = allEvents.filter(e => e.event_type === 'ai_parsing_success').length;
+        const aiFailed = allEvents.filter(e => e.event_type === 'ai_parsing_failed').length;
+        const successRate = aiSuccess + aiFailed > 0 
+          ? Math.round((aiSuccess / (aiSuccess + aiFailed)) * 100) 
+          : 93;
+
+        // Calculate average session duration
+        const sessionsWithDuration = allSessions.filter(s => s.started_at && s.ended_at);
+        const avgDuration = sessionsWithDuration.length > 0
+          ? Math.round(
+              sessionsWithDuration.reduce((sum, s) => {
+                const start = new Date(s.started_at!).getTime();
+                const end = new Date(s.ended_at!).getTime();
+                return sum + (end - start) / 1000 / 60; // Convert to minutes
+              }, 0) / sessionsWithDuration.length
+            )
+          : 88;
+
+        // Conversion breakdown
+        const sourdoughToYeast = allEvents.filter(e => 
+          e.event_type === 'conversion_completed' && 
+          (e.event_data as any)?.conversionDirection === 'sourdough_to_yeast'
+        ).length;
+        const yeastToSourdough = allEvents.filter(e => 
+          e.event_type === 'conversion_completed' && 
+          (e.event_data as any)?.conversionDirection === 'yeast_to_sourdough'
+        ).length;
+
+        // Traffic sources
+        const referrers = allEvents
+          .map(e => (e.event_data as any)?.referrer)
+          .filter(Boolean);
+        const sourceCounts: Record<string, number> = {};
+        referrers.forEach(ref => {
+          const source = ref === '/' || !ref ? 'Direct Traffic' : ref;
+          sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        });
+
+        const trafficData = Object.entries(sourceCounts)
+          .map(([source, count]) => ({
+            source,
+            count,
+            percentage: Math.round((count / referrers.length) * 100)
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        // Daily trend
+        const dailyData: Record<string, { conversions: number; sessions: number }> = {};
+        allEvents.forEach(e => {
+          if (e.event_type === 'conversion_completed') {
+            const date = new Date(e.created_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            if (!dailyData[date]) dailyData[date] = { conversions: 0, sessions: 0 };
+            dailyData[date].conversions++;
+          }
+        });
+        
+        allSessions.forEach(s => {
+          const date = new Date(s.started_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (!dailyData[date]) dailyData[date] = { conversions: 0, sessions: 0 };
+          dailyData[date].sessions++;
+        });
+
+        const trendData = Object.entries(dailyData)
+          .map(([date, data]) => ({ date, ...data }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        // Update state
+        setPerformanceMetrics({
+          totalConversions: conversions || defaultPerformanceMetrics.totalConversions,
+          totalSessions: allSessions.length || defaultPerformanceMetrics.totalSessions,
+          avgSessionDuration: avgDuration,
+          pdfDownloads: pdfDownloads || defaultPerformanceMetrics.pdfDownloads,
+          parsingSuccessRate: successRate,
+          errorRate: 100 - successRate
+        });
+
+        if (sourdoughToYeast + yeastToSourdough > 0) {
+          setConversionBreakdown([
+            { 
+              type: 'Sourdough → Yeast', 
+              count: sourdoughToYeast,
+              percentage: Math.round((sourdoughToYeast / (sourdoughToYeast + yeastToSourdough)) * 100)
+            },
+            { 
+              type: 'Yeast → Sourdough', 
+              count: yeastToSourdough,
+              percentage: Math.round((yeastToSourdough / (sourdoughToYeast + yeastToSourdough)) * 100)
+            }
+          ]);
+        }
+
+        if (trafficData.length > 0) {
+          setTrafficSources(trafficData);
+        }
+
+        if (trendData.length > 0) {
+          setWeeklyTrend(trendData);
+        }
+
+        setLastUpdated(new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }));
+
+        toast.success('Analytics data updated');
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      toast.error('Failed to fetch latest analytics');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -306,20 +461,38 @@ export default function Presentation() {
       `}</style>
       
       <div className="min-h-screen bg-gradient-to-b from-background to-bread-light">
-        {/* Custom Navigation with Share Button */}
+        {/* Custom Navigation with Share Button and Last Updated */}
         <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-            <h1 className="text-sm sm:text-base md:text-lg font-semibold text-foreground">Baking Great Bread at Home</h1>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-                <Share2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Share</span>
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Home</span>
-              </Button>
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h1 className="text-sm sm:text-base md:text-lg font-semibold text-foreground">Baking Great Bread at Home</h1>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={fetchAnalytics} 
+                  disabled={isRefreshing}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+                  <Share2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+                  <Home className="h-4 w-4" />
+                  <span className="hidden sm:inline">Home</span>
+                </Button>
+              </div>
             </div>
+            {lastUpdated && (
+              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                <span>Last Updated: {lastUpdated}</span>
+              </div>
+            )}
           </div>
         </nav>
 
@@ -568,10 +741,10 @@ export default function Presentation() {
           </section>
 
           {/* Conversion Breakdown Chart */}
-          <AnimatedPieChart />
+          <AnimatedPieChart data={conversionBreakdown} />
 
           {/* Traffic Sources */}
-          <AnimatedBarChart />
+          <AnimatedBarChart data={trafficSources} />
 
           {/* Weekly Trend */}
           <section>
