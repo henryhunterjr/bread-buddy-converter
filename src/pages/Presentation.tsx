@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion, useInView } from 'framer-motion';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
-import { PasswordProtection } from '@/components/PasswordProtection';
 import { supabase } from '@/integrations/supabase/client';
 import heroImage from '@/assets/presentation-hero.jpeg';
 import qrCodeImage from '@/assets/qr-code-converter.png';
@@ -438,10 +437,9 @@ export default function Presentation() {
   };
 
   return (
-    <PasswordProtection correctPassword="40664066" storageKey="presentation-auth">
-      <>
-        <style>{`
-        @keyframes slideUp {
+    <>
+      <style>{`
+      @keyframes slideUp {
           from {
             opacity: 0;
             transform: translateY(20px);
@@ -1559,10 +1557,12 @@ export default function Presentation() {
               <Button 
                 size="lg" 
                 className="mt-4 bg-bread-earth hover:bg-bread-terracotta text-white"
-                onClick={() => window.location.href = 'mailto:henrysbreadkitchen@gmail.com?subject=Partnership Inquiry - Bread Buddy Converter'}
+                asChild
               >
-                <Calendar className="h-5 w-5 mr-2" />
-                Schedule a Demo
+                <a href="mailto:henrysbreadkitchen@gmail.com?subject=Partnership Inquiry - Bread Buddy Converter">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Schedule a Demo
+                </a>
               </Button>
             </div>
           </Card>
@@ -1580,7 +1580,6 @@ export default function Presentation() {
           </div>
         </div>
       </div>
-      </>
-    </PasswordProtection>
+    </>
   );
 }
