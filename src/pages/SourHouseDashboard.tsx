@@ -66,41 +66,44 @@ export default function SourHouseDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
       {/* Header */}
       <header className="border-b border-gray-800 bg-[#0f0f18]">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-black" />
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-black" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-bold truncate">SourHouse Commission Tracker</h1>
+                <p className="text-xs sm:text-sm text-gray-400">HBK23 Affiliate Dashboard</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">SourHouse Commission Tracker</h1>
-              <p className="text-sm text-gray-400">HBK23 Affiliate Dashboard</p>
+            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-shrink-0">
+              {lastUpdated && (
+                <span className="text-xs text-gray-400 hidden md:block">
+                  Last updated: {formatDate(lastUpdated)}
+                </span>
+              )}
+              <Button
+                onClick={handleRefresh}
+                disabled={isLoading || isRefreshing}
+                className="bg-cyan-600 hover:bg-cyan-700 text-sm px-3 py-2 h-auto"
+                size="sm"
+              >
+                <RefreshCw className={`w-4 h-4 sm:mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+              <a
+                href="https://thesourhouse.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-400 hover:text-white transition-colors p-2"
+              >
+                <ExternalLink className="w-5 h-5" />
+              </a>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {lastUpdated && (
-              <span className="text-sm text-gray-400">
-                Last updated: {formatDate(lastUpdated)}
-              </span>
-            )}
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading || isRefreshing}
-              className="bg-cyan-600 hover:bg-cyan-700"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <a
-              href="https://thesourhouse.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <ExternalLink className="w-5 h-5" />
-            </a>
           </div>
         </div>
       </header>
