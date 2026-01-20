@@ -82,13 +82,14 @@ const UNIT_CONVERSIONS: Record<string, number> = {
 };
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
-const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
+const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk', 'sour cream', 'yogurt', 'juice'];
 const STARTER_KEYWORDS = ['starter', 'sourdough starter'];
 const YEAST_KEYWORDS = ['yeast', 'instant yeast', 'active dry yeast'];
 const SALT_KEYWORDS = ['salt', 'kosher salt', 'sea salt', 'fine salt', 'coarse salt', 'flaky salt'];
 const FAT_KEYWORDS = ['butter', 'oil', 'lard', 'shortening', 'cream', 'heavy cream'];
 const ENRICHMENT_KEYWORDS = ['egg', 'eggs'];
 const SWEETENER_KEYWORDS = ['sugar', 'honey', 'syrup', 'molasses'];
+const CHEMICAL_LEAVENER_KEYWORDS = ['baking soda', 'baking powder', 'bicarbonate of soda', 'sodium bicarbonate'];
 
 // Core ingredient keywords for compound detection
 const CORE_INGREDIENTS = ['water', 'milk', 'butter', 'oil', 'egg', 'flour', 'yeast', 'sugar', 'salt', 'starter', 'honey'];
@@ -469,10 +470,13 @@ function createIngredient(name: string, amount: number, lowerLine: string): Pars
   
   // Determine type - CHECK MOST SPECIFIC FIRST
   let type: ParsedIngredient['type'] = 'other';
-  
+
   // Check enrichments BEFORE flour (egg might have "flour" in contaminated text)
   // Check cream specifically as fat BEFORE checking generic liquids
-  if (ENRICHMENT_KEYWORDS.some(k => lowerLine.includes(k))) {
+  // Check chemical leaveners (baking soda/powder) early
+  if (CHEMICAL_LEAVENER_KEYWORDS.some(k => lowerLine.includes(k))) {
+    type = 'other'; // Chemical leaveners stored as 'other' type, detection handled separately
+  } else if (ENRICHMENT_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'enrichment';
   } else if (SWEETENER_KEYWORDS.some(k => lowerLine.includes(k))) {
     type = 'sweetener';
@@ -677,6 +681,316 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
       });
     }
   }
-  
+
   return warnings;
+}
+
+/**
+ * Quick Bread Recipe Parser
+ * Parses quick bread recipes while preserving original units (volume or weight)
+ * Used specifically for sourdough discard conversion
+ */
+export interface QuickBreadParsedIngredient {
+  name: string;
+  amount: number;
+  unit: string;
+  originalText: string;
+  type: 'flour' | 'liquid' | 'leavener' | 'fat' | 'sweetener' | 'enrichment' | 'other';
+  amountInGrams: number; // Always calculate grams for conversion math
+}
+
+export interface QuickBreadParsedRecipe {
+  ingredients: QuickBreadParsedIngredient[];
+  method: string;
+  totalFlourGrams: number;
+  isVolumeBasedRecipe: boolean;
+}
+
+// Volume to grams conversions for quick bread parsing
+const QUICK_BREAD_CONVERSIONS: Record<string, number> = {
+  // Flour
+  'cup_flour': 120,
+  'cup_all-purpose': 120,
+  'cup_bread': 130,
+  'cup_whole wheat': 113,
+  'cup_cake': 115,
+  'tablespoon_flour': 8,
+  'teaspoon_flour': 2.6,
+  // Liquids
+  'cup_milk': 240,
+  'cup_buttermilk': 245,
+  'cup_sour cream': 240,
+  'cup_yogurt': 245,
+  'cup_water': 240,
+  'cup_juice': 240,
+  'cup_oil': 224,
+  'tablespoon_milk': 15,
+  'tablespoon_buttermilk': 15,
+  'tablespoon_sour cream': 15,
+  'tablespoon_yogurt': 15,
+  'tablespoon_oil': 14,
+  'teaspoon_milk': 5,
+  'teaspoon_vanilla': 4,
+  // Sugar
+  'cup_sugar': 200,
+  'cup_brown sugar': 220,
+  'tablespoon_sugar': 12.5,
+  'teaspoon_sugar': 4,
+  // Butter
+  'cup_butter': 227,
+  'tablespoon_butter': 14,
+  'teaspoon_butter': 5,
+  // Default
+  'cup_default': 200,
+  'tablespoon_default': 15,
+  'teaspoon_default': 5,
+};
+
+function normalizeUnitName(unit: string): string {
+  const u = unit.toLowerCase().trim();
+  if (u.startsWith('cup')) return 'cup';
+  if (u === 'tablespoons' || u === 'tablespoon' || u === 'tbsp') return 'tablespoon';
+  if (u === 'teaspoons' || u === 'teaspoon' || u === 'tsp') return 'teaspoon';
+  if (u === 'g' || u === 'gram' || u === 'grams') return 'g';
+  if (u === 'ml' || u === 'milliliter' || u === 'milliliters') return 'ml';
+  return u;
+}
+
+function convertQuickBreadToGrams(amount: number, unit: string, ingredientName: string): number {
+  const normalizedUnit = normalizeUnitName(unit);
+  const name = ingredientName.toLowerCase();
+
+  // If already in grams or ml, return as-is
+  if (normalizedUnit === 'g' || normalizedUnit === 'ml') {
+    return amount;
+  }
+
+  // Check for ingredient type matches
+  if (name.includes('flour')) {
+    if (name.includes('whole wheat')) {
+      return amount * (QUICK_BREAD_CONVERSIONS['cup_whole wheat'] || 113);
+    }
+    if (name.includes('bread')) {
+      return amount * (QUICK_BREAD_CONVERSIONS['cup_bread'] || 130);
+    }
+    if (name.includes('cake')) {
+      return amount * (QUICK_BREAD_CONVERSIONS['cup_cake'] || 115);
+    }
+    return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_flour`] || (normalizedUnit === 'cup' ? 120 : normalizedUnit === 'tablespoon' ? 8 : 2.6));
+  }
+
+  if (name.includes('sugar') || name.includes('honey')) {
+    if (name.includes('brown')) {
+      return amount * (QUICK_BREAD_CONVERSIONS['cup_brown sugar'] || 220);
+    }
+    return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_sugar`] || (normalizedUnit === 'cup' ? 200 : normalizedUnit === 'tablespoon' ? 12.5 : 4));
+  }
+
+  if (name.includes('butter')) {
+    return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_butter`] || (normalizedUnit === 'cup' ? 227 : normalizedUnit === 'tablespoon' ? 14 : 5));
+  }
+
+  if (name.includes('oil')) {
+    return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_oil`] || (normalizedUnit === 'cup' ? 224 : 14));
+  }
+
+  if (name.includes('milk') || name.includes('buttermilk') || name.includes('yogurt') || name.includes('sour cream') || name.includes('water') || name.includes('juice')) {
+    return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_milk`] || (normalizedUnit === 'cup' ? 240 : normalizedUnit === 'tablespoon' ? 15 : 5));
+  }
+
+  // Default conversion
+  return amount * (QUICK_BREAD_CONVERSIONS[`${normalizedUnit}_default`] || amount);
+}
+
+function classifyQuickBreadIngredient(name: string): QuickBreadParsedIngredient['type'] {
+  const lower = name.toLowerCase();
+
+  // Chemical leaveners
+  if (lower.includes('baking soda') || lower.includes('baking powder') || lower.includes('bicarbonate')) {
+    return 'leavener';
+  }
+
+  // Flour
+  if (lower.includes('flour')) {
+    return 'flour';
+  }
+
+  // Liquids (including dairy that acts as liquid)
+  if (lower.includes('milk') || lower.includes('buttermilk') || lower.includes('water') ||
+      lower.includes('sour cream') || lower.includes('yogurt') || lower.includes('juice')) {
+    return 'liquid';
+  }
+
+  // Fats
+  if (lower.includes('butter') || lower.includes('oil') || lower.includes('shortening') ||
+      lower.includes('lard') || lower.includes('cream cheese')) {
+    return 'fat';
+  }
+
+  // Sweeteners
+  if (lower.includes('sugar') || lower.includes('honey') || lower.includes('syrup') ||
+      lower.includes('molasses') || lower.includes('maple')) {
+    return 'sweetener';
+  }
+
+  // Enrichments
+  if (lower.includes('egg')) {
+    return 'enrichment';
+  }
+
+  return 'other';
+}
+
+export function parseQuickBreadRecipe(recipeText: string): QuickBreadParsedRecipe {
+  const ingredients: QuickBreadParsedIngredient[] = [];
+  let method = '';
+
+  // Split by method/instructions section
+  const methodKeywords = ['method:', 'instructions:', 'directions:', 'steps:', 'procedure:'];
+  let ingredientsSection = recipeText;
+  let methodSection = '';
+
+  const lowerText = recipeText.toLowerCase();
+  let methodStartIndex = -1;
+
+  for (const keyword of methodKeywords) {
+    const index = lowerText.indexOf(keyword);
+    if (index !== -1 && (methodStartIndex === -1 || index < methodStartIndex)) {
+      methodStartIndex = index;
+    }
+  }
+
+  if (methodStartIndex !== -1) {
+    ingredientsSection = recipeText.substring(0, methodStartIndex);
+    methodSection = recipeText.substring(methodStartIndex);
+  }
+
+  // Detect if recipe uses volume or weight
+  const gramsCount = (ingredientsSection.match(/\d+\s*g(?:rams?)?\b/gi) || []).length;
+  const volumeCount = (ingredientsSection.match(/\d+(?:\s*\d*\/\d+)?\s*(?:cups?|tablespoons?|tbsp|teaspoons?|tsp)\b/gi) || []).length;
+  const isVolumeBasedRecipe = volumeCount > gramsCount;
+
+  // Normalize text
+  let normalized = ingredientsSection
+    .replace(/\s*\*\s*/g, '\n')
+    .replace(/\s+(\d+(?:\.\d+)?)\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)(?=\s)/gi, '\n$1$2 ')
+    .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ')
+    .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');
+
+  const lines = normalized.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 3) continue;
+    if (!/\d/.test(trimmed)) continue;
+
+    // Skip metadata lines
+    if (/^(prep|bake|fermentation|total|yield|servings?|category|cuisine|difficulty|calories)[\s:]/i.test(trimmed)) continue;
+
+    // Parse the ingredient line
+    const parsed = parseQuickBreadIngredientLine(trimmed);
+    if (parsed) {
+      ingredients.push(parsed);
+    }
+  }
+
+  method = methodSection.trim();
+
+  // Calculate total flour in grams
+  const totalFlourGrams = ingredients
+    .filter(i => i.type === 'flour')
+    .reduce((sum, i) => sum + i.amountInGrams, 0);
+
+  return {
+    ingredients,
+    method,
+    totalFlourGrams,
+    isVolumeBasedRecipe,
+  };
+}
+
+function parseQuickBreadIngredientLine(line: string): QuickBreadParsedIngredient | null {
+  const trimmed = line.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Pattern 1: Grams "100g flour" or "100 g flour"
+  const gramsMatch = lower.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams?)\s+(.+)/);
+  if (gramsMatch) {
+    const amount = parseFloat(gramsMatch[1]);
+    const name = gramsMatch[2].trim();
+    return {
+      name,
+      amount,
+      unit: 'g',
+      originalText: trimmed,
+      type: classifyQuickBreadIngredient(name),
+      amountInGrams: amount,
+    };
+  }
+
+  // Pattern 2: Fractions "1 1/2 cups flour" or "1/2 cup flour"
+  const fractionMatch = lower.match(/^(\d+)?\s*(\d+)\/(\d+)\s+(cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+(.+)/);
+  if (fractionMatch) {
+    const whole = fractionMatch[1] ? parseFloat(fractionMatch[1]) : 0;
+    const numerator = parseFloat(fractionMatch[2]);
+    const denominator = parseFloat(fractionMatch[3]);
+    const amount = whole + (numerator / denominator);
+    const unit = normalizeUnitName(fractionMatch[4]);
+    const name = fractionMatch[5].trim();
+    return {
+      name,
+      amount,
+      unit,
+      originalText: trimmed,
+      type: classifyQuickBreadIngredient(name),
+      amountInGrams: convertQuickBreadToGrams(amount, unit, name),
+    };
+  }
+
+  // Pattern 3: Volume "2 cups flour"
+  const volumeMatch = lower.match(/^(\d+(?:\.\d+)?)\s+(cups?|tablespoons?|tbsp|teaspoons?|tsp)\s+(.+)/);
+  if (volumeMatch) {
+    const amount = parseFloat(volumeMatch[1]);
+    const unit = normalizeUnitName(volumeMatch[2]);
+    const name = volumeMatch[3].trim();
+    return {
+      name,
+      amount,
+      unit,
+      originalText: trimmed,
+      type: classifyQuickBreadIngredient(name),
+      amountInGrams: convertQuickBreadToGrams(amount, unit, name),
+    };
+  }
+
+  // Pattern 4: Simple number with ml "240ml milk"
+  const mlMatch = lower.match(/^(\d+(?:\.\d+)?)\s*ml\s+(.+)/);
+  if (mlMatch) {
+    const amount = parseFloat(mlMatch[1]);
+    const name = mlMatch[2].trim();
+    return {
+      name,
+      amount,
+      unit: 'ml',
+      originalText: trimmed,
+      type: classifyQuickBreadIngredient(name),
+      amountInGrams: amount, // ml roughly equals grams for most liquids
+    };
+  }
+
+  // Pattern 5: Count "2 eggs"
+  const eggMatch = lower.match(/^(\d+)\s+(large\s+)?(eggs?)/);
+  if (eggMatch) {
+    const count = parseInt(eggMatch[1]);
+    return {
+      name: eggMatch[0],
+      amount: count,
+      unit: 'count',
+      originalText: trimmed,
+      type: 'enrichment',
+      amountInGrams: count * 50, // ~50g per large egg
+    };
+  }
+
+  return null;
 }

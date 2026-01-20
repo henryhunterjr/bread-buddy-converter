@@ -8,7 +8,7 @@ import logo from '@/assets/logo.png';
 import heroBanner from '@/assets/hero-banner.png';
 
 interface LandingScreenProps {
-  onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
+  onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough' | 'quick-bread-discard') => void;
 }
 
 export default function LandingScreen({ onSelectDirection }: LandingScreenProps) {
@@ -59,6 +59,19 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
                   onClick={() => onSelectDirection('yeast-to-sourdough')}
                 >
                   Convert Yeast → Sourdough
+                </Button>
+              </div>
+
+              {/* Quick Bread Discard Option */}
+              <div className="pt-4 border-t border-bread-medium/20 mt-6">
+                <p className="text-sm text-muted-foreground mb-3">Have a quick bread recipe? Add sourdough discard for extra flavor!</p>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="text-base px-6 py-4 border-2 border-burnt-orange/50 hover:bg-burnt-orange/10 hover:border-burnt-orange transition-all duration-300 text-burnt-orange font-semibold"
+                  onClick={() => onSelectDirection('quick-bread-discard')}
+                >
+                  Add Discard to Quick Bread
                 </Button>
               </div>
             </div>

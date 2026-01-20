@@ -1,9 +1,9 @@
 import { useState, lazy, Suspense } from 'react';
 import LandingScreen from '@/components/LandingScreen';
-import { parseRecipe } from '@/utils/recipeParser';
+import { parseRecipe, parseQuickBreadRecipe } from '@/utils/recipeParser';
 import { convertSourdoughToYeast, convertYeastToSourdough, cleanIngredientName } from '@/utils/recipeConverter';
 import { validateConversion } from '@/utils/recipeValidator';
-import { ConvertedRecipe, ParsedIngredient, ParsedRecipe } from '@/types/recipe';
+import { ConvertedRecipe, ParsedIngredient, ParsedRecipe, QuickBreadConvertedRecipe } from '@/types/recipe';
 import { supabase } from '@/integrations/supabase/client';
 import { extractRecipeInfo } from '@/utils/titleExtractor';
 import { HelpModal } from '@/components/HelpModal';
@@ -12,20 +12,25 @@ import { HelpCircle, Loader2 } from 'lucide-react';
 import { SavedRecipe } from '@/utils/recipeStorage';
 import { Navigation } from '@/components/Navigation';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { detectQuickBread } from '@/utils/quickBreadDetector';
+import { convertQuickBreadToDiscard, QuickBreadConversionResult } from '@/utils/quickBreadConverter';
 
 // Lazy load heavy components for better initial load performance
 const InputScreen = lazy(() => import('@/components/InputScreen'));
 const OutputScreen = lazy(() => import('@/components/OutputScreen'));
 const IngredientConfirmation = lazy(() => import('@/components/IngredientConfirmation').then(module => ({ default: module.IngredientConfirmation })));
 const SavedRecipes = lazy(() => import('@/components/SavedRecipes').then(module => ({ default: module.SavedRecipes })));
+const QuickBreadOutputScreen = lazy(() => import('@/components/QuickBreadOutputScreen'));
+const QuickBreadInputScreen = lazy(() => import('@/components/QuickBreadInputScreen'));
 
-type Screen = 'landing' | 'input' | 'confirmation' | 'output' | 'saved';
+type Screen = 'landing' | 'input' | 'confirmation' | 'output' | 'saved' | 'quick-bread-input' | 'quick-bread-output';
 
 const Index = () => {
   const { trackEvent } = useAnalytics();
   const [screen, setScreen] = useState<Screen>('landing');
-  const [direction, setDirection] = useState<'sourdough-to-yeast' | 'yeast-to-sourdough'>('sourdough-to-yeast');
+  const [direction, setDirection] = useState<'sourdough-to-yeast' | 'yeast-to-sourdough' | 'quick-bread-discard'>('sourdough-to-yeast');
   const [result, setResult] = useState<ConvertedRecipe | null>(null);
+  const [quickBreadResult, setQuickBreadResult] = useState<QuickBreadConversionResult | null>(null);
   const [originalRecipeText, setOriginalRecipeText] = useState<string>('');
   const [extractedIngredients, setExtractedIngredients] = useState<ParsedIngredient[]>([]);
   const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<any>(null);
@@ -34,9 +39,13 @@ const Index = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [validationAutoFixes, setValidationAutoFixes] = useState<string[]>([]);
 
-  const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
+  const handleSelectDirection = (selectedDirection: 'sourdough-to-yeast' | 'yeast-to-sourdough' | 'quick-bread-discard') => {
     setDirection(selectedDirection);
-    setScreen('input');
+    if (selectedDirection === 'quick-bread-discard') {
+      setScreen('quick-bread-input');
+    } else {
+      setScreen('input');
+    }
     trackEvent('conversion_started', { conversion_direction: selectedDirection });
   };
 
@@ -279,7 +288,120 @@ const Index = () => {
   const handleStartOver = () => {
     setScreen('landing');
     setResult(null);
+    setQuickBreadResult(null);
     setOriginalRecipeText('');
+  };
+
+  /**
+   * Handle quick bread conversion
+   */
+  const handleQuickBreadConvert = async (recipeText: string) => {
+    setOriginalRecipeText(recipeText);
+
+    // Extract recipe title
+    let title = 'Quick Bread Recipe';
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-extract-title', {
+        body: { recipeText }
+      });
+
+      if (!error && data?.success) {
+        title = data.title;
+      } else {
+        const fallback = extractRecipeInfo(recipeText);
+        title = fallback.title;
+      }
+    } catch (error) {
+      console.error('AI title extraction failed, using fallback:', error);
+      const fallback = extractRecipeInfo(recipeText);
+      title = fallback.title;
+    }
+
+    // Parse the quick bread recipe
+    const parsed = parseQuickBreadRecipe(recipeText);
+
+    // Detect if it's a valid quick bread
+    const detection = detectQuickBread(recipeText);
+
+    if (detection.hasExistingSourdough) {
+      // Recipe already has sourdough
+      setQuickBreadResult({
+        recipeName: title,
+        originalIngredients: [],
+        convertedIngredients: [],
+        discardAmount: 0,
+        discardUnit: 'g',
+        flourReduction: 0,
+        flourReductionUnit: 'g',
+        liquidReductions: [],
+        originalMethod: parsed.method,
+        convertedMethod: parsed.method,
+        warnings: [{ type: 'info', message: 'This recipe already includes sourdough.' }],
+        notes: [],
+        summary: {
+          discardAdded: 'No conversion needed',
+          flourReduced: 'N/A',
+          liquidReduced: 'N/A',
+        },
+        isVolumeBasedRecipe: parsed.isVolumeBasedRecipe,
+        hasBakingSoda: false,
+      });
+      setScreen('quick-bread-output');
+      return;
+    }
+
+    if (detection.isNotBakedGood) {
+      // Not a baked good
+      setQuickBreadResult({
+        recipeName: title,
+        originalIngredients: [],
+        convertedIngredients: [],
+        discardAmount: 0,
+        discardUnit: 'g',
+        flourReduction: 0,
+        flourReductionUnit: 'g',
+        liquidReductions: [],
+        originalMethod: parsed.method,
+        convertedMethod: parsed.method,
+        warnings: [{ type: 'warning', message: "This recipe doesn't appear to be a quick bread. Need help with something else?" }],
+        notes: [],
+        summary: {
+          discardAdded: 'No conversion performed',
+          flourReduced: 'N/A',
+          liquidReduced: 'N/A',
+        },
+        isVolumeBasedRecipe: parsed.isVolumeBasedRecipe,
+        hasBakingSoda: false,
+      });
+      setScreen('quick-bread-output');
+      return;
+    }
+
+    // Convert the parsed ingredients to the format needed by the converter
+    const ingredientsForConverter: ParsedIngredient[] = parsed.ingredients.map(ing => ({
+      name: ing.name,
+      amount: ing.amountInGrams,
+      unit: 'g',
+      type: ing.type === 'leavener' ? 'other' : ing.type as ParsedIngredient['type'],
+    }));
+
+    // Perform the conversion
+    const conversionResult = convertQuickBreadToDiscard(
+      title,
+      ingredientsForConverter,
+      parsed.method,
+      recipeText
+    );
+
+    setQuickBreadResult(conversionResult);
+    setRecipeName(title);
+    setScreen('quick-bread-output');
+
+    trackEvent('quick_bread_converted', {
+      flour_amount: parsed.totalFlourGrams,
+      is_volume_based: parsed.isVolumeBasedRecipe,
+      confidence_score: detection.confidenceScore,
+    });
   };
 
   const handleBack = () => {
@@ -353,7 +475,7 @@ const Index = () => {
           </div>
         )}
         {screen === 'output' && result && (
-          <OutputScreen 
+          <OutputScreen
             result={result}
             recipeName={recipeName}
             recipeDescription={recipeDescription}
@@ -363,6 +485,21 @@ const Index = () => {
             validationAutoFixes={validationAutoFixes}
             onHome={handleStartOver}
             onMyRecipes={handleViewSavedRecipes}
+          />
+        )}
+        {screen === 'quick-bread-input' && (
+          <QuickBreadInputScreen
+            onConvert={handleQuickBreadConvert}
+            onBack={handleBack}
+            onHome={handleStartOver}
+          />
+        )}
+        {screen === 'quick-bread-output' && quickBreadResult && (
+          <QuickBreadOutputScreen
+            result={quickBreadResult}
+            originalRecipeText={originalRecipeText}
+            onStartOver={handleStartOver}
+            onHome={handleStartOver}
           />
         )}
       </Suspense>
