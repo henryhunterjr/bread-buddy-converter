@@ -27,12 +27,14 @@ export interface QuickBreadDetectionResult {
   isNotBakedGood: boolean;
 }
 
-// Chemical leavener patterns
+// Chemical leavener patterns - more flexible to handle OCR variations
 const CHEMICAL_LEAVENER_PATTERNS = [
   /baking\s*soda/i,
   /bicarbonate\s*of\s*soda/i,
   /sodium\s*bicarbonate/i,
   /baking\s*powder/i,
+  /\d+\s*(?:tsp|teaspoon|tbsp|tablespoon)s?\s*(?:of\s+)?baking/i,  // "1 tsp baking soda"
+  /baking\s*(?:soda|powder)\s*[\d\/]+/i,  // "baking soda 1/2 tsp"
 ];
 
 // Yeast patterns - must NOT be present for quick bread
@@ -62,7 +64,7 @@ const YEAST_PROCESS_PATTERNS = [
   /knead(?:ing|ed)?\s+(?:for\s+)?\d+\s*(?:min|minute)/i,  // Extended kneading typical of yeasted bread
 ];
 
-// Flour patterns
+// Flour patterns - more flexible to handle OCR variations
 const FLOUR_PATTERNS = [
   /\bflour\b/i,
   /\bwheat\b/i,
@@ -70,6 +72,8 @@ const FLOUR_PATTERNS = [
   /\bspelt\b/i,
   /\beinkorn\b/i,
   /\bkamut\b/i,
+  /\d+\s*(?:cups?|g|grams?)\s*(?:of\s+)?(?:all[\s-]*purpose|bread|cake|self[\s-]*rising|whole[\s-]*wheat)/i,  // "2 cups all-purpose"
+  /(?:all[\s-]*purpose|bread|cake|self[\s-]*rising)\s*flour/i,
 ];
 
 // Existing sourdough patterns - skip conversion if already has sourdough
