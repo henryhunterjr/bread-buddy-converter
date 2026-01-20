@@ -4,7 +4,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
+import { parseRecipe } from '@/utils/recipeParser';
+import { detectQuickBread } from '@/utils/quickBreadDetector';
 import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat, ChefHat } from 'lucide-react';
 import { HeroHeader } from '@/components/HeroHeader';
 import { extractTextFromFile, ExtractedContent } from '@/utils/lazyFileExtractor';
@@ -43,6 +44,7 @@ interface InputScreenProps {
   onBack: () => void;
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
   onHome: () => void;
+  onQuickBreadDetected?: (recipeText: string) => void;
 }
 
 const getPlaceholderText = (direction: string) => 
@@ -60,7 +62,7 @@ const getButtonText = (direction: string) =>
     ? 'Convert to Sourdough'
     : 'Convert to Yeast';
 
-export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
+export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome, onQuickBreadDetected }: InputScreenProps) {
   const { trackEvent, logDetailedError } = useAnalytics();
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -501,9 +503,37 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       // Check for essential ingredients upfront
       const textToCheck = preprocessResult.cleanedText;
       const hasFlour = /\d+\s*(g|grams?|oz|ounces?|cups?|lbs?|pounds?).*?(flour|bread|wheat|rye|spelt)/i.test(textToCheck);
-      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(textToCheck);
+      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk|buttermilk|sour\s*cream|yogurt)/i.test(textToCheck);
       const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(textToCheck);
-      
+
+      // AUTOMATIC QUICK BREAD DETECTION
+      // If recipe has flour but no yeast, check if it's a quick bread
+      if (hasFlour && !hasLeavening) {
+        const quickBreadDetection = detectQuickBread(textToCheck);
+
+        if (quickBreadDetection.isQuickBread && onQuickBreadDetected) {
+          console.log('Quick bread detected! Routing to quick bread converter...');
+          console.log('Detection details:', quickBreadDetection);
+
+          toast({
+            title: "Quick bread detected!",
+            description: "This looks like a quick bread recipe. Converting to use sourdough discard...",
+          });
+
+          setIsProcessing(false);
+          onQuickBreadDetected(recipeText);
+          return;
+        }
+
+        // If it has chemical leavener but we don't have the callback, show a helpful message
+        if (quickBreadDetection.hasChemicalLeavener) {
+          toast({
+            title: "Quick bread detected",
+            description: "This appears to be a quick bread (uses baking soda/powder). Use 'Add Discard to Quick Bread' on the home page for best results.",
+          });
+        }
+      }
+
       if (!hasFlour || !hasWater || !hasLeavening) {
         // If user uploaded an image and parsing failed, try AI vision
         if (uploadedImageFile) {
@@ -514,7 +544,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
           await parseImageWithAI(uploadedImageFile);
           return;
         }
-        
+
         const suggestions = generateCorrectionSuggestions('Missing essential ingredients', textToCheck);
         setErrors([
           '🤔 Need flour, water, and yeast/starter amounts to convert.',

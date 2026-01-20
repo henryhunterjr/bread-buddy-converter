@@ -448,12 +448,13 @@ const Index = () => {
         </div>
       }>
         {screen === 'input' && (
-          <InputScreen 
-            direction={direction} 
+          <InputScreen
+            direction={direction as 'sourdough-to-yeast' | 'yeast-to-sourdough'}
             onConvert={handleConvert}
             onBack={handleBack}
             onLoadSaved={handleLoadSaved}
             onHome={handleStartOver}
+            onQuickBreadDetected={handleQuickBreadConvert}
           />
         )}
         {screen === 'confirmation' && (
