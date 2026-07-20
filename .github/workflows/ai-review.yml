@@ -1,0 +1,117 @@
+name: AI Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run unit tests (conversion math regression suite)
+        run: npm test
+      - name: Typecheck
+        run: npx tsc -p tsconfig.app.json --noEmit
+
+  claude-review:
+    name: claude-review
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude architecture review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --model claude-opus-4-8
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(npm test:*),Bash(npx vitest:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh api:*)"
+          prompt: |
+            You are the AI code reviewer for the Bread Buddy Converter — a sourdough↔yeast
+            recipe converter whose output real bakers follow with real ingredients. Review
+            PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+
+            Get the diff with: gh pr diff ${{ github.event.pull_request.number }}
+
+            REVIEW FOR (in priority order):
+            1. Business-logic correctness — especially the conversion math in
+               src/utils/recipeConverter.ts, recipeParser.ts, smartWarnings.ts, and
+               src/lib/methodTemplates.ts. Wrong numbers here ruin someone's bread.
+               Check hydration preservation, starter-hydration ratios (flour fraction is
+               100/(100+H), water is H/(100+H)), unit-conversion densities, baker's
+               percentage math, and rounding drift between displayed components and totals.
+            2. Security — XSS via rendered recipe text, unsafe HTML injection, secrets in
+               source, Supabase query patterns that trust client input, RLS assumptions,
+               edge-function input validation (supabase/functions/*).
+            3. Unhandled edge cases — division by zero / NaN propagation (zero flour, empty
+               recipes), null/undefined on parsed ingredients, localStorage corruption,
+               failed network calls falling through without a fallback.
+            4. Performance — accidental eager imports of the lazy-loaded heavy libraries
+               (tesseract, pdfjs, jspdf must stay behind lazyFileExtractor/lazyPdfGenerator),
+               N+1 Supabase round-trips inside loops, unnecessary re-renders from unstable
+               deps, large assets added to src/assets.
+            5. ALWAYS FLAG, regardless of apparent correctness: any change touching
+               payments/checkout, data deletion, analytics collection, the Supabase anon
+               key usage, localStorage schema of saved recipes, or the committed .env file
+               (it must STAY committed — Lovable builds require it; removing it white-screens
+               production).
+
+            IGNORE ENTIRELY: formatting, naming preferences, import ordering, style choices,
+            comment style, anything a linter would catch. Do not comment on these even in
+            passing.
+
+            If the diff touches the math files, run `npm test` and treat any failure as
+            CRITICAL. If it changes math without adding/updating tests in
+            src/utils/__tests__/, flag that as a WARNING.
+
+            Report every issue you find, including ones you are uncertain about — do not
+            self-filter for importance; the severity field does that. For each finding
+            assign a severity:
+              - CRITICAL: wrong numbers shown to users, crash on plausible input, security
+                vulnerability, data loss, broken production build, or a failing test
+              - WARNING: everything else worth a human's attention
+
+            POST YOUR REVIEW as inline comments on the specific lines using:
+              gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+                -f event=COMMENT -f body="<summary>" ...with a comments[] array for inline notes
+            (fall back to a single `gh pr comment` with file:line references if the inline
+            API rejects a position). Begin the summary with a one-line verdict and a count:
+            "AI Review: N critical, M warnings".
+
+            FINALLY — and this is mandatory — write a machine-readable verdict to the file
+            `ai-review-verdict.json` in the workspace root, exactly this shape:
+              {"critical": <int>, "warnings": <int>}
+            The workflow gates the merge on that file.
+
+      - name: Gate on critical findings
+        run: |
+          if [ ! -f ai-review-verdict.json ]; then
+            echo "::warning::No verdict file produced — treating as non-blocking"
+            exit 0
+          fi
+          cat ai-review-verdict.json
+          CRITICAL=$(node -e "console.log(JSON.parse(require('fs').readFileSync('ai-review-verdict.json','utf8')).critical ?? 0)")
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "::error::AI review found $CRITICAL critical issue(s) — merge blocked. Read the review comments on the PR."
+            exit 1
+          fi
+          echo "AI review passed: no critical issues."
