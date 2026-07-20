@@ -23,7 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment files (Supabase anon key is public, but .env should not live in git)
-.env
-.env.*
-!.env.example
