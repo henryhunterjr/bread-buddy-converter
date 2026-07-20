@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ParsedIngredient } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,15 +19,19 @@ interface IngredientConfirmationProps {
   onConfirm: (confirmed: ParsedIngredient[]) => void;
   onReject: () => void;
   onHome: () => void;
+  onSelectDirection?: (dir: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
 }
 
-export function IngredientConfirmation({ 
-  ingredients, 
-  onConfirm, 
+export function IngredientConfirmation({
+  ingredients,
+  onConfirm,
   onReject,
-  onHome 
+  onHome,
+  onSelectDirection
 }: IngredientConfirmationProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  // Raw text of the amount field while editing, so clearing it doesn't snap to 0
+  const [editAmountText, setEditAmountText] = useState('');
   
   // Auto-fill defaults for low-confidence or estimated ingredients
   const autoFilledIngredients = ingredients.map(ing => {
@@ -47,17 +51,6 @@ export function IngredientConfirmation({
   });
   
   const [edited, setEdited] = useState(autoFilledIngredients);
-
-  // 🧪 DIAGNOSTIC TEST: Check flour consolidation
-  useEffect(() => {
-    console.log('INGREDIENT CHECK:', {
-      totalIngredients: ingredients.length,
-      flourEntries: ingredients.filter(i => 
-        i.name.toLowerCase().includes('flour')
-      ).length,
-      samples: ingredients.map(i => i.name).slice(0, 5)
-    });
-  }, [ingredients]);
 
   // Calculate confidence statistics
   const confidenceStats = {
@@ -107,8 +100,8 @@ export function IngredientConfirmation({
 
     if (ingredient.confidence === 'low') {
       return (
-        <Badge variant="outline" className="text-xs bg-yellow-500/20 text-yellow-700 border-yellow-500/40">
-          Medium
+        <Badge variant="outline" className="text-xs bg-red-500/20 text-red-700 border-red-500/50">
+          Low
         </Badge>
       );
     }
@@ -186,22 +179,36 @@ export function IngredientConfirmation({
           <>
             <div className="flex items-center gap-2 flex-1">
               <Input
-                value={ing.amount}
-                onChange={(e) => updateIngredient(globalIndex, 'amount', parseFloat(e.target.value) || 0)}
+                value={editAmountText}
+                onChange={(e) => {
+                  // Keep the raw string while typing; commit only on a valid parse
+                  setEditAmountText(e.target.value);
+                  const parsed = parseFloat(e.target.value);
+                  if (!isNaN(parsed)) {
+                    updateIngredient(globalIndex, 'amount', parsed);
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = parseFloat(editAmountText);
+                  updateIngredient(globalIndex, 'amount', isNaN(parsed) ? 0 : parsed);
+                }}
                 className="w-24 h-10"
                 type="number"
+                aria-label={`Amount for ${ing.name} in grams`}
               />
               <span className="text-sm font-medium text-muted-foreground">g</span>
               <Input
                 value={ing.name}
                 onChange={(e) => updateIngredient(globalIndex, 'name', e.target.value)}
                 className="flex-1 h-10"
+                aria-label="Ingredient name"
               />
             </div>
             <Button
               size="sm"
               onClick={() => setEditingIndex(null)}
               className="bg-green-600 hover:bg-green-700 text-white"
+              aria-label={`Confirm changes to ${ing.name}`}
             >
               <Check className="h-4 w-4" />
             </Button>
@@ -224,8 +231,12 @@ export function IngredientConfirmation({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setEditingIndex(globalIndex)}
+              onClick={() => {
+                setEditAmountText(String(ing.amount ?? ''));
+                setEditingIndex(globalIndex);
+              }}
               className="shrink-0"
+              aria-label={`Edit ${ing.name}`}
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -262,11 +273,12 @@ export function IngredientConfirmation({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-bread-cream via-bread-light to-bread-cream">
-      <HeroHeader 
+      <HeroHeader
         pageTitle="Review Extracted Ingredients"
         pageSubtitle="We've parsed your recipe. Confirm or edit the ingredients below."
         showNav={true}
         onNavigate={handleNavigation}
+        onSelectDirection={onSelectDirection}
       />
       
       {/* Progress Indicator */}
@@ -318,7 +330,7 @@ export function IngredientConfirmation({
                   </Badge>
                 )}
                 {confidenceStats.low > 0 && (
-                  <Badge variant="outline" className="bg-yellow-500/20 text-yellow-700 border-yellow-500/40">
+                  <Badge variant="outline" className="bg-red-500/20 text-red-700 border-red-500/50">
                     {confidenceStats.low} Low
                   </Badge>
                 )}

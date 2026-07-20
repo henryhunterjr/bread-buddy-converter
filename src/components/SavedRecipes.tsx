@@ -105,9 +105,11 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
                         <Clock className="h-3 w-3" />
                         <span>{formatDate(recipe.savedAt)}</span>
                         <span className="mx-1">•</span>
-                        <span className="capitalize">
-                          {recipe.convertedRecipe.direction.replace('-', ' → ')}
-                        </span>
+                        {recipe.convertedRecipe?.direction && (
+                          <span className="capitalize">
+                            {recipe.convertedRecipe.direction.replace('-', ' → ')}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -118,6 +120,7 @@ export function SavedRecipes({ onLoadRecipe }: SavedRecipesProps) {
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={(e) => e.stopPropagation()}
+                            aria-label={`Delete recipe ${recipe.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

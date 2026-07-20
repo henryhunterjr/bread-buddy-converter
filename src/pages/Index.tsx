@@ -76,15 +76,7 @@ const Index = () => {
       conversion_direction: direction,
       parser_used: aiParsedData ? 'ai' : 'regex'
     });
-    
-    console.log('handleConvert - using', aiParsedData ? 'AI-parsed data' : 'regex-parsed data');
-    console.log('Parsed recipe:', {
-      totalFlour: parsed.totalFlour,
-      totalLiquid: parsed.totalLiquid,
-      hydration: parsed.hydration,
-      ingredientCount: parsed.ingredients.length
-    });
-    
+
     // Extract recipe name and description using AI
     let title = 'Converted Bread Recipe';
     let description = '';
@@ -111,25 +103,10 @@ const Index = () => {
       description = fallback.description;
     }
     
-    console.log('Extracted title:', title);
-    console.log('Extracted description:', description);
-    
     // Show confirmation screen before converting
     // CRITICAL: Consolidate duplicate ingredients BEFORE showing to user
-    console.log('=== INGREDIENTS BEFORE CONSOLIDATION ===');
-    console.log('Raw ingredients:', parsed.ingredients.length);
-    parsed.ingredients.forEach((ing, idx) => {
-      console.log(`  ${idx + 1}. ${ing.amount}g ${ing.name} [${ing.type}]`);
-    });
-    
     const consolidatedIngredients = consolidateIngredients(parsed.ingredients);
-    
-    console.log('=== INGREDIENTS AFTER CONSOLIDATION ===');
-    console.log('Consolidated ingredients:', consolidatedIngredients.length);
-    consolidatedIngredients.forEach((ing, idx) => {
-      console.log(`  ${idx + 1}. ${ing.amount}g ${ing.name} [${ing.type}]`);
-    });
-    
+
     setOriginalRecipeText(recipeText);
     setExtractedIngredients(consolidatedIngredients);
     setParsedRecipeForConfirmation({ ...parsed, starterHydration });
@@ -168,8 +145,6 @@ const Index = () => {
     
     // Log corrections for learning if any were made
     if (userCorrections.length > 0) {
-      console.log('User made corrections:', userCorrections);
-      
       // Send to learning system (non-blocking)
       supabase.functions.invoke('log-correction', {
         body: {
@@ -179,9 +154,8 @@ const Index = () => {
           userCorrections,
           timestamp: new Date().toISOString()
         }
-      }).then(({ data, error }) => {
+      }).then(({ error }) => {
         if (error) console.error('Failed to log correction:', error);
-        else console.log('✓ Correction logged for learning:', data?.correctionId);
       });
     }
     
@@ -231,14 +205,8 @@ const Index = () => {
       : convertYeastToSourdough(updatedRecipe, originalRecipeText, starterHydration);
     
     // CRITICAL: Run validation AFTER conversion but BEFORE displaying to user
-    console.log('=== RUNNING VALIDATION ===');
     const validationResult = validateConversion(converted);
-    
-    // Log any auto-fixes made
-    if (validationResult.autoFixes.length > 0) {
-      console.log('✓ Auto-fixes applied:', validationResult.autoFixes);
-    }
-    
+
     // Add validation warnings to the recipe warnings
     const validatedRecipe = {
       ...validationResult.recipe,
@@ -273,6 +241,9 @@ const Index = () => {
     setOriginalRecipeText(recipeText);
     setResult(savedResult);
     setDirection(savedResult.direction);
+    // Reset title/description so a previous conversion's metadata doesn't bleed through
+    setRecipeName('Converted Recipe');
+    setRecipeDescription('');
     setScreen('output');
   };
 
@@ -280,6 +251,8 @@ const Index = () => {
     setScreen('landing');
     setResult(null);
     setOriginalRecipeText('');
+    setRecipeName('Converted Recipe');
+    setRecipeDescription('');
   };
 
   const handleBack = () => {
@@ -295,6 +268,7 @@ const Index = () => {
     setResult(recipe.convertedRecipe);
     setDirection(recipe.convertedRecipe.direction);
     setRecipeName(recipe.name);
+    setRecipeDescription('');
     setScreen('output');
   };
 
@@ -326,12 +300,13 @@ const Index = () => {
         </div>
       }>
         {screen === 'input' && (
-          <InputScreen 
-            direction={direction} 
+          <InputScreen
+            direction={direction}
             onConvert={handleConvert}
             onBack={handleBack}
             onLoadSaved={handleLoadSaved}
             onHome={handleStartOver}
+            onSelectDirection={handleSelectDirection}
           />
         )}
         {screen === 'confirmation' && (
@@ -340,6 +315,7 @@ const Index = () => {
             onConfirm={handleConfirmIngredients}
             onReject={handleRejectIngredients}
             onHome={handleStartOver}
+            onSelectDirection={handleSelectDirection}
           />
         )}
         {screen === 'saved' && (

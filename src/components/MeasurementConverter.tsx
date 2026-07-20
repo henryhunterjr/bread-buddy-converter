@@ -64,47 +64,31 @@ const CONVERSIONS = {
 type Ingredient = keyof typeof CONVERSIONS;
 type Unit = 'cup' | 'tbsp' | 'tsp' | 'g';
 
+function computeResult(amount: string, ingredient: Ingredient, fromUnit: Unit): number | null {
+  const value = parseFloat(amount);
+  if (isNaN(value) || value <= 0) {
+    return null;
+  }
+
+  if (fromUnit === 'g') {
+    // Converting FROM grams TO cups/tbsp/tsp is not supported
+    return null;
+  }
+
+  // Converting TO grams
+  const gramsPerUnit = CONVERSIONS[ingredient][fromUnit as 'cup' | 'tbsp' | 'tsp'];
+  const grams = value * gramsPerUnit;
+  return Math.round(grams * 10) / 10; // Round to 1 decimal
+}
+
 export function MeasurementConverter() {
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState('1');
   const [ingredient, setIngredient] = useState<Ingredient>('flour');
   const [fromUnit, setFromUnit] = useState<Unit>('cup');
-  const [result, setResult] = useState<number | null>(null);
 
-  const convert = () => {
-    const value = parseFloat(amount);
-    if (isNaN(value) || value <= 0) {
-      setResult(null);
-      return;
-    }
-
-    if (fromUnit === 'g') {
-      // Converting FROM grams TO cups/tbsp/tsp
-      setResult(null);
-      return;
-    }
-
-    // Converting TO grams
-    const gramsPerUnit = CONVERSIONS[ingredient][fromUnit as 'cup' | 'tbsp' | 'tsp'];
-    const grams = value * gramsPerUnit;
-    setResult(Math.round(grams * 10) / 10); // Round to 1 decimal
-  };
-
-  // Auto-convert on any change (instant)
-  const handleAmountChange = (val: string) => {
-    setAmount(val);
-    setTimeout(convert, 0);
-  };
-
-  const handleIngredientChange = (val: Ingredient) => {
-    setIngredient(val);
-    setTimeout(convert, 0);
-  };
-
-  const handleUnitChange = (val: Unit) => {
-    setFromUnit(val);
-    setTimeout(convert, 0);
-  };
+  // Computed directly during render — always in sync with the inputs
+  const result = computeResult(amount, ingredient, fromUnit);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -112,6 +96,7 @@ export function MeasurementConverter() {
         <Button
           size="icon"
           variant="outline"
+          aria-label="Open quick measurement converter"
           className="fixed bottom-20 right-4 h-12 w-12 rounded-full shadow-lg bg-warm-orange hover:bg-warm-orange-hover text-white border-2 border-golden-yellow z-40 print:hidden"
         >
           <Calculator className="h-5 w-5" />
@@ -128,11 +113,12 @@ export function MeasurementConverter() {
         <div className="space-y-4 py-4">
           {/* Amount Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Amount</label>
+            <label htmlFor="quick-converter-amount" className="text-sm font-medium">Amount</label>
             <Input
+              id="quick-converter-amount"
               type="number"
               value={amount}
-              onChange={(e) => handleAmountChange(e.target.value)}
+              onChange={(e) => setAmount(e.target.value)}
               placeholder="1"
               className="text-lg"
               step="0.25"
@@ -141,9 +127,9 @@ export function MeasurementConverter() {
 
           {/* Ingredient Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Ingredient</label>
-            <Select value={ingredient} onValueChange={handleIngredientChange}>
-              <SelectTrigger>
+            <label htmlFor="quick-converter-ingredient" className="text-sm font-medium">Ingredient</label>
+            <Select value={ingredient} onValueChange={(val: Ingredient) => setIngredient(val)}>
+              <SelectTrigger id="quick-converter-ingredient">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -161,9 +147,9 @@ export function MeasurementConverter() {
 
           {/* Unit Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">From</label>
-            <Select value={fromUnit} onValueChange={handleUnitChange}>
-              <SelectTrigger>
+            <label htmlFor="quick-converter-unit" className="text-sm font-medium">From</label>
+            <Select value={fromUnit} onValueChange={(val: Unit) => setFromUnit(val)}>
+              <SelectTrigger id="quick-converter-unit">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

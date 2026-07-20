@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseRecipe, validateRecipe } from '@/utils/recipeParser';
-import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, Wheat, ChefHat } from 'lucide-react';
+import { AlertCircle, Upload, FileText, Image, Info, Sparkles, HelpCircle, ChevronDown, ChevronUp, Loader2, CheckCircle2, Archive, Mail, Home, ChefHat } from 'lucide-react';
 import { HeroHeader } from '@/components/HeroHeader';
 import { extractTextFromFile, ExtractedContent } from '@/utils/lazyFileExtractor';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,7 @@ interface InputScreenProps {
   onBack: () => void;
   onLoadSaved: (recipeText: string, savedResult: ConvertedRecipe) => void;
   onHome: () => void;
+  onSelectDirection?: (dir: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
 }
 
 const getPlaceholderText = (direction: string) => 
@@ -60,7 +61,7 @@ const getButtonText = (direction: string) =>
     ? 'Convert to Sourdough'
     : 'Convert to Yeast';
 
-export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome }: InputScreenProps) {
+export default function InputScreen({ direction, onConvert, onBack, onLoadSaved, onHome, onSelectDirection }: InputScreenProps) {
   const { trackEvent, logDetailedError } = useAnalytics();
   const [recipeText, setRecipeText] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
@@ -74,7 +75,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [showAIRetryButton, setShowAIRetryButton] = useState(false);
-  const [doughType, setDoughType] = useState<'plain' | 'enriched' | 'whole-grain'>('plain');
   const [multipleRecipes, setMultipleRecipes] = useState<Array<{title: string, text: string}>>([]);
   const [showRecipeSelector, setShowRecipeSelector] = useState(false);
   const { toast } = useToast();
@@ -94,7 +94,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     // Won't match: "5-7g" (range), "all-purpose" (no digits), "2024-11-15" (preceded by digit)
     const negativePattern = /(?:^|\s)-\s*\d+/;
     if (negativePattern.test(text)) {
-      console.log('[InputScreen] Negative number detected in recipe text');
       errors.push("Recipe amounts can't be negative");
     }
     
@@ -116,9 +115,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
   
   const handleTextBlur = () => {
     // Validate only when user leaves the field
-    console.log('[InputScreen] Text blur triggered, validating:', recipeText.substring(0, 100));
     const validationErrors = validateInputOnBlur(recipeText);
-    console.log('[InputScreen] Validation errors:', validationErrors);
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
       toast({
@@ -379,25 +376,10 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       }, 'AI recipe parsing');
 
       if (!result.success) {
-        // Show retry-specific error message
-        const suggestions = generateCorrectionSuggestions(
-          result.error?.message || 'Unknown error',
-          recipeText
-        );
-
-        toast({
-          title: "AI Parsing Failed",
-          description: suggestions[0] || result.error?.message,
-          variant: "destructive",
-        });
-
+        // AI assist is unavailable — the built-in parser takes over silently.
+        // No scary toast: the fallback produces correct results on its own.
         throw result.error;
       }
-
-      toast({
-        title: `✓ Parsed successfully (${result.attempts} attempt${result.attempts > 1 ? 's' : ''})`,
-        description: result.attempts > 1 ? `Took ${Math.round(result.totalTime / 1000)}s with automatic retry` : undefined,
-      });
 
       return result.data!;
     } catch (error) {
@@ -448,12 +430,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       if (error) throw error;
       if (!data.success) throw new Error('Validation failed');
 
-      console.log('✓ Validation complete:', {
-        confidence: data.validatedRecipe.confidence,
-        parserUsed: data.validatedRecipe.parserUsed,
-        improvements: data.improvements
-      });
-
       return data.validatedRecipe;
     } catch (error) {
       console.error('Validation error:', error);
@@ -475,7 +451,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     const preprocessResult = preprocessRecipeText(recipeText);
     
     if (preprocessResult.appliedFixes.length > 0) {
-      console.log('[Preprocessing] Applied fixes:', preprocessResult.appliedFixes);
       toast({
         title: "🔧 Auto-fixed recipe format",
         description: `Applied ${preprocessResult.appliedFixes.length} fix${preprocessResult.appliedFixes.length > 1 ? 'es' : ''}: ${preprocessResult.appliedFixes[0]}`,
@@ -529,19 +504,13 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       ]);
 
       if (!aiResult) {
-        toast({
-          title: "Using standard parser",
-          description: "Advanced validation unavailable",
-          variant: "default"
-        });
-        
         const validationErrors = validateRecipe(regexResult);
         if (validationErrors.length > 0) {
           setErrors(validationErrors);
           return;
         }
         
-        onConvert(recipeText, starterHydration, {
+        onConvert(preprocessResult.cleanedText, starterHydration, {
           ...regexResult,
           parserUsed: 'regex',
           confidence: 70
@@ -575,7 +544,7 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       }
 
       setErrors([]);
-      onConvert(recipeText, starterHydration, validated);
+      onConvert(preprocessResult.cleanedText, starterHydration, validated);
       
     } catch (error) {
       console.error('Parsing error:', error);
@@ -687,11 +656,12 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
       )}
 
       {/* Hero Header */}
-      <HeroHeader 
+      <HeroHeader
         pageTitle={pageTitle}
         pageSubtitle={pageSubtitle}
         showNav={true}
         onNavigate={handleNavigation}
+        onSelectDirection={onSelectDirection}
       />
       
       {/* Progress Indicator */}
@@ -727,56 +697,6 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
               <p className="text-base text-muted-foreground max-w-2xl mx-auto">
                 Paste your recipe text, or upload a PDF or image. We'll extract the ingredients and convert it for you.
               </p>
-            </div>
-
-            {/* Dough Type Selector */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-base font-semibold text-bread-earth flex items-center gap-2">
-                  <Wheat className="h-5 w-5 text-burnt-orange" />
-                  Dough Type
-                </label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs bg-background z-50">
-                      <p className="text-sm">
-                        <strong>Straight:</strong> Basic bread.<br/>
-                        <strong>Enriched:</strong> Has butter/eggs/sugar.<br/>
-                        <strong>Whole-grain:</strong> 50%+ whole wheat/rye.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              
-              <Select 
-                value={doughType} 
-                onValueChange={(value: any) => setDoughType(value)}
-              >
-                <SelectTrigger className="w-full bg-background text-foreground font-medium border-bread-medium h-14 text-base rounded-lg shadow-sm hover:border-burnt-orange transition-colors">
-                  <SelectValue placeholder="Select dough type" />
-                </SelectTrigger>
-                <SelectContent className="bg-background z-50 border-bread-medium">
-                  <SelectItem value="plain" className="font-medium text-base">
-                    <div className="flex items-center gap-2">
-                      🍞 Straight Dough - Basic bread
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="enriched" className="font-medium text-base">
-                    <div className="flex items-center gap-2">
-                      🥐 Enriched Dough - Butter, eggs, or sugar
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="whole-grain" className="font-medium text-base">
-                    <div className="flex items-center gap-2">
-                      🌾 Whole-Grain - 50%+ whole wheat/rye
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Text Area */}
@@ -1037,16 +957,6 @@ Mix flour and water, rest 30 min...
         </div>
       </main>
       
-      {/* Floating Help Button - Bottom Right */}
-      <Button
-        variant="outline"
-        size="icon"
-        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 bg-card border-2 border-warm-orange z-50"
-        onClick={() => setShowHelp(!showHelp)}
-      >
-        <HelpCircle className="h-5 w-5 text-warm-orange" />
-      </Button>
-
       {/* Floating Measurement Converter */}
       <MeasurementConverter />
 
@@ -1055,7 +965,7 @@ Mix flour and water, rest 30 min...
 
       {/* Footer */}
       <footer className="text-center py-4 text-xs text-muted-foreground border-t border-border">
-        Copyright 2025 Henry Hunter Baking Great Bread at Home. All Rights Reserved
+        © {new Date().getFullYear()} Henry Hunter · Baking Great Bread at Home · All Rights Reserved
       </footer>
     </div>
   );

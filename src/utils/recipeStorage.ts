@@ -15,7 +15,7 @@ export function saveRecipe(name: string, originalText: string, convertedRecipe: 
     const savedRecipes = getSavedRecipes();
     
     const newRecipe: SavedRecipe = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       name: name.trim() || `Recipe ${savedRecipes.length + 1}`,
       originalText,
       convertedRecipe,
@@ -40,11 +40,30 @@ export function saveRecipe(name: string, originalText: string, convertedRecipe: 
   }
 }
 
+function isValidSavedRecipe(entry: unknown): entry is SavedRecipe {
+  if (!entry || typeof entry !== 'object') return false;
+  const recipe = entry as Partial<SavedRecipe>;
+  return (
+    typeof recipe.id === 'string' &&
+    typeof recipe.name === 'string' &&
+    !!recipe.convertedRecipe &&
+    typeof recipe.convertedRecipe === 'object' &&
+    !!recipe.convertedRecipe.direction &&
+    !!recipe.convertedRecipe.original &&
+    typeof recipe.convertedRecipe.original === 'object' &&
+    !!recipe.convertedRecipe.converted &&
+    typeof recipe.convertedRecipe.converted === 'object'
+  );
+}
+
 export function getSavedRecipes(): SavedRecipe[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    // Silently filter out malformed entries so one corrupt entry can't crash the list
+    return parsed.filter(isValidSavedRecipe);
   } catch (error) {
     console.error('Error reading saved recipes:', error);
     return [];

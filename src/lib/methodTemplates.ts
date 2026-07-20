@@ -13,6 +13,9 @@ export function classifyDough(
   milkAmount: number,
   totalFlour: number
 ): DoughClassification {
+  if (totalFlour <= 0) {
+    return { type: 'lean', sugarPercent: 0, fatPercent: 0, milkPercent: 0 };
+  }
   const sugarPercent = (sugarAmount / totalFlour) * 100;
   const fatPercent = (fatAmount / totalFlour) * 100;
   const milkPercent = (milkAmount / totalFlour) * 100;
@@ -45,15 +48,13 @@ export function getMethodTemplate(
   const hasButter = ingredients?.some(i => i.name.toLowerCase().includes('butter'));
   const hasOil = ingredients?.some(i => i.name.toLowerCase().includes('oil'));
   const hasMilk = ingredients?.some(i => i.name.toLowerCase().includes('milk'));
-  const hasSugar = ingredients?.some(i => i.name.toLowerCase().includes('sugar') || i.type === 'sweetener');
-  
-  console.log('[BUG FIX #3] Detected ingredients:', { hasEggs, hasButter, hasOil, hasMilk, hasSugar });
-
   if (type === 'enriched' || type === 'sweet') {
-    // Build dynamic ingredient list for mix instruction
-    let mixIngredients = ['water'];
+    // Build dynamic ingredient list for mix instruction — only list liquids
+    // the dough actually contains
+    const mixIngredients: string[] = [];
+    if (doughWater > 0) mixIngredients.push('water');
     if (hasMilk) mixIngredients.push('milk');
-    const liquidsList = mixIngredients.join(' + ');
+    const liquidsList = mixIngredients.length > 0 ? mixIngredients.join(' + ') : 'the recipe liquids';
     
     let enrichmentInstructions = '';
     if (hasButter) {
@@ -119,7 +120,9 @@ export function getMethodTemplate(
     },
     {
       step: '2. MIX DOUGH (Morning)',
-      change: `In a large bowl, dissolve levain into ${doughWater}g warm water. Add ${doughFlour}g flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
+      change: doughWater > 0
+        ? `In a large bowl, dissolve levain into ${doughWater}g warm water. Add ${doughFlour}g flour and mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`
+        : `In a large bowl, combine the levain with ${doughFlour}g flour and the recipe's remaining liquids. Mix until shaggy. Rest 45–60 minutes (autolyse) to allow flour to fully hydrate.`,
       timing: '45-60 min autolyse'
     },
     {

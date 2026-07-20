@@ -2,18 +2,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail, BarChart3 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import logo from '@/assets/logo.png';
-import heroBanner from '@/assets/hero-banner.png';
+import { Mail } from 'lucide-react';
+import logo from '@/assets/logo.webp';
+import heroBanner from '@/assets/hero-banner.webp';
 
 interface LandingScreenProps {
   onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
 }
 
 export default function LandingScreen({ onSelectDirection }: LandingScreenProps) {
-  const navigate = useNavigate();
-  
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
       {/* Hero Banner Section */}
@@ -98,24 +95,6 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/analytics')}
-            className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            View Analytics
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/presentation')}
-            className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            View Presentation
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             asChild
             className="border-bread-medium/30 hover:bg-bread-light/50 transition-all"
           >
@@ -126,7 +105,7 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           </Button>
         </div>
         <p className="text-center text-xs text-muted-foreground">
-          Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved
+          © {new Date().getFullYear()} Henry Hunter · Baking Great Bread at Home · All Rights Reserved
         </p>
       </footer>
     </div>

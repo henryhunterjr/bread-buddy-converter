@@ -143,14 +143,21 @@ function validateHydration(
   const totalLiquid = conversion.converted.totalLiquid;
   const displayedHydration = conversion.converted.hydration;
   
-  // Calculate actual hydration
-  const calculatedHydration = (totalLiquid / totalFlour) * 100;
+  // Calculate actual hydration (guard against zero flour)
+  const calculatedHydration = totalFlour > 0 ? (totalLiquid / totalFlour) * 100 : 0;
   const difference = Math.abs(calculatedHydration - displayedHydration);
-  
+
   if (difference > 2) {
     // Significant mismatch - recalculate
     autoFixes.push(`Corrected hydration calculation: ${calculatedHydration.toFixed(1)}% (was showing ${displayedHydration.toFixed(1)}%)`);
-    
+
+    if (difference > 10) {
+      warnings.push({
+        type: 'warning',
+        message: `Large hydration adjustment made (${difference.toFixed(1)}%). Please verify ingredient amounts.`
+      });
+    }
+
     return {
       ...conversion,
       converted: {
@@ -158,13 +165,6 @@ function validateHydration(
         hydration: calculatedHydration
       }
     };
-  }
-  
-  if (difference > 10) {
-    warnings.push({
-      type: 'warning',
-      message: `Large hydration adjustment made (${difference.toFixed(1)}%). Please verify ingredient amounts.`
-    });
   }
   
   // Check for unusually high hydration (>150%)

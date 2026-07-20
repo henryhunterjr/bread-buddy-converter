@@ -1,85 +1,62 @@
 import { ParsedIngredient, ParsedRecipe } from '@/types/recipe';
 
-const UNIT_CONVERSIONS: Record<string, number> = {
-  'cup ap flour': 120,
-  'cup all-purpose flour': 120,
-  'cup unbleached all-purpose flour': 120,
-  'cup bread flour': 130,
-  'cup whole wheat': 113,
-  'cup whole wheat flour': 113,
-  'cup flour': 120, // default flour
-  'cups flour': 120,
-  'cup water': 240,
-  'cups water': 240,
-  'cup milk': 240,
-  'cups milk': 240,
-  'cup heavy cream': 240,
-  'cups heavy cream': 240,
-  'cup cream': 240,
-  'cups cream': 240,
-  'tablespoon heavy cream': 15,
-  'tablespoons heavy cream': 15,
-  'tbsp heavy cream': 15,
-  'tablespoon cream': 15,
-  'tablespoons cream': 15,
-  'tbsp cream': 15,
-  'cup oil': 224,
-  'cups oil': 224,
-  'cup vegetable oil': 224,
-  'cups vegetable oil': 224,
-  // BUTTER CONVERSIONS
-  'cup butter': 227,
-  'cups butter': 227,
-  'tablespoon butter': 14,
-  'tablespoons butter': 14,
-  'tbsp butter': 14,
-  'teaspoon butter': 5,
-  'teaspoons butter': 5,
-  'tsp butter': 5,
-  // YEAST
-  'tablespoon yeast': 10,
-  'tablespoon active dry yeast': 10,
-  'tablespoon instant yeast': 10,
-  'tbsp yeast': 10,
-  'tsp instant yeast': 3,
-  'tsp active dry yeast': 3,
-  'tsp yeast': 3,
-  // SALT
-  'tablespoon salt': 20,
-  'tablespoon kosher salt': 20,
-  'tablespoon sea salt': 20,
-  'tablespoon fine salt': 20,
-  'tbsp salt': 20,
-  'tbsp kosher salt': 20,
-  'tbsp sea salt': 20,
-  'teaspoon salt': 6,
-  'teaspoon kosher salt': 6,
-  'teaspoon sea salt': 6,
-  'teaspoon fine salt': 6,
-  'tsp salt': 6,
-  'tsp kosher salt': 6,
-  'tsp sea salt': 6,
-  // OIL
-  'tablespoon oil': 15,
-  'tbsp oil': 15,
-  'tablespoon vegetable oil': 15,
-  'tbsp vegetable oil': 15,
-  // HONEY/SUGAR
-  'tablespoon honey': 21,
-  'tbsp honey': 21,
-  'cup honey': 340,
-  'cups honey': 340,
-  'cup sugar': 200,
-  'cups sugar': 200,
-  // MILK POWDER
-  'tablespoon milk powder': 8,
-  'tablespoons milk powder': 8,
-  'tbsp milk powder': 8,
-  // EGG (count, not grams)
-  'egg': 50,  // 1 large egg ≈ 50g
-  'large egg': 50,
-  'eggs': 50,
-};
+/**
+ * Volume→weight conversion via canonical units + per-ingredient density.
+ * Units are normalized first (cups→cup, tablespoons→tbsp, etc.) so plural
+ * and long-form units always convert. Density is stored as grams per US cup;
+ * tbsp = cup/16, tsp = cup/48 (standard US measure relationships).
+ * First matching pattern wins — keep most-specific patterns first.
+ */
+const GRAMS_PER_CUP: Array<[RegExp, number]> = [
+  [/milk\s*powder|dry\s*milk/, 128],
+  [/bread\s*flour/, 127],          // King Arthur: 120g; USDA: ~127-130g
+  [/whole\s*wheat|wholemeal|graham/, 113],
+  [/rye/, 102],
+  [/spelt/, 113],
+  [/semolina/, 163],
+  [/flour/, 120],                  // AP flour default
+  [/buttermilk/, 245],
+  [/cream/, 238],                  // heavy cream
+  [/milk/, 245],
+  [/water/, 237],
+  [/oil/, 218],
+  [/butter/, 227],                 // 2 sticks
+  [/kosher\s*salt/, 230],          // Morton kosher (~14g/tbsp). Diamond Crystal is ~half — see warning
+  [/salt/, 288],                   // fine/table salt (6g/tsp, 18g/tbsp)
+  [/yeast/, 144],                  // instant/active dry (~3g/tsp)
+  [/honey|molasses/, 340],
+  [/syrup/, 312],                  // maple syrup
+  [/sugar/, 200],                  // granulated
+  [/starter|levain/, 240],         // 100%-hydration starter, stirred down
+];
+
+/** Grams per ml for liquids measured by volume (default 1.0 = water) */
+const GRAMS_PER_ML: Array<[RegExp, number]> = [
+  [/honey|molasses/, 1.42],
+  [/syrup/, 1.33],
+  [/oil/, 0.92],
+  [/cream/, 0.99],
+  [/milk/, 1.03],
+];
+
+type CanonicalUnit = 'cup' | 'tbsp' | 'tsp' | 'ml' | 'g' | 'oz' | 'lb' | 'kg' | 'l' | null;
+
+/** Normalize any written unit (plural, long-form, abbreviated) to a canonical token */
+function canonicalUnit(unit: string): CanonicalUnit {
+  const u = unit.toLowerCase().replace(/\.$/, '').replace(/s$/, '');
+  switch (u) {
+    case 'cup': case 'c': return 'cup';
+    case 'tablespoon': case 'tbsp': case 'tb': case 'tbl': return 'tbsp';
+    case 'teaspoon': case 'tsp': return 'tsp';
+    case 'ml': case 'milliliter': case 'millilitre': return 'ml';
+    case 'g': case 'gram': case 'gm': return 'g';
+    case 'oz': case 'ounce': return 'oz';
+    case 'lb': case 'pound': return 'lb';
+    case 'kg': case 'kilogram': return 'kg';
+    case 'l': case 'liter': case 'litre': return 'l';
+    default: return null;
+  }
+}
 
 const FLOUR_KEYWORDS = ['flour', 'wheat', 'rye', 'spelt'];
 const LIQUID_KEYWORDS = ['water', 'milk', 'buttermilk'];
@@ -167,11 +144,12 @@ function isValidIngredientLine(line: string): boolean {
     /for\s+(?:brushing|finishing|topping|glazing|egg\s+wash|wash)/i,  // Finishing ingredients
     /(?:after|before)\s+baking/i,      // Pre/post-bake finishes
     /egg\s+wash/i,                     // Egg wash
-    /\(optional/i,                     // Optional ingredients
+    // NOTE: "(optional)" ingredients are intentionally KEPT — dropping them
+    // silently changed dough totals. createIngredient strips the annotation.
   ];
 
   // Must contain a measurement word + ingredient word
-  const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)/i.test(line);
+  const hasMeasurement = /\d+(?:\.\d+)?(?:\s*\d+\/\d+)?\s*(?:\(.*?\))?\s*(g|grams?|kg|kilograms?|ml|l|liters?|litres?|oz|ounces?|lbs?|pounds?|cups?|tablespoons?|tbsp|teaspoons?|tsp)\b/i.test(line);
   const hasIngredient = /(flour|water|milk|butter|oil|egg|sugar|salt|yeast|starter|cream|honey|syrup|molasses|agave)/i.test(line);
 
   // Skip if matches any skip pattern
@@ -368,11 +346,13 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
   }
   
   // Pattern 1: "100g bread flour" or "240ml water" (grams/ml directly stated)
-  const gramsFirstMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*(?:g|grams?|ml)\s+(.+)/);
+  const gramsFirstMatch = cleaned.match(/^(\d+(?:\.\d+)?)\s*(g|grams?|ml)\s+(.+)/);
   if (gramsFirstMatch) {
     const amount = parseFloat(gramsFirstMatch[1]);
-    const name = gramsFirstMatch[2].trim();
-    return createIngredient(name, amount, lower);
+    const unit = gramsFirstMatch[2];
+    const name = gramsFirstMatch[3].trim();
+    // Route ml through density conversion (honey/oil/etc. are not 1g/ml)
+    return createIngredient(name, convertToGrams(amount, unit, name), lower);
   }
   
   // Pattern 2: "or 590g water" or "or 10g yeast" (prefer the gram measurement after "or")
@@ -425,30 +405,37 @@ function parseIngredientLine(line: string): ParsedIngredient | null {
 }
 
 function convertToGrams(amount: number, unit: string, name: string): number {
-  if (unit === 'g' || unit === 'gram' || unit === 'grams' || unit === 'ml') {
-    return amount;
+  const canon = canonicalUnit(unit);
+  const lowerName = name.toLowerCase();
+
+  // Eggs are counted as whole items regardless of the written unit
+  if (/\begg/.test(lowerName) && canon !== 'g') {
+    return amount * 50; // 1 large egg ≈ 50g
   }
-  
-  // Build conversion key: unit + name
-  const conversionKey = `${unit} ${name}`.toLowerCase();
-  
-  // Try exact match first
-  for (const [key, grams] of Object.entries(UNIT_CONVERSIONS)) {
-    if (conversionKey.includes(key)) {
-      console.log(`Converting ${amount} ${unit} ${name} using key "${key}" = ${amount * grams}g`);
-      return amount * grams;
-    }
+
+  if (canon === 'g') return amount;
+  if (canon === 'oz') return round1(amount * 28.35);
+  if (canon === 'lb') return round1(amount * 453.6);
+  if (canon === 'kg') return amount * 1000;
+
+  if (canon === 'ml' || canon === 'l') {
+    const mlAmount = canon === 'l' ? amount * 1000 : amount;
+    const density = GRAMS_PER_ML.find(([re]) => re.test(lowerName))?.[1] ?? 1.0;
+    return round1(mlAmount * density);
   }
-  
-  // Special handling for eggs (count as whole items)
-  if (name.toLowerCase().includes('egg')) {
-    console.log(`Converting ${amount} egg(s) = ${amount * 50}g`);
-    return amount * 50; // 1 egg ≈ 50g
+
+  if (canon === 'cup' || canon === 'tbsp' || canon === 'tsp') {
+    const perCup = GRAMS_PER_CUP.find(([re]) => re.test(lowerName))?.[1] ?? 237; // water-density fallback
+    const divisor = canon === 'cup' ? 1 : canon === 'tbsp' ? 16 : 48;
+    return round1((amount * perCup) / divisor);
   }
-  
-  // If no conversion found, assume grams
-  console.log(`No conversion found for "${unit} ${name}", assuming ${amount}g`);
+
+  // Unknown unit — assume the number was already grams
   return amount;
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
@@ -600,11 +587,11 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
   
   // Hydration warnings based on dough type
   if (isEnriched) {
-    // Enriched doughs: 60-68%
-    if (recipe.hydration > 68 && recipe.hydration <= 75) {
+    // Enriched doughs: 60-70%
+    if (recipe.hydration > 70 && recipe.hydration <= 75) {
       warnings.push({
         type: 'warning',
-        message: `Hydration is ${recipe.hydration.toFixed(0)}%. For enriched doughs (with butter, eggs, or sugar), 60-68% is typical. Higher hydration may make shaping difficult.`
+        message: `Hydration is ${recipe.hydration.toFixed(0)}%. For enriched doughs (with butter, eggs, or sugar), 60-70% is typical. Higher hydration may make shaping difficult.`
       });
     } else if (recipe.hydration > 75) {
       warnings.push({
@@ -652,7 +639,7 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
     if (yeastPercentage > 1.5) {
       warnings.push({
         type: 'info',
-        message: `Instant yeast is at ${yeastPercentage.toFixed(1)}% of flour weight. This is higher than typical (0.7%). Expect a faster rise but less flavor development.`
+        message: `Instant yeast is at ${yeastPercentage.toFixed(1)}% of flour weight. This is higher than typical (0.7-1.1%). Expect a faster rise but less flavor development.`
       });
     } else if (yeastPercentage < 0.4) {
       warnings.push({
@@ -662,18 +649,21 @@ export function generateBakerWarnings(recipe: ParsedRecipe): Array<{ type: 'info
     }
   }
   
-  // Starter percentage warnings
+  // Starter inoculation warnings — measured as starter FLOUR / total flour,
+  // the same basis the converter uses (a 100%-hydration starter is half flour).
+  // This keeps warnings consistent with the converter's 20% inoculation target.
   if (recipe.starterAmount > 0) {
-    const starterPercentage = (recipe.starterAmount / recipe.totalFlour) * 100;
-    if (starterPercentage < 15) {
+    const starterFlour = recipe.starterAmount / 2;
+    const inoculation = (starterFlour / recipe.totalFlour) * 100;
+    if (inoculation < 10) {
       warnings.push({
         type: 'warning',
-        message: `Starter is only ${starterPercentage.toFixed(0)}% of total flour weight. Typical sourdough uses 15-25%. Bulk fermentation may take 8-12 hours or longer.`
+        message: `Starter provides only ${inoculation.toFixed(0)}% of the total flour (inoculation). Typical sourdough runs 15-25%. Bulk fermentation may take 8-12 hours or longer.`
       });
-    } else if (starterPercentage > 30) {
+    } else if (inoculation > 30) {
       warnings.push({
         type: 'info',
-        message: `Starter is ${starterPercentage.toFixed(0)}% of total flour weight, which is higher than typical (15-25%). This will speed up fermentation but may taste more acidic.`
+        message: `Starter provides ${inoculation.toFixed(0)}% of the total flour (inoculation), higher than the typical 15-25%. Fermentation will run faster and flavor may be more acidic.`
       });
     }
   }

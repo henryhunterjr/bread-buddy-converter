@@ -59,18 +59,18 @@ interface DoughComposition {
 function analyzeDoughComposition(recipe: ParsedRecipe): DoughComposition {
   const totalFlour = recipe.totalFlour;
   
-  // Find enrichment ingredients
-  const eggs = recipe.ingredients.find(i => i.type === 'enrichment' && i.name.toLowerCase().includes('egg'));
-  const butter = recipe.ingredients.find(i => i.type === 'fat' && i.name.toLowerCase().includes('butter'));
-  const milk = recipe.ingredients.find(i => i.type === 'liquid' && i.name.toLowerCase().includes('milk'));
-  const sugar = recipe.ingredients.find(i => i.type === 'sweetener' && (
-    i.name.toLowerCase().includes('sugar') || 
-    i.name.toLowerCase().includes('honey')
-  ));
-  
-  const sugarAmount = sugar?.amount || 0;
-  const fatAmount = (butter?.amount || 0) + (eggs ? eggs.amount * 0.3 : 0); // Eggs are ~30% fat
-  const enrichmentTotal = sugarAmount + fatAmount + (milk?.amount || 0);
+  // Sum ALL enrichment ingredients (a recipe can have both sugar and honey)
+  const eggs = recipe.ingredients.filter(i => i.type === 'enrichment' && i.name.toLowerCase().includes('egg'));
+  const butters = recipe.ingredients.filter(i => i.type === 'fat');
+  const milks = recipe.ingredients.filter(i => i.type === 'liquid' && i.name.toLowerCase().includes('milk'));
+  const sugars = recipe.ingredients.filter(i => i.type === 'sweetener');
+
+  const eggAmount = eggs.reduce((s, i) => s + i.amount, 0);
+  const sugarAmount = sugars.reduce((s, i) => s + i.amount, 0);
+  const butterAmount = butters.reduce((s, i) => s + i.amount, 0);
+  const milkAmount = milks.reduce((s, i) => s + i.amount, 0);
+  const fatAmount = butterAmount + eggAmount * 0.1; // whole egg is ~10% fat
+  const enrichmentTotal = sugarAmount + fatAmount + milkAmount;
   
   // Calculate percentages
   const sugarPercentage = totalFlour > 0 ? (sugarAmount / totalFlour) * 100 : 0;
@@ -91,10 +91,10 @@ function analyzeDoughComposition(recipe: ParsedRecipe): DoughComposition {
   
   return {
     isEnriched: enrichmentTotal > totalFlour * 0.05, // >5% enrichment
-    hasEggs: !!eggs,
-    hasButter: !!butter,
-    hasMilk: !!milk,
-    hasSugar: !!sugar,
+    hasEggs: eggs.length > 0,
+    hasButter: butters.length > 0,
+    hasMilk: milks.length > 0,
+    hasSugar: sugars.length > 0,
     sugarPercentage,
     fatPercentage,
     enrichmentTotal,
@@ -120,8 +120,9 @@ function getHydrationWarnings(recipe: ParsedRecipe, comp: DoughComposition): Rec
   // HIGH HYDRATION WARNINGS (context-aware)
   if (hydration > 75) {
     if (comp.isEnriched) {
-      const targetHydrationLow = 70;
-      const targetHydrationHigh = 75;
+      // Keep in sync with generateBakerWarnings: enriched doughs run 60-70%
+      const targetHydrationLow = 60;
+      const targetHydrationHigh = 70;
       const suggestedWaterLow = Math.round(recipe.totalFlour * targetHydrationLow / 100);
       const suggestedWaterHigh = Math.round(recipe.totalFlour * targetHydrationHigh / 100);
       warnings.push({

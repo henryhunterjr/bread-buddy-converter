@@ -12,7 +12,8 @@
  * - Fat: reduces hydration by 2-3% per 5% fat
  * 
  * Yeast ↔ Starter Equivalents:
- * - 100g active starter ≈ 4g instant yeast (0.7% of flour)
+ * - Converter uses instant yeast at 1.1% of total flour for a reliable
+ *   same-day rise (typical published range is 0.7–1.1%)
  * - Instant → Active dry = ×1.25
  * - Active dry → Instant = ×0.75
  * 
@@ -262,17 +263,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   // TRUE totals including what's IN the starter
   const trueFlour = recipe.totalFlour; // Already includes starter flour from parser
   const trueWater = recipe.totalLiquid; // Already includes starter water from parser
-  const trueHydration = (trueWater / trueFlour) * 100;
-  
-  console.log('[convertSourdoughToYeast] LEVAIN DEBUG:', {
-    totalStarterAmount: recipe.starterAmount,
-    actualStarterAmount,
-    starterFlour,
-    starterWater,
-    trueFlour,
-    trueWater,
-    trueHydration: trueHydration.toFixed(1) + '%'
-  });
+  const trueHydration = trueFlour > 0 ? (trueWater / trueFlour) * 100 : 0;
   
   // STEP 2: Build clean ingredient list for yeast version - PRESERVE multi-flour ratios
   // Separate flour ingredients from non-flour ingredients
@@ -293,20 +284,12 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   // If recipe has multiple flours, add proportionally to the largest flour
   // If single flour, add all starter flour to it
   const adjustedFlourIngredients = flourIngredients.map((f, idx, arr) => {
-    if (arr.length === 1) {
-      // Single flour: add all starter flour
-      console.log(`[BUG FIX #1] Single flour detected: ${f.amount}g + ${starterFlour}g from starter = ${f.amount + starterFlour}g`);
+    if (arr.length === 1 || idx === 0) {
+      // Single flour, or the first (typically largest) of multiple flours:
+      // fold the starter's flour back in
       return {
         ...f,
-        amount: f.amount + starterFlour,
-        name: cleanIngredientName(f.name)
-      };
-    } else if (idx === 0) {
-      // Multiple flours: add to first (typically largest) flour
-      console.log(`[BUG FIX #1] Multiple flours detected: Adding ${starterFlour}g from starter to primary flour`);
-      return {
-        ...f,
-        amount: f.amount + starterFlour,
+        amount: Math.round(f.amount + starterFlour),
         name: cleanIngredientName(f.name)
       };
     }
@@ -321,46 +304,70 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   
   if (originalLiquids.length === 0) {
     // No liquids in original recipe - default to water (rare case)
-    console.log('[LIQUID PRESERVATION] No original liquids detected, defaulting to water');
     adjustedLiquidIngredients = [{
       name: 'water (80-85°F)',
-      amount: trueWater,
+      amount: Math.round(trueWater),
       unit: 'g',
       type: 'liquid'
     }];
   } else if (originalLiquids.length === 1) {
-    // Single liquid type - preserve it and add starter water to it
     const liquid = originalLiquids[0];
     const liquidName = liquid.name.toLowerCase();
     let displayName = liquid.name;
-    
-    // Add temperature guidance for water
+
+    // Add temperature guidance
     if (liquidName.includes('water')) {
       displayName = displayName.replace(/water/i, 'water (80-85°F)');
     } else if (liquidName.includes('milk')) {
       displayName = displayName.replace(/milk/i, 'milk (80-85°F)');
     }
-    
-    console.log(`[LIQUID PRESERVATION] Single liquid detected: ${liquid.name}, total: ${trueWater}g`);
-    adjustedLiquidIngredients = [{
-      ...liquid,
-      name: displayName,
-      amount: trueWater
-    }];
-  } else {
-    // Multiple liquids - distribute proportionally
-    console.log(`[LIQUID PRESERVATION] Multiple liquids detected, distributing ${trueWater}g proportionally`);
-    adjustedLiquidIngredients = originalLiquids.map(liquid => {
-      const proportion = liquid.amount / totalOriginalLiquid;
-      const newAmount = Math.round(trueWater * proportion);
-      
-      console.log(`[LIQUID PRESERVATION] ${liquid.name}: ${liquid.amount}g → ${newAmount}g (${(proportion * 100).toFixed(1)}%)`);
-      
-      return {
+
+    if (liquidName.includes('water')) {
+      // Single water line absorbs the starter's water
+      adjustedLiquidIngredients = [{
         ...liquid,
-        amount: newAmount
-      };
-    });
+        name: displayName,
+        amount: Math.round(trueWater)
+      }];
+    } else {
+      // Single non-water liquid (e.g. milk): keep it at its original amount and
+      // return the starter's water as a separate water line — the starter never
+      // contained milk, so milk must not grow.
+      const starterWaterToReturn = Math.max(0, trueWater - liquid.amount);
+      adjustedLiquidIngredients = [
+        { ...liquid, name: displayName },
+        {
+          name: 'water (80-85°F)',
+          amount: Math.round(starterWaterToReturn),
+          unit: 'g',
+          type: 'liquid'
+        }
+      ];
+    }
+  } else {
+    // Multiple liquids: keep every non-water liquid (milk, etc.) at its ORIGINAL
+    // amount and return the starter's water to the water line only. The starter
+    // contained flour and water — never milk — so milk must not grow.
+    const starterWaterToReturn = Math.max(0, trueWater - totalOriginalLiquid);
+    const waterLine = originalLiquids.find(l => l.name.toLowerCase().includes('water'));
+    if (waterLine) {
+      adjustedLiquidIngredients = originalLiquids.map(liquid =>
+        liquid === waterLine
+          ? { ...liquid, amount: Math.round(liquid.amount + starterWaterToReturn) }
+          : { ...liquid }
+      );
+    } else {
+      // No explicit water line — add one for the starter's water
+      adjustedLiquidIngredients = [
+        ...originalLiquids.map(l => ({ ...l })),
+        {
+          name: 'water (80-85°F)',
+          amount: Math.round(starterWaterToReturn),
+          unit: 'g',
+          type: 'liquid' as const
+        }
+      ];
+    }
   }
   
   // Build final ingredient list - PRESERVE multi-flour ratios AND liquid types
@@ -431,7 +438,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
       }] : []),
       {
         step: 'PREPARE YEAST',
-        change: `Dissolve ${instantYeastAmount}g instant yeast (or ${activeDryYeastAmount}g active dry yeast) in 1/4 cup warm water (105-110°F) for 5-10 minutes until foamy. This ensures yeast viability.`,
+        change: `Dissolve ${instantYeastAmount}g instant yeast (or ${activeDryYeastAmount}g active dry yeast) in 1/4 cup of the recipe's water, warmed to 105-110°F, for 5-10 minutes until foamy. This ensures yeast viability without adding extra water.`,
         timing: '5-10 minutes'
       },
       {
@@ -564,11 +571,11 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
 
   // STEP 2.5: Calculate ORIGINAL recipe hydration FIRST (before levain build)
   // This is the KEY FIX - we must maintain the original recipe's hydration!
-  const liquidFromEggs = eggAmount * 0.75;
-  const liquidFromMilk = milkAmount * 1.0; // Count milk at 100%
+  const liquidFromEggs = eggAmount * 0.75;  // whole egg ≈ 75% water
+  const liquidFromMilk = milkAmount * 0.87; // whole milk ≈ 87% water
   const totalEnrichmentLiquid = liquidFromEggs + liquidFromMilk;
   const originalTotalLiquid = originalWater + totalEnrichmentLiquid;
-  const originalHydration = originalTotalLiquid / totalFlour; // e.g., 0.78125 for 78.125%
+  const originalHydration = totalFlour > 0 ? originalTotalLiquid / totalFlour : 0; // e.g., 0.78125 for 78.125%
 
   // STEP 3: Calculate starter amount (20% of flour)
   // For 20% inoculation, we need starter flour to be ~20% of total flour
@@ -583,10 +590,14 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   // - Water to ADD: Equal to flour to add for 100% hydration (e.g., 89.5g)
   // Result: Levain always at 100% hydration, matching typical home baker starter maintenance
   const activeStarterWeight = Math.round(starterFlourNeeded * 0.4); // 40% of target = 8% of total flour
-  const starterFlourInLevain = activeStarterWeight * (starterHydration / (100 + starterHydration));
+  // A starter at H% hydration is flour × (100/(100+H)) and water × (H/(100+H))
+  const starterFlourInLevain = activeStarterWeight * (100 / (100 + starterHydration));
   const starterWaterInLevain = activeStarterWeight * (starterHydration / (100 + starterHydration));
   const levainFlour = Math.round(starterFlourNeeded - starterFlourInLevain); // Flour to ADD
-  const levainWater = levainFlour; // 100% hydration: water to add = flour to add
+  // Water to ADD so the finished levain lands at 100% hydration overall:
+  // total levain water must equal total levain flour (= starterFlourNeeded).
+  // When the seed starter is 100% hydration this equals levainFlour exactly.
+  const levainWater = Math.round(starterFlourNeeded - starterWaterInLevain);
 
   // Calculate levain total using helper function to ensure consistency
   const levainTotal = computeLevainTotal({
@@ -702,17 +713,12 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   // we need to reduce milk proportionally to maintain original hydration
   if (milkIngredients.length > 0) {
     const levainWaterFromNonWaterSources = Math.max(0, totalLevainWater - originalWater);
+    // Milk is ~87% water, so replacing X g of water requires removing X/0.87 g of milk
+    const milkToRemove = levainWaterFromNonWaterSources / 0.87;
     const adjustedMilkIngredients = milkIngredients.map(milk => ({
       ...milk,
-      amount: Math.max(0, milk.amount - (levainWaterFromNonWaterSources * (milk.amount / milkAmount)))
+      amount: Math.round(Math.max(0, milk.amount - (milkToRemove * (milk.amount / milkAmount))))
     }));
-
-    if (levainWaterFromNonWaterSources > 0) {
-      console.log('Adjusting milk to account for levain water:');
-      console.log('- Original milk:', milkAmount + 'g');
-      console.log('- Levain water (not from original water):', levainWaterFromNonWaterSources.toFixed(1) + 'g');
-      console.log('- Adjusted milk:', adjustedMilkIngredients.map(m => m.amount).reduce((a,b) => a+b, 0).toFixed(1) + 'g');
-    }
 
     doughIngredients.push(...adjustedMilkIngredients);
   }
@@ -720,32 +726,25 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   // WORKING PATTERN: Add ALL non-flour/liquid/yeast ingredients (salt, fat, enrichment, sweetener, other)
   doughIngredients.push(...nonFlourLiquidYeastIngredients);
   
-  console.log('Final dough ingredients:', doughIngredients.map(i => `${i.amount}g ${i.name} [${i.type}]`));
-  
-  // Validation: Check that enrichments are present
-  const hasButterInDough = doughIngredients.some(i => 
+  // Validation: enrichments must survive the conversion
+  const hasButterInDough = doughIngredients.some(i =>
     i.type === 'fat' || i.name.toLowerCase().includes('butter')
   );
-  const hasEggsInDough = doughIngredients.some(i => 
+  const hasEggsInDough = doughIngredients.some(i =>
     i.type === 'enrichment' || i.name.toLowerCase().includes('egg')
   );
-  const hasSugarInDough = doughIngredients.some(i => 
+  const hasSugarInDough = doughIngredients.some(i =>
     i.type === 'sweetener' || i.name.toLowerCase().includes('sugar')
   );
-  
-  console.log('=== ENRICHMENT VALIDATION ===');
-  console.log('Butter in original:', butterAmount > 0, '| Butter in dough:', hasButterInDough);
-  console.log('Eggs in original:', eggAmount > 0, '| Eggs in dough:', hasEggsInDough);
-  console.log('Sugar in original:', sugarAmount > 0, '| Sugar in dough:', hasSugarInDough);
-  
+
   if (butterAmount > 0 && !hasButterInDough) {
-    console.error('❌ BUTTER WAS LOST IN CONVERSION!');
+    console.error('Butter was lost in conversion');
   }
   if (eggAmount > 0 && !hasEggsInDough) {
-    console.error('❌ EGGS WERE LOST IN CONVERSION!');
+    console.error('Eggs were lost in conversion');
   }
   if (sugarAmount > 0 && !hasSugarInDough) {
-    console.error('❌ SUGAR WAS LOST IN CONVERSION!');
+    console.error('Sugar was lost in conversion');
   }
 
   // RECALCULATE final hydration from actual ingredients (after milk adjustment!)
@@ -757,7 +756,8 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     }
 
     if (ing.type === 'liquid') {
-      return sum + ing.amount;
+      // Milk is ~87% water; other liquids counted at 100%
+      return sum + (ing.name.toLowerCase().includes('milk') ? ing.amount * 0.87 : ing.amount);
     } else if (ing.type === 'enrichment' || ing.name.toLowerCase().includes('egg')) {
       return sum + (ing.amount * 0.75); // Eggs are 75% water
     } else if (ing.type === 'starter') {
@@ -767,13 +767,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     return sum;
   }, 0);
 
-  const finalHydration = (finalTotalWater / totalFlour) * 100;
-
-  console.log('=== FINAL HYDRATION VERIFICATION ===');
-  console.log('Total liquid (recalculated from actual ingredients):', finalTotalWater.toFixed(1) + 'g');
-  console.log('Total flour:', totalFlour + 'g');
-  console.log('Final hydration:', finalHydration.toFixed(1) + '%');
-  console.log('Should match original:', (originalHydration * 100).toFixed(1) + '%');
+  const finalHydration = totalFlour > 0 ? (finalTotalWater / totalFlour) * 100 : 0;
 
   const converted: ParsedRecipe = {
     ...recipe,
@@ -785,13 +779,8 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     hydration: finalHydration
   };
   
-  console.log('Converted recipe hydration (final):', finalHydration.toFixed(1) + '%');
-  console.log('Starter flour contribution:', totalLevainFlour + 'g (' + ((totalLevainFlour / totalFlour) * 100).toFixed(1) + '% of total flour)');
-  console.log('Active starter used:', activeStarterWeight + 'g (provides ' + starterFlourInLevain + 'g flour)');
-  console.log('Levain build ratio: ' + activeStarterWeight + 'g starter : ' + levainWater + 'g water : ' + levainFlour + 'g flour = ' + levainTotal + 'g total');
-  
   // Calculate actual starter percentage for validation
-  const actualStarterPercentage = (totalLevainFlour / totalFlour) * 100;
+  const actualStarterPercentage = totalFlour > 0 ? (totalLevainFlour / totalFlour) * 100 : 0;
 
   // Classify dough type
   const classification = classifyDough(
@@ -800,8 +789,6 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     milkAmount,
     totalFlour
   );
-
-  console.log('Dough classification:', classification);
 
   // Get appropriate method template
   const methodChanges = getMethodTemplate(
@@ -901,28 +888,17 @@ export function calculateBakersPercentages(recipe: ParsedRecipe) {
   // Baker's percentage formula: (ingredient weight / total flour weight) × 100
   // Flour is ALWAYS 100% (the baseline)
   const baseFlour = recipe.totalFlour;
-  
-  // Group ingredients by type for better display
-  const percentages = recipe.ingredients.map(ing => {
-    let percentage: number;
-    
-    // For flour in sourdough conversions (levain section), calculate against base
-    if (ing.type === 'flour') {
-      percentage = (ing.amount / baseFlour) * 100;
-    } else if (ing.type === 'starter') {
-      // Levain/starter as percentage of flour
-      percentage = (ing.amount / baseFlour) * 100;
-    } else {
-      // All other ingredients
-      percentage = (ing.amount / baseFlour) * 100;
-    }
-    
-    return {
+  if (baseFlour <= 0) {
+    return recipe.ingredients.map(ing => ({ ingredient: ing.name, amount: ing.amount, percentage: 0 }));
+  }
+
+  return recipe.ingredients
+    // The composite "all of the levain" row re-lists the levain-build rows above
+    // it; including it would double-count 40% of the formula.
+    .filter(ing => !ing.name.toLowerCase().includes('all of the levain'))
+    .map(ing => ({
       ingredient: ing.name,
       amount: ing.amount,
-      percentage: Math.round(percentage * 10) / 10 // Round to 1 decimal
-    };
-  });
-
-  return percentages;
+      percentage: Math.round((ing.amount / baseFlour) * 1000) / 10 // 1 decimal
+    }));
 }

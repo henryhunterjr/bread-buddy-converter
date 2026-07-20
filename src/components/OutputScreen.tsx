@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConvertedRecipe } from '@/types/recipe';
@@ -6,9 +6,9 @@ import { calculateBakersPercentages } from '@/utils/recipeConverter';
 import { generatePDF } from '@/utils/lazyPdfGenerator';
 import { Navigation } from '@/components/Navigation';
 import { saveRecipe } from '@/utils/recipeStorage';
-import logo from '@/assets/logo.png';
-import heroBanner from '@/assets/hero-banner.png';
-import { Save, Info, Mail, Download, Printer, RotateCcw, Home } from 'lucide-react';
+import logo from '@/assets/logo.webp';
+import heroBanner from '@/assets/hero-banner.webp';
+import { Save, Mail, Download, Printer, RotateCcw, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -64,33 +64,48 @@ export default function OutputScreen({
   const { toast } = useToast();
   
   // Track funnel stage when conversion result is viewed
-  useState(() => {
+  useEffect(() => {
     trackEvent('funnel_conversion_viewed', { conversion_direction: result.direction });
-  });
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const convertedPercentages = calculateBakersPercentages(result.converted);
+
+  // Derive starter hydration from the levain ingredient name, e.g.
+  // "active sourdough starter (100% hydration)". Defaults to 100%.
+  const starterHydrationMatch = convertedPercentages
+    .map(item => item.ingredient.match(/\((\d+)%\s*hydration\)/i))
+    .find(match => match !== null);
+  const starterHydration = starterHydrationMatch ? parseInt(starterHydrationMatch[1], 10) : 100;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
-    
+
     // Track PDF download
     trackEvent('funnel_download');
     trackEvent('pdf_downloaded', {
       conversion_direction: result.direction
     });
-    
+
     toast({
       title: "Generating PDF...",
       description: "Please wait a moment",
     });
-    
-    setTimeout(() => {
-      generatePDF(result, name, recipeDescription || '');
-    }, 100);
+
+    try {
+      await generatePDF(result, name, recipeDescription || '');
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({
+        title: "PDF generation failed",
+        description: "Something went wrong while creating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveRecipe = () => {
@@ -126,10 +141,131 @@ export default function OutputScreen({
     )
   );
 
-  const finishingIngredients = convertedPercentages.filter(item => 
+  const finishingIngredients = convertedPercentages.filter(item =>
     ['cranberries', 'raisins', 'walnuts', 'pecans', 'chocolate', 'seeds', 'nuts', 'inclusions'].some(
       finish => item.ingredient.toLowerCase().includes(finish)
     )
+  );
+
+  // For yeast-to-sourdough conversions, split the dough table into a Levain
+  // section and a Final Dough section. The composite "all of the levain" row is
+  // excluded from baker's percentages (it would double-count the levain build),
+  // so locate the split point from the raw converted ingredient list instead:
+  // everything before the composite row is the levain build.
+  const levainCompositeIndex = result.converted.ingredients.findIndex(ing =>
+    /all of the levain/i.test(ing.name)
+  );
+  const showLevainSections = result.direction === 'yeast-to-sourdough' && levainCompositeIndex > 0;
+  const levainRows = showLevainSections ? doughIngredients.slice(0, levainCompositeIndex) : [];
+  const levainTotalGrams = levainRows.reduce((total, item) => total + item.amount, 0);
+  const finalDoughRows = showLevainSections
+    ? [
+        // Synthetic display row: the finished levain going into the final dough.
+        // Its percentage is levain weight ÷ total flour (standard formula notation).
+        {
+          ingredient: 'All of the levain (from above)',
+          amount: levainTotalGrams,
+          percentage: result.converted.totalFlour > 0
+            ? Math.round((levainTotalGrams / result.converted.totalFlour) * 1000) / 10
+            : 0
+        },
+        ...doughIngredients.slice(levainCompositeIndex)
+      ]
+    : doughIngredients;
+
+  const sumGrams = (rows: typeof convertedPercentages) =>
+    rows.reduce((total, item) => total + item.amount, 0);
+
+  const renderIngredientRows = (rows: typeof convertedPercentages) =>
+    rows.map((item, index) => {
+      const isStarter = item.ingredient.toLowerCase().includes('starter');
+      const starterFlour = Math.round(item.amount * 100 / (100 + starterHydration));
+      const starterWater = Math.round(item.amount * starterHydration / (100 + starterHydration));
+
+      return (
+        <React.Fragment key={index}>
+          <tr
+            className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}
+          >
+            <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]">
+              {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
+            </td>
+            <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">{item.amount.toFixed(0)}g</td>
+            <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage.toFixed(0)}%</td>
+          </tr>
+
+          {/* Starter Breakdown - Only show for yeast-to-sourdough conversions */}
+          {isStarter && result.direction === 'yeast-to-sourdough' && (
+            <tr className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}>
+              <td colSpan={3} className="px-4 pb-3">
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors w-full">
+                    <ChevronDown className="h-3 w-3" />
+                    <span className="italic">What's in the starter? (Click to expand)</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 ml-5 text-xs text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))]/20 p-3 rounded border border-[hsl(var(--border))]">
+                    <p className="mb-2 font-semibold text-[hsl(var(--foreground))]">
+                      Starter Composition ({starterHydration}% hydration):
+                    </p>
+                    <ul className="space-y-1 ml-4">
+                      <li>• Flour: {starterFlour}g</li>
+                      <li>• Water: {starterWater}g</li>
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              </td>
+            </tr>
+          )}
+        </React.Fragment>
+      );
+    });
+
+  const renderIngredientTable = (
+    title: string,
+    rows: typeof convertedPercentages,
+    subtotalLabel: string,
+    extraRows?: React.ReactNode
+  ) => (
+    <div>
+      <h3 className="text-lg font-bold mb-3 text-[hsl(var(--foreground))] bg-[hsl(var(--primary))]/10 px-4 py-2 rounded-t-lg border-l-4 border-[hsl(var(--primary))]">
+        {title}
+      </h3>
+      <div className="overflow-x-auto bg-white dark:bg-gray-900 rounded-b-lg shadow-sm">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[hsl(var(--muted))]">
+              <th className="py-3 px-4 text-left text-sm font-semibold text-[hsl(var(--foreground))]">Ingredient</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-[hsl(var(--foreground))]">Amount</th>
+              <th className="py-3 px-4 text-right text-sm font-semibold text-[hsl(var(--foreground))]">Baker's %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {renderIngredientRows(rows)}
+            <tr className="border-t-2 border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5 font-bold">
+              <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]">
+                {subtotalLabel}
+              </td>
+              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">
+                {sumGrams(rows).toFixed(0)}g
+              </td>
+              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]"></td>
+            </tr>
+            {extraRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const totalHydrationRow = (
+    <tr className="border-t border-[hsl(var(--border))] bg-[hsl(var(--primary))]/5 font-bold">
+      <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]" colSpan={2}>
+        Total Hydration
+      </td>
+      <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">
+        {result.converted.hydration.toFixed(0)}%
+      </td>
+    </tr>
   );
 
   return (
@@ -221,7 +357,12 @@ export default function OutputScreen({
               <span className="hidden sm:inline">•</span>
               <span>Hydration: {result.converted.hydration.toFixed(0)}%</span>
               <span className="hidden sm:inline">•</span>
-              <span>Yield: {(result.converted.totalFlour + result.converted.totalLiquid + result.converted.saltAmount).toFixed(0)}g</span>
+              <span>
+                Yield: {result.converted.ingredients
+                  .filter(ing => !/all of the levain/i.test(ing.name))
+                  .reduce((total, ing) => total + ing.amount, 0)
+                  .toFixed(0)}g
+              </span>
               <span className="hidden sm:inline">•</span>
               <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
             </div>
@@ -260,80 +401,14 @@ export default function OutputScreen({
             </h2>
             
             <div className="space-y-6">
-              {/* Dough Table */}
-              <div>
-                <h3 className="text-lg font-bold mb-3 text-[hsl(var(--foreground))] bg-[hsl(var(--primary))]/10 px-4 py-2 rounded-t-lg border-l-4 border-[hsl(var(--primary))]">
-                  Dough
-                </h3>
-                <div className="overflow-x-auto bg-white dark:bg-gray-900 rounded-b-lg shadow-sm">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-[hsl(var(--muted))]">
-                        <th className="py-3 px-4 text-left text-sm font-semibold text-[hsl(var(--foreground))]">Ingredient</th>
-                        <th className="py-3 px-4 text-right text-sm font-semibold text-[hsl(var(--foreground))]">Amount</th>
-                        <th className="py-3 px-4 text-right text-sm font-semibold text-[hsl(var(--foreground))]">Baker's %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {doughIngredients.map((item, index) => {
-                        const isStarter = item.ingredient.toLowerCase().includes('starter') || 
-                                         item.ingredient.toLowerCase().includes('levain');
-                        const starterAmount = item.amount;
-                        const starterFlour = starterAmount / 2; // 100% hydration = 50% flour
-                        const starterWater = starterAmount / 2; // 100% hydration = 50% water
-                        
-                        return (
-                          <React.Fragment key={index}>
-                            <tr 
-                              className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}
-                            >
-                              <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]">
-                                {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">{item.amount.toFixed(0)}g</td>
-                              <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage.toFixed(0)}%</td>
-                            </tr>
-                            
-                            {/* Starter Breakdown - Only show for yeast-to-sourdough conversions */}
-                            {isStarter && result.direction === 'yeast-to-sourdough' && (
-                              <tr className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-[hsl(var(--muted))]/30'}>
-                                <td colSpan={3} className="px-4 pb-3">
-                                  <Collapsible>
-                                    <CollapsibleTrigger className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors w-full">
-                                      <ChevronDown className="h-3 w-3" />
-                                      <span className="italic">What's in the starter? (Click to expand)</span>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent className="mt-2 ml-5 text-xs text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))]/20 p-3 rounded border border-[hsl(var(--border))]">
-                                      <p className="mb-2 font-semibold text-[hsl(var(--foreground))]">
-                                        Starter Composition (100% hydration):
-                                      </p>
-                                      <ul className="space-y-1 ml-4">
-                                        <li>• Flour: {starterFlour.toFixed(1)}g</li>
-                                        <li>• Water: {starterWater.toFixed(1)}g</li>
-                                      </ul>
-                                      <p className="mt-2 text-[hsl(var(--muted-foreground))]">
-                                        This flour is included in the total flour calculation.
-                                      </p>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                      <tr className="border-t-2 border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5 font-bold">
-                        <td className="py-3 px-4 text-sm text-[hsl(var(--foreground))]" colSpan={2}>
-                          Total Hydration
-                        </td>
-                        <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">
-                          {result.converted.hydration.toFixed(0)}%
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {showLevainSections ? (
+                <>
+                  {renderIngredientTable('Levain — build the night before', levainRows, 'Levain subtotal')}
+                  {renderIngredientTable('Final Dough — next morning', finalDoughRows, 'Final dough subtotal', totalHydrationRow)}
+                </>
+              ) : (
+                renderIngredientTable('Dough', doughIngredients, 'Dough subtotal', totalHydrationRow)
+              )}
 
               {/* Finishing Table - if applicable */}
               {finishingIngredients.length > 0 && (
@@ -370,15 +445,6 @@ export default function OutputScreen({
               )}
             </div>
 
-            {/* Explanation Note */}
-            {result.direction === 'yeast-to-sourdough' && (
-              <div className="mt-4 flex items-start gap-2 text-sm text-[hsl(var(--muted-foreground))] bg-[hsl(var(--muted))]/30 p-4 rounded-lg">
-                <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <p>
-                  <strong>Note:</strong> The levain flour and water are included in both the levain section and the total calculations. This is standard practice in baker's formulas.
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Method Section */}
@@ -571,7 +637,7 @@ export default function OutputScreen({
       
       {/* Footer */}
       <footer className="text-center py-4 text-xs text-[hsl(var(--muted-foreground))] border-t border-[hsl(var(--border))]">
-        <p>Copyright 2025 Henry Hunter Baking Great Bread at Home All Rights Reserved</p>
+        <p>© {new Date().getFullYear()} Henry Hunter · Baking Great Bread at Home · All Rights Reserved</p>
       </footer>
     </div>
   );

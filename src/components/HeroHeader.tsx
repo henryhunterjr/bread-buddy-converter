@@ -1,25 +1,31 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
-import heroBanner from '@/assets/hero-banner.png';
+import heroBanner from '@/assets/hero-banner.webp';
 
 interface HeroHeaderProps {
   pageTitle: string;
   pageSubtitle?: string;
   showNav?: boolean;
   onNavigate?: (route: 'home' | 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
+  onSelectDirection?: (dir: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
 }
 
-export const HeroHeader = ({ 
-  pageTitle, 
-  pageSubtitle, 
+export const HeroHeader = ({
+  pageTitle,
+  pageSubtitle,
   showNav = true,
-  onNavigate 
+  onNavigate,
+  onSelectDirection
 }: HeroHeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNavClick = (route: 'home' | 'sourdough-to-yeast' | 'yeast-to-sourdough') => {
-    onNavigate?.(route);
+    if (route !== 'home' && onSelectDirection) {
+      onSelectDirection(route);
+    } else {
+      onNavigate?.(route);
+    }
     setMobileMenuOpen(false);
   };
 
