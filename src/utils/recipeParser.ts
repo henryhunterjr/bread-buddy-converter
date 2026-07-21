@@ -167,22 +167,32 @@ export { detectSpecialTechniques };
 export function parseRecipe(recipeText: string, starterHydration: number = 100): ParsedRecipe {
   const ingredients: ParsedIngredient[] = [];
   let method = '';
-  
-  // First, split by common method indicators to separate ingredients from method
+
+  // First, split by common method indicators to separate ingredients from method.
+  // Recipes pasted from web/print pages often use a bare heading line
+  // ("Instructions", "Method") with no colon — recognize both forms, else
+  // instruction sentences like "Pour 2 Tbsp olive oil into a 9x13 pan" leak
+  // into the ingredient parser as garbled ingredients.
   const methodKeywords = ['method:', 'instructions:', 'directions:', 'steps:'];
   let ingredientsSection = recipeText;
   let methodSection = '';
-  
+
   const lowerText = recipeText.toLowerCase();
   let methodStartIndex = -1;
-  
+
   for (const keyword of methodKeywords) {
     const index = lowerText.indexOf(keyword);
     if (index !== -1 && (methodStartIndex === -1 || index < methodStartIndex)) {
       methodStartIndex = index;
     }
   }
-  
+
+  const bareHeading = recipeText.match(/^[ \t]*(?:\d+\.\s*)?(method|instructions|directions|steps|process)[ \t]*$/im);
+  if (bareHeading && bareHeading.index !== undefined &&
+      (methodStartIndex === -1 || bareHeading.index < methodStartIndex)) {
+    methodStartIndex = bareHeading.index;
+  }
+
   if (methodStartIndex !== -1) {
     ingredientsSection = recipeText.substring(0, methodStartIndex);
     methodSection = recipeText.substring(methodStartIndex);
@@ -207,14 +217,26 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
     
   const lines = normalized.split('\n');
-  
-  
+
+  // Section awareness: ingredients under "Brine", "For Pan & Topping", "Glaze"
+  // etc. are FINISHING items — real parts of the recipe that must be preserved
+  // and shown, but never counted as dough (brine water inflating hydration was
+  // how an 80% focaccia got reported as 92%).
+  const FINISHING_HEADER = /^(?:for\s+)?(?:the\s+)?(brine|pan\s*&?\s*topping|pan\s+and\s+topping|topping|toppings|glaze|glazing|egg\s*wash|finishing|assembly|garnish|drizzle|to\s+finish|for\s+serving)\b[\s:]*$/i;
+  const DOUGH_HEADER = /^(?:for\s+)?(?:the\s+)?(dough|final\s+dough|main\s+dough|ingredients|levain|starter\s+build|starter|preferment|poolish|biga|tangzhong|sponge)\b[\s:]*$/i;
+  let inFinishingSection = false;
+
   for (const line of lines) {
     const trimmed = line.trim();
-    
+
+    // Section headers flip the finishing flag (checked before any skips —
+    // headers are short and digit-free, so the skips below would eat them)
+    if (FINISHING_HEADER.test(trimmed)) { inFinishingSection = true; continue; }
+    if (DOUGH_HEADER.test(trimmed)) { inFinishingSection = false; continue; }
+
     // Skip empty lines or very short lines
     if (!trimmed || trimmed.length < 5) continue;
-    
+
     // Skip lines that don't contain numbers (likely titles or section headers)
     if (!/\d/.test(trimmed)) continue;
     
@@ -243,20 +265,21 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
         name: eggData.fullText,
         amount: eggData.count * 50, // 50g per large egg
         unit: 'g',
-        type: 'enrichment'
+        type: 'enrichment',
+        ...(inFinishingSection ? { isFinishing: true } : {})
       };
       ingredients.push(eggIngredient);
-      console.log(`Added egg ingredient: ${eggData.count}x eggs = ${eggIngredient.amount}g`);
-      
+
       // Remove the egg text from the line before processing other ingredients
       const lineWithoutEgg = processLine.replace(new RegExp(eggData.fullText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
-      
+
       // If there's still content, process it
       if (lineWithoutEgg && lineWithoutEgg.length > 5 && /\d/.test(lineWithoutEgg)) {
         const segments = splitCompoundIngredients(lineWithoutEgg);
         for (const segment of segments) {
           const ingredient = parseIngredientLine(segment);
           if (ingredient) {
+            if (inFinishingSection) ingredient.isFinishing = true;
             ingredients.push(ingredient);
           }
         }
@@ -269,6 +292,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     for (const segment of segments) {
       const ingredient = parseIngredientLine(segment);
       if (ingredient) {
+        if (inFinishingSection) ingredient.isFinishing = true;
         ingredients.push(ingredient);
       }
     }
@@ -276,24 +300,28 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
   
   method = methodSection.trim();
 
-  // Calculate totals
-  const totalFlour = ingredients
+  // Calculate totals — finishing items (brine, toppings, glazes) are real
+  // recipe components but NOT dough: they never count toward flour, hydration,
+  // or salt percentages.
+  const doughOnly = ingredients.filter(i => !i.isFinishing);
+
+  const totalFlour = doughOnly
     .filter(i => i.type === 'flour')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const totalLiquid = ingredients
+  const totalLiquid = doughOnly
     .filter(i => i.type === 'liquid')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const starterAmount = ingredients
+  const starterAmount = doughOnly
     .filter(i => i.type === 'starter')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const yeastAmount = ingredients
+  const yeastAmount = doughOnly
     .filter(i => i.type === 'yeast')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const saltAmount = ingredients
+  const saltAmount = doughOnly
     .filter(i => i.type === 'salt')
     .reduce((sum, i) => sum + i.amount, 0);
 

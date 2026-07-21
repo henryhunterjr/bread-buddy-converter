@@ -49,7 +49,8 @@ const Index = () => {
 
     for (const ingredient of ingredients) {
       const cleanedName = cleanIngredientName(ingredient.name);
-      const key = `${cleanedName}|${ingredient.type}`; // Use name + type as key to preserve different types
+      // Key includes the finishing flag so brine salt never merges into dough salt
+      const key = `${cleanedName}|${ingredient.type}|${ingredient.isFinishing ? 'finishing' : 'dough'}`;
 
       if (consolidationMap.has(key)) {
         // Sum amounts for duplicate ingredients
@@ -168,20 +169,22 @@ const Index = () => {
     // Get starter hydration from parsed recipe
     const starterHydration = parsedRecipeForConfirmation?.starterHydration || 100;
     
-    // Recalculate totals based on confirmed ingredients
-    const totalFlour = confirmedIngredients
+    // Recalculate totals based on confirmed ingredients — finishing items
+    // (brine, toppings) are preserved but never count as dough
+    const confirmedDough = confirmedIngredients.filter(i => !i.isFinishing);
+    const totalFlour = confirmedDough
       .filter(i => i.type === 'flour')
       .reduce((sum, i) => sum + i.amount, 0);
-    const totalLiquid = confirmedIngredients
+    const totalLiquid = confirmedDough
       .filter(i => i.type === 'liquid')
       .reduce((sum, i) => sum + i.amount, 0);
-    const starterAmount = confirmedIngredients
+    const starterAmount = confirmedDough
       .filter(i => i.type === 'starter')
       .reduce((sum, i) => sum + i.amount, 0);
-    const yeastAmount = confirmedIngredients
+    const yeastAmount = confirmedDough
       .filter(i => i.type === 'yeast')
       .reduce((sum, i) => sum + i.amount, 0);
-    const saltAmount = confirmedIngredients
+    const saltAmount = confirmedDough
       .filter(i => i.type === 'salt')
       .reduce((sum, i) => sum + i.amount, 0);
 

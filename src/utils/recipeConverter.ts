@@ -246,34 +246,39 @@ export function cleanIngredientName(name: string): string {
 export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // DETECT if this is a complex multi-day sourdough
   const isMultiDay = originalRecipeText ? detectMultiDaySourdough(originalRecipeText) : false;
-  
+
+  // Finishing items (brine, toppings, glazes) are preserved verbatim and
+  // excluded from all dough math
+  const finishingIngredients = recipe.ingredients.filter(i => i.isFinishing);
+  const doughSource = recipe.ingredients.filter(i => !i.isFinishing);
+
   // STEP 1: Calculate TRUE total ingredients from sourdough recipe
   // CRITICAL FIX: Only sum starter amounts that are NOT levain references
   // Levain references point to levain builds already counted elsewhere
-  const actualStarterAmount = recipe.ingredients
+  const actualStarterAmount = doughSource
     .filter(i => i.type === 'starter' && !i.isLevainReference)
     .reduce((sum, i) => sum + i.amount, 0);
-  
+
   // Starter hydration ratio calculation
   const starterFlourRatio = 100 / (100 + starterHydration);
   const starterWaterRatio = starterHydration / (100 + starterHydration);
   const starterFlour = actualStarterAmount * starterFlourRatio;
   const starterWater = actualStarterAmount * starterWaterRatio;
-  
+
   // TRUE totals including what's IN the starter
   const trueFlour = recipe.totalFlour; // Already includes starter flour from parser
   const trueWater = recipe.totalLiquid; // Already includes starter water from parser
   const trueHydration = trueFlour > 0 ? (trueWater / trueFlour) * 100 : 0;
-  
+
   // STEP 2: Build clean ingredient list for yeast version - PRESERVE multi-flour ratios
   // Separate flour ingredients from non-flour ingredients
-  const flourIngredients = recipe.ingredients.filter(i => i.type === 'flour');
-  const nonStarterIngredients = recipe.ingredients.filter(
+  const flourIngredients = doughSource.filter(i => i.type === 'flour');
+  const nonStarterIngredients = doughSource.filter(
     i => i.type !== 'starter' && i.type !== 'liquid' && i.type !== 'flour'
   );
-  
+
   // LIQUID PRESERVATION: Extract original liquid ingredients (excluding starter)
-  const originalLiquids = recipe.ingredients.filter(i => i.type === 'liquid');
+  const originalLiquids = doughSource.filter(i => i.type === 'liquid');
   const totalOriginalLiquid = originalLiquids.reduce((sum, l) => sum + l.amount, 0);
   
   // Calculate yeast amount: 0.7-1.1% of flour weight
@@ -380,7 +385,8 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
       amount: instantYeastAmount,
       unit: 'g',
       type: 'yeast'
-    }
+    },
+    ...finishingIngredients
   ];
   
   const converted: ParsedRecipe = {
@@ -532,28 +538,150 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   };
 }
 
+/**
+ * Convert the ORIGINAL yeast-recipe method into sourdough steps, preserving
+ * everything recipe-specific (pan prep, shaping, dimpling, brines, glazes,
+ * bake temperature/time) and changing only what leavening requires:
+ *  - a levain-build step is prepended,
+ *  - yeast references become "ripe levain",
+ *  - fermentation/rise durations are stretched ~3x (bake times, fold rests,
+ *    and cold-retard windows are left alone).
+ * Returns null when the method text is too thin to trust — caller falls back
+ * to the generic template.
+ */
+export function convertYeastMethodToSourdough(
+  methodText: string,
+  levain: { starter: number; water: number; flour: number; total: number }
+): MethodChange[] | null {
+  const cleaned = methodText
+    .replace(/^\s*(method|instructions|directions|steps|process)\s*:?\s*/i, '')
+    .trim();
+  if (cleaned.length < 300) return null;
+
+  // Split into steps on numbered headings ("1. Mix the Dough"); fall back to
+  // paragraphs when the method isn't numbered.
+  let chunks = cleaned.split(/\r?\n(?=\s*\d+\s*[.)]\s+\S)/).map(c => c.trim()).filter(Boolean);
+  if (chunks.length < 2) {
+    chunks = cleaned.split(/\r?\n\s*\r?\n/).map(c => c.trim()).filter(Boolean);
+  }
+  if (chunks.length < 2) return null;
+  chunks = chunks.slice(0, 16);
+
+  const scaleTime = (text: string): string =>
+    text.replace(
+      /(\d+(?:\.\d+)?)(?:\s*(?:[-–]|to)\s*(\d+(?:\.\d+)?))?\s*(hours?|hrs?|minutes?|mins?)\b/gi,
+      (_m, a: string, b: string | undefined, unit: string) => {
+        const isHours = /^h/i.test(unit);
+        const toMin = (v: string) => parseFloat(v) * (isHours ? 60 : 1);
+        const fmt = (min: number) => {
+          const rounded = Math.round(min / 15) * 15;
+          if (rounded >= 90) {
+            const h = Math.round((rounded / 60) * 2) / 2;
+            return `${h % 1 === 0 ? h : h.toFixed(1)} hours`;
+          }
+          return `${rounded} minutes`;
+        };
+        const lo = fmt(toMin(a) * 3);
+        if (b !== undefined) {
+          const hi = fmt(toMin(b) * 3);
+          // Avoid "3 hours-6 hours": strip the unit from the low end when equal
+          const loNum = lo.replace(/ (hours|minutes)$/, '');
+          return lo.endsWith(hi.replace(/^[\d.]+ /, '')) ? `${loNum}–${hi}` : `${lo}–${hi}`;
+        }
+        return lo;
+      }
+    );
+
+  const FERMENT_CUE = /(rise|rising|proof|proofing|bulk|ferment|doubled?|puffy|nearly filling)/i;
+  const SKIP_SCALING = /(bake|oven|preheat|refriger|fridge|cold|overnight|knead|mix for|cool)/i;
+
+  const transformSentences = (text: string): string =>
+    text
+      .split(/(?<=[.!?])\s+/)
+      .map(sentence =>
+        FERMENT_CUE.test(sentence) && !SKIP_SCALING.test(sentence)
+          ? scaleTime(sentence)
+          : sentence
+      )
+      .join(' ');
+
+  const swapLeavening = (text: string): string =>
+    text
+      .replace(/\b(?:instant|active[- ]dry|commercial|fresh|rapid[- ]rise)[- ]yeast\b/gi, 'ripe levain')
+      .replace(/\byeast\b/gi, 'levain')
+      .replace(/\b(?:bloom|proof)\s+the\s+levain\b/gi, 'disperse the levain')
+      .replace(/let\s+(?:it\s+)?(?:sit|stand)[^.]*?until\s+(?:slightly\s+)?foamy\.?/gi, 'Swish it around until mostly dispersed.')
+      .replace(/until\s+(?:slightly\s+)?foamy/gi, 'until mostly dispersed');
+
+  const steps: MethodChange[] = [
+    {
+      step: '1. BUILD THE LEVAIN (NIGHT BEFORE)',
+      change: `Mix ${levain.starter}g active starter, ${levain.water}g water (80–85°F), and ${levain.flour}g flour (${levain.total}g total). Cover loosely and ripen 8–12 hours at room temperature until bubbly, risen, and domed.`,
+      timing: '8-12 hours overnight'
+    }
+  ];
+
+  chunks.forEach((chunk, idx) => {
+    const lines = chunk.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let title = '';
+    let body = chunk;
+    // A short first line is the step's own heading — keep it as the title
+    const headingMatch = lines[0]?.match(/^(?:\d+\s*[.)]\s*)?(.{2,60})$/);
+    if (lines.length > 1 && headingMatch && !/[.!?]$/.test(lines[0])) {
+      title = headingMatch[1].trim();
+      body = lines.slice(1).join('\n');
+    }
+    const converted = transformSentences(swapLeavening(body)).trim();
+    if (!converted) return;
+    steps.push({
+      step: `${idx + 2}. ${(title || `Step ${idx + 1}`).toUpperCase()}`,
+      change: converted
+    });
+  });
+
+  steps.push({
+    step: 'SOURDOUGH TIMING NOTE',
+    change: 'Fermentation times above were stretched for natural leavening — a 20% levain runs slower than commercial yeast. Judge by the dough, not the clock: bulk is done when the dough is puffy, roughly doubled, and jiggly. Everything else — shaping, toppings, temperatures — follows your original recipe unchanged.'
+  });
+
+  return steps;
+}
+
 export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText?: string, starterHydration: number = 100): ConvertedRecipe {
   // STEP 1: Identify total flour
   const totalFlour = recipe.totalFlour;
-  
+
+  // STEP 1.5: Set aside finishing items (brine, pan oil, toppings, glazes).
+  // They are preserved verbatim and re-attached at the end — they never enter
+  // the dough math. Counting brine water as dough water once turned an 80%
+  // focaccia into a reported "92% hydration" while deleting the brine step.
+  const finishingIngredients = recipe.ingredients.filter(i => i.isFinishing);
+  const doughSource = recipe.ingredients.filter(i => !i.isFinishing);
+
   // STEP 2: Separate ingredients by category
   // Use WORKING PATTERN from convertSourdoughToYeast: filter OUT what we don't want
   // CRITICAL: Also filter out any existing starter to prevent duplication
-  const nonFlourLiquidYeastIngredients = recipe.ingredients.filter(
+  const nonFlourLiquidYeastIngredients = doughSource.filter(
     i => i.type !== 'flour' && i.type !== 'liquid' && i.type !== 'yeast' && i.type !== 'starter'
   );
-  
-  const waterIngredients = recipe.ingredients.filter(i => 
+
+  const waterIngredients = doughSource.filter(i =>
     i.type === 'liquid' && !i.name.toLowerCase().includes('milk')
   );
-  const milkIngredients = recipe.ingredients.filter(i => 
+  const milkIngredients = doughSource.filter(i =>
     i.type === 'liquid' && i.name.toLowerCase().includes('milk')
   );
-  
+
   const originalWater = waterIngredients.reduce((sum, i) => sum + i.amount, 0);
   const milkAmount = milkIngredients.reduce((sum, i) => sum + i.amount, 0);
   const butterAmount = nonFlourLiquidYeastIngredients
     .filter(i => i.type === 'fat' || i.name.toLowerCase().includes('butter') || i.name.toLowerCase().includes('oil'))
+    .reduce((sum, i) => sum + i.amount, 0);
+  // Solid fats only — for dough CLASSIFICATION. Olive oil in a lean flatbread
+  // (focaccia, ciabatta) must not trigger the enriched-dough template with its
+  // butter/egg-wash language and 375°F bake.
+  const solidFatAmount = nonFlourLiquidYeastIngredients
+    .filter(i => /butter|lard|shortening|margarine|ghee/i.test(i.name))
     .reduce((sum, i) => sum + i.amount, 0);
   const eggAmount = nonFlourLiquidYeastIngredients
     .filter(i => i.type === 'enrichment' || i.name.toLowerCase().includes('egg'))
@@ -631,8 +759,8 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   const waterHydration = (totalWater / totalFlour) * 100;
   
   // Get flour breakdown from original recipe for multi-flour support
-  const flourIngredients = recipe.ingredients.filter(i => i.type === 'flour');
-  
+  const flourIngredients = doughSource.filter(i => i.type === 'flour');
+
   // Calculate how much flour goes in levain (20% of total) and dough (80%)
   // CRITICAL: Use levainFlour (not totalLevainFlour) to get the ADDED flour amount
   // This ensures 100% hydration: if we add 200g flour + 200g water to 40g starter, we get 100% hydration
@@ -748,10 +876,11 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   }
 
   // RECALCULATE final hydration from actual ingredients (after milk adjustment!)
-  const allIngredients = [...levainIngredients, ...doughIngredients];
+  const allIngredients = [...levainIngredients, ...doughIngredients, ...finishingIngredients];
   const finalTotalWater = allIngredients.reduce((sum, ing) => {
-    // Skip "all of the levain" composite ingredient to avoid double-counting
-    if (ing.name.toLowerCase().includes('all of the levain')) {
+    // Skip "all of the levain" composite ingredient to avoid double-counting,
+    // and finishing items (brine water is not dough water)
+    if (ing.isFinishing || ing.name.toLowerCase().includes('all of the levain')) {
       return sum;
     }
 
@@ -782,16 +911,28 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   // Calculate actual starter percentage for validation
   const actualStarterPercentage = totalFlour > 0 ? (totalLevainFlour / totalFlour) * 100 : 0;
 
-  // Classify dough type
+  // Classify dough type — SOLID fats only; liquid oil must not make a
+  // focaccia "enriched" (that pulled in butter/egg-wash/375°F template text)
   const classification = classifyDough(
     sugarAmount,
-    butterAmount,
+    solidFatAmount,
     milkAmount,
     totalFlour
   );
 
-  // Get appropriate method template
-  const methodChanges = getMethodTemplate(
+  // METHOD: preserve the ORIGINAL recipe's instructions whenever we have them.
+  // A generic template throws away everything that makes a specific bread
+  // itself — pan prep, dimpling, brine, its bake temperature. We only swap the
+  // leavening and stretch fermentation times. Fall back to the canned template
+  // when the original method is missing or too thin to trust.
+  const preservedMethod = convertYeastMethodToSourdough(recipe.method || '', {
+    starter: activeStarterWeight,
+    water: levainWater,
+    flour: levainFlour,
+    total: validatedLevainTotal
+  });
+
+  const methodChanges = preservedMethod ?? getMethodTemplate(
     classification,
     {
       starter: activeStarterWeight,
@@ -899,6 +1040,9 @@ export function calculateBakersPercentages(recipe: ParsedRecipe) {
     .map(ing => ({
       ingredient: ing.name,
       amount: ing.amount,
-      percentage: Math.round((ing.amount / baseFlour) * 1000) / 10 // 1 decimal
+      // Finishing items (brine, toppings) aren't part of the dough formula —
+      // no baker's percentage for them
+      percentage: ing.isFinishing ? 0 : Math.round((ing.amount / baseFlour) * 1000) / 10,
+      isFinishing: ing.isFinishing === true
     }));
 }

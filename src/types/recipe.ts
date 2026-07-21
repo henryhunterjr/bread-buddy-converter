@@ -7,6 +7,7 @@ export interface ParsedIngredient {
   source?: 'regex' | 'ai' | 'corrected' | 'estimated';
   aiSuggestion?: string;
   isLevainReference?: boolean; // True when referencing levain built in separate section
+  isFinishing?: boolean; // Brine/topping/glaze items: preserved and displayed, but excluded from dough math
 }
 
 export interface ParsedRecipe {

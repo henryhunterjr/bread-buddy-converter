@@ -134,18 +134,17 @@ export default function OutputScreen({
     setRecipeName('');
   };
 
-  // Group ingredients into Dough and Finishing
-  const doughIngredients = convertedPercentages.filter(item => 
-    !['cranberries', 'raisins', 'walnuts', 'pecans', 'chocolate', 'seeds', 'nuts', 'inclusions'].some(
-      finish => item.ingredient.toLowerCase().includes(finish)
-    )
-  );
-
-  const finishingIngredients = convertedPercentages.filter(item =>
+  // Group ingredients into Dough and Finishing. The parser flags brine /
+  // pan-oil / topping / glaze section items with isFinishing; the keyword list
+  // catches inclusions in older parses without the flag.
+  const isFinishingItem = (item: { ingredient: string; isFinishing?: boolean }) =>
+    item.isFinishing === true ||
     ['cranberries', 'raisins', 'walnuts', 'pecans', 'chocolate', 'seeds', 'nuts', 'inclusions'].some(
       finish => item.ingredient.toLowerCase().includes(finish)
-    )
-  );
+    );
+
+  const doughIngredients = convertedPercentages.filter(item => !isFinishingItem(item));
+  const finishingIngredients = convertedPercentages.filter(isFinishingItem);
 
   // For yeast-to-sourdough conversions, split the dough table into a Levain
   // section and a Final Dough section. The composite "all of the levain" row is
@@ -436,7 +435,7 @@ export default function OutputScreen({
                               {item.ingredient.charAt(0).toUpperCase() + item.ingredient.slice(1)}
                             </td>
                             <td className="py-3 px-4 text-sm text-right text-[hsl(var(--foreground))]">{item.amount.toFixed(0)}g</td>
-                            <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage.toFixed(0)}%</td>
+                            <td className="py-3 px-4 text-sm text-right text-[hsl(var(--muted-foreground))]">{item.percentage > 0 ? `${item.percentage.toFixed(0)}%` : '—'}</td>
                           </tr>
                         ))}
                       </tbody>
