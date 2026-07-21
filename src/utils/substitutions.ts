@@ -3,8 +3,11 @@ import { ParsedRecipe, IngredientSubstitution } from '@/types/recipe';
 export function generateSubstitutions(recipe: ParsedRecipe): IngredientSubstitution[] {
   const substitutions: IngredientSubstitution[] = [];
   
-  // Check each ingredient for possible substitutions
+  // Check each ingredient for possible substitutions.
+  // Skip finishing items (pan oil, brine, toppings) — we don't offer swaps for
+  // the parts of the recipe that define its character.
   recipe.ingredients.forEach(ingredient => {
+    if (ingredient.isFinishing) return;
     const lowerName = ingredient.name.toLowerCase();
     
     // Flour substitutions
@@ -76,7 +79,17 @@ export function generateSubstitutions(recipe: ParsedRecipe): IngredientSubstitut
       });
     }
     
-    if (lowerName.includes('oil')) {
+    // Olive oil is a defining flavor in breads like focaccia and ciabatta —
+    // never suggest swapping it for butter. Offer a neutral-oil swap instead.
+    if (lowerName.includes('olive oil')) {
+      substitutions.push({
+        original: 'Olive oil',
+        substitute: 'Neutral oil (avocado, grapeseed, canola)',
+        ratio: '1:1',
+        hydrationAdjustment: 0,
+        notes: 'Direct 1:1 swap for a milder flavor. Note that olive oil is traditional here and carries much of the character.'
+      });
+    } else if (lowerName.includes('oil')) {
       substitutions.push({
         original: 'Oil',
         substitute: 'Butter (melted)',
