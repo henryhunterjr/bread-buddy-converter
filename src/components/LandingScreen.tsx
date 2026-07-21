@@ -2,17 +2,34 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Mail } from 'lucide-react';
+import { Mail, BookOpen } from 'lucide-react';
 import logo from '@/assets/logo.webp';
 import heroBanner from '@/assets/hero-banner.webp';
 
 interface LandingScreenProps {
   onSelectDirection: (direction: 'sourdough-to-yeast' | 'yeast-to-sourdough') => void;
+  onMyRecipes?: () => void;
 }
 
-export default function LandingScreen({ onSelectDirection }: LandingScreenProps) {
+export default function LandingScreen({ onSelectDirection, onMyRecipes }: LandingScreenProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-bread-light flex flex-col">
+      {/* Persistent top nav — first-time visitors can reach My Recipes directly */}
+      <nav className="w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-sm sm:text-base md:text-lg font-semibold text-foreground whitespace-nowrap">Bread Buddy</span>
+            <span className="hidden md:inline text-xs text-muted-foreground truncate">by Baking Great Bread at Home</span>
+          </div>
+          {onMyRecipes && (
+            <Button variant="ghost" size="sm" onClick={onMyRecipes} className="gap-2">
+              <BookOpen className="h-4 w-4" />
+              <span>My Recipes</span>
+            </Button>
+          )}
+        </div>
+      </nav>
+
       {/* Hero Banner Section */}
       <div 
         className="relative w-full h-[150px] sm:h-[200px] md:h-[260px]"
@@ -33,11 +50,14 @@ export default function LandingScreen({ onSelectDirection }: LandingScreenProps)
           <Card className="w-full p-5 md:p-8 space-y-4 bg-background/95 backdrop-blur border-bread-medium/20 shadow-xl">
             <div className="text-center space-y-3">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground font-serif">
-                Baking Great Bread at Home
+                Bread Buddy
               </h1>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground font-serif">
                 Sourdough & Yeast Bread Recipe Converter
               </h2>
+              <p className="text-sm text-muted-foreground">
+                from Baking Great Bread at Home
+              </p>
               <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
                 Convert any bread recipe between commercial yeast and sourdough starter instantly with precise baker's percentages
               </p>

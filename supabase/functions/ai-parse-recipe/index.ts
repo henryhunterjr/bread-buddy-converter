@@ -12,144 +12,122 @@ serve(async (req) => {
 
   try {
     let { recipeText, starterHydration = 100 } = await req.json();
-    
+
+    if (typeof recipeText !== 'string' || recipeText.trim().length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'No recipe text provided.',
+          errorType: 'empty_input',
+          errorCode: 'PARSE_002',
+          errorSeverity: 'medium',
+          errorDetails: 'recipeText was empty or missing',
+          partialResults: null,
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Long blog-style recipes (title, byline, prep times, story copy) are the
+    // norm for pasted/PDF input. Cap the input defensively — 24k chars is far
+    // beyond any real recipe — and truncate rather than fail.
+    const MAX_INPUT_CHARS = 24000;
+    if (recipeText.length > MAX_INPUT_CHARS) {
+      console.warn(`Input truncated from ${recipeText.length} to ${MAX_INPUT_CHARS} chars`);
+      recipeText = recipeText.slice(0, MAX_INPUT_CHARS);
+    }
+
     // Pre-process text to fix common concatenation issues
     recipeText = recipeText.replace(/(\d+g?\s+)?(bread\s+)?flour\s+yolks/gi, '$1$2flour\n3 egg yolks');
     recipeText = recipeText.replace(/flour\s+and\b/gi, 'flour\n');
     recipeText = recipeText.replace(/sugar\s+and\b/gi, 'sugar\n');
-    
-    console.log('AI parsing recipe with starter hydration:', starterHydration);
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const systemPrompt = `SYSTEM ROLE:
-You are Henry Hunter's Recipe Coach and Technical Checker.
-
-PURPOSE:
-When a recipe is uploaded, you will analyze it, make only the necessary technical corrections or readability improvements, enhance clarity for the reader, and preserve Henry's voice and teaching style.
-
-TONE & STYLE:
-- Write in Henry's voice: warm, confident, conversational, mentoring.
-- No em dashes, no marketing fluff, no "AI-style" phrasing.
-- Use metric + volumetric units throughout.
-- Assume the target user is a skilled home baker (intermediate), not a pro chef.
-
-WHAT TO CHECK & POSSIBLY CORRECT:
-
-Ingredient List:
-- Are groups clearly defined (e.g., Starter, Dough, Enrichment, Finishing)?
-- Are units consistent? Duplicate entries or unclear flour breakdown must be clarified.
-
-Hydration, Ratios, and Enrichment:
-- Does total hydration align with dough type and enrichments (butter, eggs, sugar)?
-- Are enrichment ratios realistic and technically sound?
-
-Method / Instructions:
-- Ensure stages are clear (Day 1, Day 2, etc.).
-- Include sensory cues ("you'll feel...", "the dough looks...", "stop when...").
-- Provide temperature/time ranges and explain why they matter (structure, fermentation, etc.).
-- Flag common failure-points and provide guidance ("if it's sticky...", "if rise stalls...").
-
-Baking & Cooling Instructions:
-- Does bake time/temp match loaf size and type? If not, suggest adjustment.
-- Is cooling method clearly described (especially for tall loaves needing upside-down hang)?
-
-Voice & Reader Guidance:
-- Does the instruction guide the reader, rather than simply list steps?
-- Does the output retain Henry's personal teaching tone?
-
-WHEN TO PASS WITHOUT CHANGES:
-- No technical inconsistencies (hydration, bake time, ratios) are present.
-- Language already reflects Henry's voice and includes adequate sensory cues.
-- Recipe is logically structured, reader-friendly, and clear.
-
-FORMATTING RULES:
-- Numbered steps must be sequential and unique: "1.", "2.", "3." ... Do not use "1. 1." or duplicate numbering.
-- Insert a blank line before each H2 or H3 heading and after each major section for readability.
-- For lists: maintain consistent indentation. When a list item wraps to a second line, indent to align visually with the text after the number or bullet.
-- Sections like Tips & Tricks, Substitutions, Pro Tips / Troubleshooting must be separated by at least one blank line and formatted as distinct sections.
-
-FINAL SELF-REVIEW QUESTIONS:
-Before finalizing output, ask yourself:
-- Would Henry read this aloud and feel comfortable?
-- Does this improve the reader's clarity and confidence?
-- Did I only change what truly needed correction?
-- Is the recipe now easier to succeed at, not just more accurate?
-
-If all answers are "Yes", deliver the updated recipe.
+    // PARSE-ONLY prompt. This function's one job is extraction — it must never
+    // rewrite the method or generate long text. (The previous prompt asked the
+    // model to rewrite the entire recipe "in Henry's voice", which on long
+    // blog-style input produced huge, slow, often-truncated responses that
+    // failed JSON.parse and crashed this function.)
+    const systemPrompt = `You are a precise recipe-parsing engine. You receive raw recipe text — often a full blog post with a title, byline, prep/rise/bake times, yield, story copy, and instructions mixed in. Your ONLY job is to extract the DOUGH ingredients and the method text. You never rewrite, embellish, or comment.
 
 PARSING RULES:
-1. Flour MUST be detected - look for: all-purpose flour, bread flour, whole wheat, rye, spelt, etc.
-2. Extract ONLY dough ingredients - skip toppings, egg wash, or "after baking" items
-3. Convert all measurements to grams using standard conversions:
-   - 1 cup flour = 120g
-   - 1 cup bread flour = 130g
-   - 1 cup liquid = 240g (water, milk)
-   - 1 tbsp = varies by ingredient (yeast ~10g, salt ~20g, butter ~14g)
-   - 1 tsp = varies by ingredient (yeast ~3g, salt ~6g)
-4. For "plus extra for kneading" - IGNORE the extra, only count the main amount
-5. Classify each ingredient type: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other
-6. Refine method instructions to be clear, sensory-focused, and in Henry's voice
+1. Extract ONLY dough ingredients — skip toppings, egg wash, glazes, dustings, and "after baking" items.
+2. Ignore all narrative/story text, bylines, timestamps, serving suggestions, and nutrition info.
+3. Convert all measurements to grams:
+   - 1 cup all-purpose flour = 120g; 1 cup bread flour = 127g; 1 cup whole wheat = 113g
+   - 1 cup water = 237g; 1 cup milk = 245g
+   - 1 tbsp: yeast 9g, salt 18g (kosher 14g), butter 14g, sugar 12.5g, honey 21g, oil 14g
+   - 1 tsp: yeast 3g, salt 6g (kosher 5g), sugar 4g
+   - 1 large egg = 50g; 1 stick butter = 113g
+4. "plus extra for kneading/dusting" — count only the main amount.
+5. Classify each ingredient type: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other.
+6. "method" = the recipe's own instruction steps, condensed to their essential actions. Maximum 1500 characters. Do NOT rewrite style or add commentary.
 
-CRITICAL LEVAIN BUILD DETECTION:
-When a recipe has separate sections like "Levain" or "Starter Build" or "Preferment" followed by "Main Dough":
-- If the main dough lists "Xg levain" or "Xg ripe levain" or "levain (from above)" or "levain from step 1"
-- Mark that ingredient with "isLevainReference": true
-- This prevents double-counting the flour/water (once in levain build, once in main dough)
+LEVAIN DOUBLE-COUNT PREVENTION:
+If the recipe has a levain/starter/preferment BUILD section and the main dough then references it ("151g levain (from above)", "ripe levain", "all of the levain", "levain from step 1"), mark that main-dough entry with "isLevainReference": true.
 
-Examples of levain references:
-- "151g levain (from above)" → isLevainReference: true
-- "ripe levain" → isLevainReference: true  
-- "levain from step 1" → isLevainReference: true
-- "all of the levain" → isLevainReference: true
-
-Return a JSON object with this structure:
+OUTPUT: Return ONLY a valid JSON object, no markdown fences, no explanation:
 {
   "ingredients": [
-    {
-      "name": "all-purpose flour",
-      "amount": 500,
-      "unit": "g",
-      "type": "flour"
-    },
-    {
-      "name": "levain",
-      "amount": 151,
-      "unit": "g",
-      "type": "starter",
-      "isLevainReference": true
-    }
+    {"name": "bread flour", "amount": 500, "unit": "g", "type": "flour"},
+    {"name": "levain", "amount": 151, "unit": "g", "type": "starter", "isLevainReference": true}
   ],
-  "method": "extracted and refined method text with sensory cues"
+  "method": "condensed instruction steps"
 }
 
-IMPORTANT: 
-- Classify ingredient types accurately: flour, liquid, starter, yeast, salt, fat, enrichment, sweetener, other
-- All amounts must be in grams
-- Mark levain references with isLevainReference: true to prevent double-counting
-- Do NOT calculate totals or hydration - just parse and classify ingredients`;
+All amounts in grams. Do NOT calculate totals or hydration.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { 
-            role: 'user', 
-            content: `Parse this recipe and return ONLY valid JSON (no markdown, no explanation):\n\n${recipeText}` 
-          }
-        ],
-        temperature: 0.3, // Lower temperature for more consistent parsing
-      }),
-    });
+    // Hard timeout so a hung upstream call returns a clean, typed error
+    // instead of letting the function run until the platform kills it.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40000);
+
+    let response: Response;
+    try {
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Parse this recipe and return ONLY valid JSON (no markdown, no explanation):\n\n${recipeText}`
+            }
+          ],
+          temperature: 0.1,
+          // Extraction output is small by design; the cap prevents runaway
+          // generation and mid-JSON truncation on long inputs.
+          max_tokens: 4000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+    } catch (fetchError) {
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({
+            error: 'AI parsing timed out. The built-in parser will be used instead.',
+            errorType: 'timeout',
+            errorCode: '504',
+            errorSeverity: 'medium',
+            errorDetails: 'Upstream AI gateway did not respond within 40s',
+            partialResults: null,
+          }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -186,9 +164,21 @@ IMPORTANT:
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-    
-    console.log('AI response:', aiResponse);
+    const aiResponse = data?.choices?.[0]?.message?.content;
+
+    if (typeof aiResponse !== 'string' || aiResponse.trim().length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'AI returned an empty response. The built-in parser will be used instead.',
+          errorType: 'empty_ai_response',
+          errorCode: 'PARSE_003',
+          errorSeverity: 'medium',
+          errorDetails: `finish_reason: ${data?.choices?.[0]?.finish_reason ?? 'unknown'}`,
+          partialResults: null,
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Clean up the response - remove markdown code blocks if present
     let cleanedResponse = aiResponse.trim();
@@ -198,7 +188,49 @@ IMPORTANT:
       cleanedResponse = cleanedResponse.replace(/^```\n/, '').replace(/\n```$/, '');
     }
 
-    const parsedRecipe = JSON.parse(cleanedResponse);
+    let parsedRecipe;
+    try {
+      parsedRecipe = JSON.parse(cleanedResponse);
+    } catch {
+      // Salvage: model wrapped the JSON in prose, or output was truncated.
+      // Grab the outermost {...} span and try again before giving up.
+      const start = cleanedResponse.indexOf('{');
+      const end = cleanedResponse.lastIndexOf('}');
+      if (start !== -1 && end > start) {
+        try {
+          parsedRecipe = JSON.parse(cleanedResponse.slice(start, end + 1));
+        } catch {
+          parsedRecipe = null;
+        }
+      }
+      if (!parsedRecipe) {
+        return new Response(
+          JSON.stringify({
+            error: 'AI response was not valid JSON. The built-in parser will be used instead.',
+            errorType: 'json_parse_error',
+            errorCode: 'PARSE_004',
+            errorSeverity: 'medium',
+            errorDetails: `First 300 chars of AI response: ${cleanedResponse.slice(0, 300)}`,
+            partialResults: null,
+          }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    if (!Array.isArray(parsedRecipe?.ingredients)) {
+      return new Response(
+        JSON.stringify({
+          error: 'AI response was missing the ingredients list. The built-in parser will be used instead.',
+          errorType: 'malformed_ai_response',
+          errorCode: 'PARSE_005',
+          errorSeverity: 'medium',
+          errorDetails: 'Parsed JSON had no ingredients array',
+          partialResults: null,
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Clean up ingredient names
     const cleanParsedIngredient = (text: string) => {

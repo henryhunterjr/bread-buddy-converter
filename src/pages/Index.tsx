@@ -288,7 +288,10 @@ const Index = () => {
       <HelpModal open={showHelp} onOpenChange={setShowHelp} />
 
       {screen === 'landing' && (
-        <LandingScreen onSelectDirection={handleSelectDirection} />
+        <LandingScreen
+          onSelectDirection={handleSelectDirection}
+          onMyRecipes={handleViewSavedRecipes}
+        />
       )}
       
       <Suspense fallback={

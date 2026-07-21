@@ -35,13 +35,22 @@ export function preprocessRecipeText(recipeText: string): PreprocessResult {
     appliedFixes.push('Added missing gram units');
   }
 
-  // Fix 3: Inconsistent spacing around numbers
-  cleaned = cleaned.replace(/(\d+)\s*-\s*(\d+)/g, '$1-$2'); // "500 - 600" → "500-600"
-  cleaned = cleaned.replace(/(\d+)\s+([a-z])/gi, '$1 $2'); // Ensure space between number and word
+  // Fix 3: Inconsistent spacing around numbers.
+  // [^\S\n] = whitespace EXCEPT newline — line breaks are load-bearing for the
+  // parser (one ingredient per line) and must never be collapsed here.
+  cleaned = cleaned.replace(/(\d+)[^\S\n]*-[^\S\n]*(\d+)/g, '$1-$2'); // "500 - 600" → "500-600"
+  cleaned = cleaned.replace(/(\d+)[^\S\n]+([a-z])/gi, '$1 $2'); // Ensure single space between number and word
 
-  // Fix 4: Remove extra whitespace
+  // Fix 4: Remove extra whitespace — WITHIN lines only. Collapsing newlines
+  // here used to merge blog-style recipes into mega-lines, which made the
+  // parser lose water/yeast entirely (an ingredient sharing a line with
+  // "egg wash" got the whole line discarded). Keep the line structure.
   const originalLength = cleaned.length;
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  cleaned = cleaned
+    .replace(/[^\S\n]+/g, ' ')   // collapse runs of spaces/tabs, keep newlines
+    .replace(/ *\n */g, '\n')    // trim spaces around each line break
+    .replace(/\n{3,}/g, '\n\n')  // cap blank runs at one empty line
+    .trim();
   if (originalLength !== cleaned.length) {
     appliedFixes.push('Cleaned extra whitespace');
   }

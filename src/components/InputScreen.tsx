@@ -473,79 +473,86 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
     }
     
     try {
-      // Check for essential ingredients upfront
-      const textToCheck = preprocessResult.cleanedText;
-      const hasFlour = /\d+\s*(g|grams?|oz|ounces?|cups?|lbs?|pounds?).*?(flour|bread|wheat|rye|spelt)/i.test(textToCheck);
-      const hasWater = /\d+\s*(g|grams?|oz|ounces?|cups?|ml|milliliters?).*?(water|liquid|milk)/i.test(textToCheck);
-      const hasLeavening = /\d+\s*(g|grams?|oz|ounces?|tsp|teaspoons?|tbsp|tablespoons?).*?(yeast|starter|levain|sourdough)/i.test(textToCheck);
-      
-      if (!hasFlour || !hasWater || !hasLeavening) {
-        // If user uploaded an image and parsing failed, try AI vision
+      const textToProcess = preprocessResult.cleanedText;
+
+      // Parse locally FIRST. The built-in parser is reliable and runs offline;
+      // the AI edge function is an enhancement layered on top, never a hard
+      // dependency. If it's slow, down, or chokes on a long blog-style recipe,
+      // we still convert from the local parse.
+      const regexResult = parseRecipe(textToProcess, starterHydration);
+
+      // Decide "is this a usable recipe?" from the ACTUAL parsed result, not a
+      // brittle text regex — this is why long, prose-heavy recipes now work.
+      const parsedLooksComplete =
+        regexResult.totalFlour >= 100 &&
+        regexResult.totalLiquid >= 50 &&
+        (regexResult.starterAmount > 0 || regexResult.yeastAmount > 0);
+
+      // Kick off AI parsing in parallel (best-effort enhancement).
+      const aiPromise = parseWithAI();
+
+      if (!parsedLooksComplete) {
+        // The local parser couldn't pull a full recipe out of this text.
+        // Give the AI attempt a chance before deciding it's genuinely incomplete.
+        const aiResult = await aiPromise;
+
+        if (aiResult && aiResult.totalFlour >= 100) {
+          const validated = await validateAndCombine(regexResult, aiResult);
+          if (validateRecipe(validated).length === 0) {
+            setErrors([]);
+            onConvert(textToProcess, starterHydration, validated);
+            return;
+          }
+        }
+
+        // Still no luck. If there's an image, fall back to vision.
         if (uploadedImageFile) {
           toast({
-            title: "Having trouble parsing",
-            description: "Using AI vision to interpret recipe... (5-10 seconds)",
+            title: "Reading your recipe",
+            description: "Using AI vision to interpret the photo... (5-10 seconds)",
           });
           await parseImageWithAI(uploadedImageFile);
           return;
         }
-        
-        const suggestions = generateCorrectionSuggestions('Missing essential ingredients', textToCheck);
-        setErrors([
-          '🤔 Need flour, water, and yeast/starter amounts to convert.',
-          ...suggestions
-        ]);
-        return;
-      }
-      
-      const [regexResult, aiResult] = await Promise.all([
-        Promise.resolve(parseRecipe(preprocessResult.cleanedText, starterHydration)),
-        parseWithAI()
-      ]);
 
-      if (!aiResult) {
-        const validationErrors = validateRecipe(regexResult);
-        if (validationErrors.length > 0) {
-          setErrors(validationErrors);
-          return;
-        }
-        
-        onConvert(preprocessResult.cleanedText, starterHydration, {
-          ...regexResult,
-          parserUsed: 'regex',
-          confidence: 70
-        });
+        // Honest message: separate "we couldn't read it" from "you left
+        // something out." Long blog-style recipes and scanned PDFs land here.
+        const looksLongForm = textToProcess.length > 1500;
+        setErrors(
+          looksLongForm
+            ? [
+                "We couldn't automatically pull the ingredients out of this recipe.",
+                "This can happen with long blog-style recipes or scanned PDFs where the ingredients are mixed in with the instructions.",
+                "Try pasting just the ingredient list (amounts and names), or upload a clear photo of the ingredients.",
+              ]
+            : [
+                "This recipe looks incomplete. To convert, include amounts for flour, a liquid (water or milk), and a leavener (yeast or starter).",
+                ...generateCorrectionSuggestions('Missing essential ingredients', textToProcess),
+              ]
+        );
+        setAiParseAvailable(true);
         return;
       }
 
-      toast({
-        title: "Validating recipe...",
-        description: "Running validation checks",
-        duration: 2000,
-      });
+      // Local parse is complete — we already have a shippable result. Fold in
+      // the AI enhancement if it arrived; otherwise ship the local parse.
+      const aiResult = await aiPromise;
+      const finalRecipe: ParsedRecipe = aiResult
+        ? await validateAndCombine(regexResult, aiResult)
+        : { ...regexResult, parserUsed: 'regex', confidence: 70 };
 
-      const validated = await validateAndCombine(regexResult, aiResult);
-      
-      const validationErrors = validateRecipe(validated);
+      // validateRecipe only flags genuine problems (impossible hydration, both
+      // leaveners present, ocean-level salt) — surface those honestly.
+      const validationErrors = validateRecipe(finalRecipe);
       if (validationErrors.length > 0) {
-        // If parsing failed and user uploaded an image, try AI vision
-        if (uploadedImageFile && validated.totalFlour === 0) {
-          toast({
-            title: "Parser found < 3 ingredients",
-            description: "Using AI vision to interpret recipe... (5-10 seconds)",
-          });
-          await parseImageWithAI(uploadedImageFile);
-          return;
-        }
-        
         setErrors(validationErrors);
         setAiParseAvailable(true);
         return;
       }
 
       setErrors([]);
-      onConvert(preprocessResult.cleanedText, starterHydration, validated);
-      
+      onConvert(textToProcess, starterHydration, finalRecipe);
+
     } catch (error) {
       console.error('Parsing error:', error);
       
@@ -559,7 +566,12 @@ export default function InputScreen({ direction, onConvert, onBack, onLoadSaved,
         return;
       }
       
-      setErrors(['Could not parse recipe. Please check the format.']);
+      // Honest error: this is an unexpected failure in OUR processing, not a
+      // problem with the user's recipe. Don't blame their ingredients.
+      setErrors([
+        'Something went wrong on our end while processing this recipe — it is not a problem with your ingredients.',
+        'Please try again in a moment. If it keeps happening, use "Report Issue" so we can fix it.',
+      ]);
       setAiParseAvailable(true);
     } finally {
       setIsProcessing(false);

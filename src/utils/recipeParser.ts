@@ -188,6 +188,14 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     methodSection = recipeText.substring(methodStartIndex);
   }
   
+  // Drop finishing/egg-wash lines BEFORE normalization. The normalizer below
+  // splits lines at measurements, which would separate "1 tablespoon water"
+  // from its "For the egg wash:" prefix and let it count as dough liquid.
+  ingredientsSection = ingredientsSection
+    .split('\n')
+    .filter(line => !/egg\s*wash|for\s+(brushing|glazing|dusting\s+the\s+top|sprinkling\s+on\s+top)/i.test(line))
+    .join('\n');
+
   // Normalize the ingredients section:
   // 1. Replace asterisks with newlines
   // 2. Add newlines before common measurement patterns to split continuous text

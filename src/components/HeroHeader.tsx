@@ -37,11 +37,11 @@ export const HeroHeader = ({
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               {/* Logo */}
-              <button 
+              <button
                 onClick={() => handleNavClick('home')}
                 className="text-lg md:text-xl font-serif font-bold text-bread-earth hover:text-burnt-orange transition-colors"
               >
-                Baking Great Bread at Home
+                Bread Buddy
               </button>
 
               {/* Desktop Navigation */}

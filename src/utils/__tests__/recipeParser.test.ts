@@ -140,3 +140,56 @@ describe('degenerate input', () => {
     expect(Number.isFinite(r.hydration)).toBe(true);
   });
 });
+
+describe('blog-style long-form recipes (preprocessor + parser pipeline)', () => {
+  // Regression for the July 2026 "Special Round Challah" failures: the
+  // preprocessor used to collapse newlines, merging the ingredient list into
+  // mega-lines and losing water/yeast entirely.
+  const blogRecipe = `Special Round Challah by Henry Hunter
+
+There is nothing quite like the smell of challah baking on a Friday afternoon. This round challah is the one I make for the holidays.
+
+Prep Time: 30 minutes
+Rise Time: 3 hours
+Bake Time: 35 minutes
+Yield: 1 large round loaf, serves 10-12
+
+Before you begin, make sure all your ingredients are at room temperature. Cold eggs will slow the yeast down considerably.
+
+Ingredients:
+
+4 cups bread flour, plus extra for dusting
+1 cup warm water
+2 large eggs
+1/4 cup honey
+1/4 cup vegetable oil
+2 teaspoons salt
+2 teaspoons instant yeast
+
+For the egg wash: 1 egg beaten with 1 tablespoon water
+
+Instructions:
+
+1. In a large bowl, whisk together the warm water, honey, oil, and eggs until well combined.
+2. Add the flour, salt, and yeast. Mix until a shaggy dough forms, then knead for 8 to 10 minutes.
+3. Place the dough in an oiled bowl, cover, and let rise until doubled, about 2 hours.`;
+
+  it('preprocessor preserves line structure', async () => {
+    const { preprocessRecipeText } = await import('../recipePreprocessor');
+    const pre = preprocessRecipeText(blogRecipe);
+    // Line breaks are load-bearing — the cleaned text must still be multi-line
+    expect(pre.cleanedText.split('\n').length).toBeGreaterThan(10);
+  });
+
+  it('parses the full pipeline: flour, water, salt, yeast all found', async () => {
+    const { preprocessRecipeText } = await import('../recipePreprocessor');
+    const pre = preprocessRecipeText(blogRecipe);
+    const r = parseRecipe(pre.cleanedText);
+    expect(r.totalFlour).toBe(508);       // 4 cups bread flour
+    expect(r.totalLiquid).toBe(237);      // 1 cup water — egg wash water excluded
+    expect(r.yeastAmount).toBe(6);        // 2 tsp instant yeast
+    expect(r.saltAmount).toBe(12);        // 2 tsp salt
+    const egg = r.ingredients.find(i => i.type === 'enrichment');
+    expect(egg?.amount).toBe(100);        // 2 large eggs, wash egg excluded
+  });
+});

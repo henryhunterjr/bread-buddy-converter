@@ -325,21 +325,22 @@ export default function OutputScreen({
         </div>
       </div>
 
-      {/* Report Issue button - top right, fixed position */}
-      <div className="fixed top-4 right-4 z-50 no-print">
-        <Button 
-          variant="ghost" 
+      {/* Report Issue button - fixed bottom-left so it never overlaps the nav
+          (bottom-right is taken by the global Help button) */}
+      <div className="fixed bottom-4 left-4 z-40 no-print">
+        <Button
+          variant="ghost"
           size="sm"
           className="bg-white/90 backdrop-blur-sm shadow-md hover:bg-white"
           asChild
         >
-          <a href="mailto:henrysbreadkitchen@gmail.com?subject=BGB%20Feedback">
+          <a href="mailto:henrysbreadkitchen@gmail.com?subject=Bread%20Buddy%20Feedback">
             <Mail className="h-4 w-4 mr-2" />
             Report Issue
           </a>
         </Button>
       </div>
-      
+
       {/* Main Content */}
       <div className="flex-1 p-4 sm:p-8 overflow-auto">
         <div className="max-w-5xl mx-auto space-y-8">
