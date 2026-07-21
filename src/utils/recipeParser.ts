@@ -1,4 +1,5 @@
-import { ParsedIngredient, ParsedRecipe } from '@/types/recipe';
+import { ParsedIngredient, ParsedRecipe, RecipeSection } from '@/types/recipe';
+import { classifyRecipe } from './recipeClassification';
 
 /**
  * Volume→weight conversion via canonical units + per-ingredient density.
@@ -210,11 +211,11 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
   // 1. Replace asterisks with newlines
   // 2. Add newlines before common measurement patterns to split continuous text
   // 3. Split compound lines (multiple ingredients on one line)
-  let normalized = ingredientsSection
+  const normalized = ingredientsSection
     .replace(/\s*\*\s*/g, '\n')  // Replace asterisks with newlines
     .replace(/\s+(\d+(?:\.\d+)?)\s*(g|grams?|ml|cups?|tablespoons?|tbsp|teaspoons?|tsp)(?=\s)/gi, '\n$1$2 ')  // Add newline before measurements (with optional space between number and unit)
     .replace(/\s+(\d+)\s+(\d+)\/(\d+)\s+/g, '\n$1 $2/$3 ')  // Add newline before fractions
-    .replace(/\)\s+(\d+[\d\/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
+    .replace(/\)\s+(\d+[\d/]*\s*(?:cup|tablespoon|teaspoon|tbsp|tsp|g|ml|grams?))/gi, ')\n$1');  // Split after closing paren if followed by measurement
     
   const lines = normalized.split('\n');
 
@@ -222,17 +223,28 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
   // etc. are FINISHING items — real parts of the recipe that must be preserved
   // and shown, but never counted as dough (brine water inflating hydration was
   // how an 80% focaccia got reported as 92%).
-  const FINISHING_HEADER = /^(?:for\s+)?(?:the\s+)?(brine|pan\s*&?\s*topping|pan\s+and\s+topping|topping|toppings|glaze|glazing|egg\s*wash|finishing|assembly|garnish|drizzle|to\s+finish|for\s+serving)\b[\s:]*$/i;
+  const FINISHING_HEADER = /^(?:for\s+)?(?:the\s+)?(brine|pan(?:\s+preparation)?\s*&?\s*topping|pan\s+and\s+topping|pan(?:\s+preparation)?|topping|toppings|glaze|glazing|egg\s*wash|finishing|assembly|garnish|drizzle|to\s+finish|for\s+serving)\b[\s:]*$/i;
   const DOUGH_HEADER = /^(?:for\s+)?(?:the\s+)?(dough|final\s+dough|main\s+dough|ingredients|levain|starter\s+build|starter|preferment|poolish|biga|tangzhong|sponge)\b[\s:]*$/i;
   let inFinishingSection = false;
+  let currentSection: RecipeSection = 'dough';
 
   for (const line of lines) {
     const trimmed = line.trim();
 
     // Section headers flip the finishing flag (checked before any skips —
     // headers are short and digit-free, so the skips below would eat them)
-    if (FINISHING_HEADER.test(trimmed)) { inFinishingSection = true; continue; }
-    if (DOUGH_HEADER.test(trimmed)) { inFinishingSection = false; continue; }
+    if (FINISHING_HEADER.test(trimmed)) {
+      inFinishingSection = true;
+      const header = trimmed.toLowerCase();
+      currentSection = header.includes('brine') ? 'brine' : header.includes('pan') ? 'pan-preparation' : header.includes('glaze') ? 'glaze' : header.includes('wash') ? 'wash' : header.includes('garnish') ? 'garnish' : header.includes('topping') ? 'topping' : 'finishing';
+      continue;
+    }
+    if (DOUGH_HEADER.test(trimmed)) {
+      inFinishingSection = false;
+      const header = trimmed.toLowerCase();
+      currentSection = /levain|starter|preferment|poolish|biga|sponge/.test(header) ? 'levain' : /tangzhong/.test(header) ? 'tangzhong' : 'dough';
+      continue;
+    }
 
     // Skip empty lines or very short lines
     if (!trimmed || trimmed.length < 5) continue;
@@ -246,7 +258,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     // CRITICAL FIX: Remove "plus extra for kneading" notes from ingredient lines
     // This handles cases like "500g flour, plus 25-50g more for kneading"
     // Remove the extra portion but keep the main ingredient
-    let cleanedLine = trimmed.replace(/,?\s*(plus|extra|additional)\s+\d+(?:-\d+)?\s*(?:g|grams?)\s+.*?\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface).*$/i, '');
+    const cleanedLine = trimmed.replace(/,?\s*(plus|extra|additional)\s+\d+(?:-\d+)?\s*(?:g|grams?)\s+.*?\s+(for|as)\s+(kneading|dusting|rolling|sprinkling|surface).*$/i, '');
     
     // If the line was ONLY about extra (nothing left after cleaning), skip it
     if (cleanedLine.trim().length < 5 || !/\d/.test(cleanedLine)) {
@@ -268,7 +280,7 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
         type: 'enrichment',
         ...(inFinishingSection ? { isFinishing: true } : {})
       };
-      ingredients.push(eggIngredient);
+      ingredients.push({ ...eggIngredient, section: currentSection, role: currentSection === 'wash' ? 'wash' : 'enrichment', inDough: !inFinishingSection });
 
       // Remove the egg text from the line before processing other ingredients
       const lineWithoutEgg = processLine.replace(new RegExp(eggData.fullText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
@@ -280,6 +292,9 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
           const ingredient = parseIngredientLine(segment);
           if (ingredient) {
             if (inFinishingSection) ingredient.isFinishing = true;
+            ingredient.section = currentSection;
+            ingredient.role = roleForIngredient(ingredient, currentSection);
+            ingredient.inDough = !inFinishingSection;
             ingredients.push(ingredient);
           }
         }
@@ -293,6 +308,9 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
       const ingredient = parseIngredientLine(segment);
       if (ingredient) {
         if (inFinishingSection) ingredient.isFinishing = true;
+        ingredient.section = currentSection;
+        ingredient.role = roleForIngredient(ingredient, currentSection);
+        ingredient.inDough = !inFinishingSection;
         ingredients.push(ingredient);
       }
     }
@@ -333,6 +351,13 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
   const adjustedLiquid = totalLiquid + (starterAmount * starterWaterRatio);
   const hydration = adjustedFlour > 0 ? (adjustedLiquid / adjustedFlour) * 100 : 0;
 
+  const classification = classifyRecipe(methodSection ? `${ingredientsSection}\n${methodSection}` : recipeText, ingredients);
+  const sections = ingredients.reduce((acc, ingredient) => {
+    const section = ingredient.section ?? 'unknown';
+    (acc[section] ??= []).push(ingredient);
+    return acc;
+  }, {} as Record<RecipeSection, ParsedIngredient[]>);
+
   return {
     ingredients,
     method: method.trim(),
@@ -341,8 +366,28 @@ export function parseRecipe(recipeText: string, starterHydration: number = 100):
     starterAmount,
     yeastAmount,
     saltAmount,
-    hydration
+    hydration,
+    classification,
+    sections,
+    sourceIngredients: ingredients.map(i => ({ ...i }))
   };
+}
+
+function roleForIngredient(ingredient: ParsedIngredient, section: RecipeSection): ParsedIngredient['role'] {
+  if (section === 'brine') return 'brine';
+  if (section === 'pan-preparation') return 'pan-coating';
+  if (section === 'topping') return 'topping';
+  if (section === 'glaze') return 'glaze';
+  if (section === 'wash') return 'wash';
+  if (section === 'garnish') return 'garnish';
+  if (ingredient.type === 'yeast' || ingredient.type === 'starter') return 'leavener';
+  if (ingredient.type === 'flour') return 'flour';
+  if (ingredient.type === 'liquid') return 'liquid';
+  if (ingredient.type === 'salt') return 'salt';
+  if (ingredient.type === 'fat') return 'fat';
+  if (ingredient.type === 'sweetener') return 'sweetener';
+  if (ingredient.type === 'enrichment') return 'enrichment';
+  return 'other';
 }
 
 function parseIngredientLine(line: string): ParsedIngredient | null {
@@ -476,7 +521,7 @@ function round1(n: number): number {
 
 function createIngredient(name: string, amount: number, lowerLine: string): ParsedIngredient {
   // CRITICAL FIX: Clean ingredient name - remove instruction contamination
-  let cleanName = name
+  const cleanName = name
     .replace(/,?\s*plus\s+[\d-]+g?\s+(more\s+)?for.*/gi, '') // Remove ", plus 25-50g more for kneading"
     .replace(/(beaten|whisk|mix|combine|add|stir|blend|sift|divide|turn|place|shape|cover|rise|proof|knead|instructions|step|at room temperature|room temperature|neutral).*/gi, '')
     .replace(/,?\s*(for|as|with|in|on|at|to)\s+(greasing|dusting|kneading|rolling|topping|sprinkling|bowl).*/gi, '')

@@ -84,7 +84,7 @@ export function preprocessRecipeText(recipeText: string): PreprocessResult {
     /\bwhole\s+wheat\b/gi,
   ];
   
-  let hasFlourFormat = flourVariations.some(pattern => pattern.test(cleaned));
+  const hasFlourFormat = flourVariations.some(pattern => pattern.test(cleaned));
   if (!hasFlourFormat && /\bflour\b/i.test(cleaned)) {
     // If we see "flour" but no proper format, ensure it's properly separated
     cleaned = cleaned.replace(/(\d+[a-z]*)\s*flour/gi, '$1 all-purpose flour');

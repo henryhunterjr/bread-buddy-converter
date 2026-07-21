@@ -14,11 +14,13 @@
  */
 
 import { ConvertedRecipe, ParsedRecipe, ParsedIngredient, RecipeWarning } from '@/types/recipe';
+import { classifyRecipe, classificationContradictions } from './recipeClassification';
 
 export interface ValidationResult {
   recipe: ConvertedRecipe;
   validationWarnings: RecipeWarning[];
   autoFixes: string[];
+  blockingIssues: string[];
 }
 
 /**
@@ -27,22 +29,25 @@ export interface ValidationResult {
 export function validateConversion(conversion: ConvertedRecipe): ValidationResult {
   const validationWarnings: RecipeWarning[] = [];
   const autoFixes: string[] = [];
+  const blockingIssues: string[] = [];
   
   // Create working copy
   let validatedConversion = { ...conversion };
   
   // Run all validation checks in sequence
-  validatedConversion = validateSalt(validatedConversion, autoFixes, validationWarnings);
+  validatedConversion = validateSalt(validatedConversion, autoFixes, validationWarnings, blockingIssues);
   validatedConversion = validateFlourStructure(validatedConversion, autoFixes, validationWarnings);
   validatedConversion = validateHydration(validatedConversion, autoFixes, validationWarnings);
   validatedConversion = validateIngredientTotals(validatedConversion, autoFixes, validationWarnings);
   validatedConversion = validateBakersPercentages(validatedConversion, autoFixes, validationWarnings);
   validatedConversion = validateEssentialIngredients(validatedConversion, validationWarnings);
+  validateSemanticInvariants(validatedConversion, validationWarnings, blockingIssues);
   
   return {
     recipe: validatedConversion,
     validationWarnings,
-    autoFixes
+    autoFixes,
+    blockingIssues
   };
 }
 
@@ -53,7 +58,8 @@ export function validateConversion(conversion: ConvertedRecipe): ValidationResul
 function validateSalt(
   conversion: ConvertedRecipe,
   autoFixes: string[],
-  warnings: RecipeWarning[]
+  warnings: RecipeWarning[],
+  blockingIssues: string[]
 ): ConvertedRecipe {
   const totalFlour = conversion.converted.totalFlour;
   const currentSalt = conversion.converted.saltAmount;
@@ -64,28 +70,9 @@ function validateSalt(
   const maxSalt = Math.round(totalFlour * 0.03);  // 3%
   
   if (currentSalt === 0 || !currentSalt) {
-    // Missing salt - add default 2%
-    const updatedIngredients = [
-      ...conversion.converted.ingredients,
-      {
-        name: 'salt',
-        amount: recommendedSalt,
-        unit: 'g',
-        type: 'salt' as const,
-        source: 'corrected' as const
-      }
-    ];
-    
-    autoFixes.push(`Added ${recommendedSalt}g salt (2% of flour) - please verify this matches your original recipe`);
-    
-    return {
-      ...conversion,
-      converted: {
-        ...conversion.converted,
-        ingredients: updatedIngredients,
-        saltAmount: recommendedSalt
-      }
-    };
+    blockingIssues.push('Converted recipe has no dough salt. Export requires review rather than inventing an ingredient.');
+    warnings.push({ type: 'warning', message: `No dough salt was found. A typical starting point is ${recommendedSalt}g, but verify the source recipe.` });
+    return conversion;
   } else if (currentSalt < minSalt) {
     warnings.push({
       type: 'caution',
@@ -99,6 +86,32 @@ function validateSalt(
   }
   
   return conversion;
+}
+
+function validateSemanticInvariants(conversion: ConvertedRecipe, warnings: RecipeWarning[], blockingIssues: string[]) {
+  const source = conversion.original.sourceIngredients ?? conversion.original.ingredients;
+  const output = conversion.converted.ingredients;
+  const sourceDough = source.filter(i => !i.isFinishing).reduce((n, i) => n + i.amount, 0);
+  const outputDough = output.filter(i => !i.isFinishing && !/all of the levain/i.test(i.name)).reduce((n, i) => n + i.amount, 0);
+  if (sourceDough > 0 && Math.abs(sourceDough - outputDough) > Math.max(5, sourceDough * 0.08)) {
+    blockingIssues.push(`Dough ingredient conservation changed by ${Math.abs(sourceDough - outputDough).toFixed(1)}g.`);
+  }
+  const classification = conversion.original.classification ?? classifyRecipe(conversion.original.method, source);
+  const contradictions = classificationContradictions(classification, conversion.methodChanges.map(m => `${m.step} ${m.change}`).join(' '));
+  contradictions.forEach(message => {
+    blockingIssues.push(message);
+    warnings.push({ type: 'warning', message });
+  });
+  if (classification.reviewRequired) {
+    warnings.push({ type: 'warning', message: `Recipe classification is low confidence (${Math.round(classification.confidence * 100)}%). The original method should be reviewed before export.` });
+  }
+  if (conversion.original.ingredients.some(i => i.isFinishing) && !conversion.methodChanges.some(m => /brine|topping|glaze|dimple|pan|finish|garnish|wash/i.test(`${m.step} ${m.change}`))) {
+    blockingIssues.push('A finishing section was detected but is not referenced by the converted method.');
+  }
+  if (conversion.converted.ingredients.some(i => i.type === 'fat' && !i.isFinishing) && !conversion.methodChanges.some(m => /oil|butter|fat/i.test(m.change))) {
+    blockingIssues.push('A dough fat is present in ingredients but absent from the method.');
+  }
+  conversion.exportBlocked = blockingIssues.length > 0;
 }
 
 /**

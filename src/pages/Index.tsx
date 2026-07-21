@@ -28,7 +28,7 @@ const Index = () => {
   const [result, setResult] = useState<ConvertedRecipe | null>(null);
   const [originalRecipeText, setOriginalRecipeText] = useState<string>('');
   const [extractedIngredients, setExtractedIngredients] = useState<ParsedIngredient[]>([]);
-  const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<any>(null);
+  const [parsedRecipeForConfirmation, setParsedRecipeForConfirmation] = useState<(ParsedRecipe & { starterHydration?: number }) | null>(null);
   const [recipeName, setRecipeName] = useState<string>('Converted Recipe');
   const [recipeDescription, setRecipeDescription] = useState<string>('');
   const [showHelp, setShowHelp] = useState(false);
@@ -213,7 +213,9 @@ const Index = () => {
     // Add validation warnings to the recipe warnings
     const validatedRecipe = {
       ...validationResult.recipe,
+      exportBlocked: validationResult.blockingIssues.length > 0,
       warnings: [
+        ...validationResult.blockingIssues.map(message => ({ type: 'warning' as const, message: `Export blocked: ${message}` })),
         ...validationResult.validationWarnings,
         ...validationResult.recipe.warnings
       ]
