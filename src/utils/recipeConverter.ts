@@ -33,6 +33,7 @@ import { generateBakerWarnings, detectSpecialTechniques } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
 import { generateSmartWarnings } from './smartWarnings';
+import { classifyRecipe, classificationContradictions } from './recipeClassification';
 
 /**
  * Detects if recipe is a multi-day sourdough requiring complex conversion
@@ -216,6 +217,38 @@ function generateYeastTimeline(
       timing: '25-35 min at 450°F'
     }
   ];
+}
+
+/** Preserve a recipe-specific method while changing only the leavening system.
+ * This is deliberately conservative: equipment, shaping, toppings, brines and
+ * bake instructions are copied from the source instead of guessed from dough
+ * percentages.
+ */
+export function convertSourdoughMethodToYeast(methodText: string, yeastAmount: number): MethodChange[] | null {
+  const cleaned = methodText.replace(/^\s*(method|instructions|directions|steps|process)\s*:?\s*/i, '').trim();
+  if (cleaned.length < 220) return null;
+  const scaleFermentation = (text: string) => text.replace(
+    /(\d+(?:\.\d+)?)(?:\s*(?:[-–]|to)\s*(\d+(?:\.\d+)?))?\s*(hours?|hrs?|minutes?|mins?)\b/gi,
+    (_m, a: string, b: string | undefined, unit: string) => {
+      if (!/(ferment|rise|proof|bulk|rest|overnight|doubled|puffy)/i.test(text)) return _m;
+      const factor = /^h/i.test(unit) ? 1 / 3 : 1 / 3;
+      const fmt = (v: string) => `${Math.max(5, Math.round((parseFloat(v) * factor * (/^h/i.test(unit) ? 60 : 1)) / 5) * 5)} ${/^h/i.test(unit) ? 'minutes' : 'minutes'}`;
+      return b ? `${fmt(a)}–${fmt(b)}` : fmt(a);
+    }
+  );
+  const swap = (text: string) => text
+    .replace(/(?:active\s+)?sourdough\s+starter|ripe\s+levain|levain/gi, `${yeastAmount}g instant yeast`)
+    .replace(/starter/gi, `${yeastAmount}g instant yeast`)
+    .replace(/(?:build|feed|refresh)\s+(?:the\s+)?(?:\d+g\s+)?(?:instant yeast|yeast)[^.]*\.?/gi, `Add ${yeastAmount}g instant yeast to the recipe liquids.`)
+    .replace(/until\s+(?:bubbly|risen|domed|active|doubled)/gi, 'until the yeast is evenly dispersed');
+  const chunks = cleaned.split(/\r?\n(?=\s*\d+\s*[.)]\s+)/).map(c => c.trim()).filter(Boolean).slice(0, 16);
+  if (chunks.length < 2) return null;
+  return chunks.map((chunk, idx) => {
+    const lines = chunk.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const title = lines[0]?.match(/^(?:\d+\s*[.)]\s*)?(.{2,60})$/)?.[1];
+    const body = lines.length > 1 && title && !/[.!?]$/.test(lines[0]) ? lines.slice(1).join(' ') : chunk;
+    return { step: `${idx + 1}. ${(title || `Step ${idx + 1}`).toUpperCase()}`, change: scaleFermentation(swap(body)) };
+  });
 }
 
 /**
@@ -415,10 +448,14 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
 
   // STEP 5: Generate method instructions based on dough type
   const classification = classifyDough(sugarAmount, fatAmount, milkAmount, trueFlour);
+  const recipeClassification = classifyRecipe(originalRecipeText || recipe.method || '', recipe.ingredients);
   
   let methodChanges: MethodChange[];
   
-  if (isMultiDay) {
+  const preservedMethod = originalRecipeText ? convertSourdoughMethodToYeast(recipe.method || originalRecipeText, instantYeastAmount) : null;
+  if (preservedMethod) {
+    methodChanges = preservedMethod;
+  } else if (isMultiDay) {
     // Use restructured timeline for multi-day sourdough conversions
     methodChanges = generateYeastTimeline(classification, true);
   } else {
@@ -517,6 +554,7 @@ export function convertSourdoughToYeast(recipe: ParsedRecipe, originalRecipeText
   ];
 
   const warnings = generateSmartWarnings(converted);
+  classificationContradictions(recipeClassification, methodChanges.map(m => m.change).join(' ')).forEach(message => warnings.push({ type: 'warning', message }));
   const substitutions = generateSubstitutions(converted);
   
   // Add multi-day conversion notice if applicable
@@ -919,6 +957,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
     milkAmount,
     totalFlour
   );
+  const recipeClassification = classifyRecipe(originalRecipeText || recipe.method || '', recipe.ingredients);
 
   // METHOD: preserve the ORIGINAL recipe's instructions whenever we have them.
   // A generic template throws away everything that makes a specific bread
@@ -1004,6 +1043,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   }
 
   const warnings = generateBakerWarnings(converted);
+  classificationContradictions(recipeClassification, methodChanges.map(m => m.change).join(' ')).forEach(message => warnings.push({ type: 'warning', message }));
   const smartWarnings = generateSmartWarnings(recipe);
   const allWarnings = [...smartWarnings, ...warnings];
   const substitutions = generateSubstitutions(converted);
@@ -1030,7 +1070,7 @@ export function calculateBakersPercentages(recipe: ParsedRecipe) {
   // Flour is ALWAYS 100% (the baseline)
   const baseFlour = recipe.totalFlour;
   if (baseFlour <= 0) {
-    return recipe.ingredients.map(ing => ({ ingredient: ing.name, amount: ing.amount, percentage: 0 }));
+    return recipe.ingredients.map(ing => ({ ingredient: ing.name, amount: ing.amount, percentage: 0, isFinishing: ing.isFinishing, formulaNote: ing.isFinishing ? 'not part of dough formula' : 'flour baseline unavailable' }));
   }
 
   return recipe.ingredients
@@ -1042,7 +1082,8 @@ export function calculateBakersPercentages(recipe: ParsedRecipe) {
       amount: ing.amount,
       // Finishing items (brine, toppings) aren't part of the dough formula —
       // no baker's percentage for them
-      percentage: ing.isFinishing ? 0 : Math.round((ing.amount / baseFlour) * 1000) / 10,
-      isFinishing: ing.isFinishing === true
+      percentage: ing.isFinishing ? Math.round((ing.amount / baseFlour) * 1000) / 10 : Math.round((ing.amount / baseFlour) * 1000) / 10,
+      isFinishing: ing.isFinishing === true,
+      formulaNote: ing.isFinishing ? 'not part of dough formula' : undefined
     }));
 }

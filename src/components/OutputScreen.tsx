@@ -83,6 +83,14 @@ export default function OutputScreen({
   };
 
   const handleDownloadPDF = async () => {
+    if (result.exportBlocked) {
+      toast({
+        title: 'Review required before PDF export',
+        description: 'The conversion contains semantic warnings. Correct the source ingredients or method and convert again.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const name = recipeName.trim() || initialRecipeName || 'Converted Recipe';
 
     // Track PDF download
@@ -557,6 +565,8 @@ export default function OutputScreen({
                     variant="outline" 
                     size="lg"
                     onClick={handleDownloadPDF}
+                    disabled={result.exportBlocked}
+                    title={result.exportBlocked ? 'PDF export is blocked until recipe review is complete' : 'Download as PDF'}
                     className="w-full sm:w-auto gap-2"
                   >
                     <Download className="h-5 w-5" />
