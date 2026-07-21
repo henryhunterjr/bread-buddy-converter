@@ -28,7 +28,7 @@
  * Voice: Clear, confident, sensory, encouraging - like a mentor baker.
  */
 
-import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient } from '@/types/recipe';
+import { ParsedRecipe, ConvertedRecipe, MethodChange, ParsedIngredient, BakersPercentage } from '@/types/recipe';
 import { generateBakerWarnings, detectSpecialTechniques } from './recipeParser';
 import { generateSubstitutions } from './substitutions';
 import { classifyDough, getMethodTemplate } from '@/lib/methodTemplates';
@@ -1065,7 +1065,7 @@ export function convertYeastToSourdough(recipe: ParsedRecipe, originalRecipeText
   };
 }
 
-export function calculateBakersPercentages(recipe: ParsedRecipe) {
+export function calculateBakersPercentages(recipe: ParsedRecipe): BakersPercentage[] {
   // Baker's percentage formula: (ingredient weight / total flour weight) × 100
   // Flour is ALWAYS 100% (the baseline)
   const baseFlour = recipe.totalFlour;
